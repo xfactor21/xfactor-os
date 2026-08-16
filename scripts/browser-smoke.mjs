@@ -52,6 +52,40 @@ await check('Command Deck routes to Vault', async () => {
   await page.getByText('BURY IT WITH COORDINATES.').waitFor();
 });
 
+await check('Black Vault file survives reload through IndexedDB', async () => {
+  const fileInput = page.locator('input[type="file"][multiple]');
+  await fileInput.setInputFiles({
+    name: 'browser-smoke-vault.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('xFactor.OS Black Vault IndexedDB persistence smoke'),
+  });
+  await page.getByText('browser-smoke-vault.txt').waitFor();
+  const beforeReload = await page.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('xfactor-os-vault');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    try {
+      if (!db.objectStoreNames.length) return false;
+      const storeName = db.objectStoreNames[0];
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const count = tx.objectStore(storeName).count();
+        count.onsuccess = () => resolve(count.result > 0);
+        count.onerror = () => reject(count.error);
+      });
+    } finally { db.close(); }
+  });
+  if (!beforeReload) throw new Error('Vault IndexedDB contains no persisted blob');
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.keyboard.press('Control+K');
+  const input = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
+  await input.fill('open vault');
+  await input.press('Enter');
+  await page.getByText('browser-smoke-vault.txt').waitFor();
+});
+
 await check('Tape view opens', async () => {
   await page.keyboard.press('Control+K');
   const input = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
