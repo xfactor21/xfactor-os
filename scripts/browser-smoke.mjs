@@ -62,16 +62,15 @@ await check('Black Vault file survives reload through IndexedDB', async () => {
   await page.getByText('browser-smoke-vault.txt').waitFor();
   const beforeReload = await page.evaluate(async () => {
     const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('xfactor-os-vault');
+      const request = indexedDB.open('xfactor-os-assets');
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve(request.result);
     });
     try {
-      if (!db.objectStoreNames.length) return false;
-      const storeName = db.objectStoreNames[0];
+      if (!db.objectStoreNames.contains('blobs')) return false;
       return await new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readonly');
-        const count = tx.objectStore(storeName).count();
+        const tx = db.transaction('blobs', 'readonly');
+        const count = tx.objectStore('blobs').count();
         count.onsuccess = () => resolve(count.result > 0);
         count.onerror = () => reject(count.error);
       });
