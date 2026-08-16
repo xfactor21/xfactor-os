@@ -1,0 +1,39 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.env
+.env.local
+.DS_Store
+*.tsbuildinfo
+
+# Scratch Playwright test harness (mounts <Studio active /> directly,
+# bypassing Supabase Auth, since Design Studio's board/tool data is pure
+# localStorage) — dev-only test scaffolding, deliberately never shipped.
+test-studio.html
+test-studio.tsx
+
+# Scratch Playwright/screenshot harness (mounts <Shell /> directly, bypassing
+# Supabase Auth, for internal design-system screenshot verification) — same
+# dev-only precedent as test-studio.* above, deliberately never shipped.
+test-shell.html
+test-shell.tsx
+
+# Scratch Playwright/screenshot harness (mounts <Onboarding mode="full" />
+# directly, bypassing App.tsx's auth gate) — same dev-only precedent as
+# test-shell.* above, used to verify the Amendment v1.0 bug-fix pass
+# (old hologram/caption removal in the Flight Simulator sequence).
+test-onboarding.html
+test-onboarding.tsx
+
+# One-off Playwright verification scripts used during bug-fix passes —
+# not part of the app, regenerate as needed rather than maintaining.
+verify_*.mjs
+diag_*.mjs
+
+# Scratch harness that seeds fake projects/nodes directly into coreGraph's
+# Zustand state (bypassing Supabase) to exercise Projects/Bug Tracker/
+# Knowledge Matrix delete-button UI without a real signed-in Captain —
+# same dev-only precedent as test-shell.* above.
+test-shell-seeded.html
+test-shell-seeded.tsx
