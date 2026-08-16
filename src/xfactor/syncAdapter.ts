@@ -13,7 +13,11 @@ export class LocalOnlySyncAdapter implements WorkspaceSyncAdapter {
 }
 
 export class SupabaseWorkspaceSyncAdapter implements WorkspaceSyncAdapter {
-  constructor(private ownerId:string) {}
+  private ownerId: string;
+
+  constructor(ownerId: string) {
+    this.ownerId = ownerId;
+  }
 
   async pull(): Promise<WorkspaceState | null> {
     if (!supabaseConfigured) return null;
