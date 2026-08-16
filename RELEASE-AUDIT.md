@@ -2,64 +2,91 @@
 
 ## Current verdict
 
-**SOURCE BUILD COMPLETE FOR THE DEFINED 0.3.0 PRODUCT SCOPE; PUBLIC RELEASE VERIFICATION STILL GATED.**
+**ENGINEERING RELEASE CANDIDATE VERIFIED.**
 
-The earlier 0.2.x build was a compact MVP shell. The 0.3.0 completion pass deliberately filled the largest shallow/partial areas instead of adding unrelated product ideas.
+The defined 0.3.0 source scope now passes clean dependency installation, security audit, static/release checks, TypeScript/Vite production build, real Chromium runtime acceptance, and Tauri packaging on Windows, macOS, and Linux.
+
+This does **not** mean signed public-store distribution is complete. Code signing/notarization, installer smoke on physical target machines, and live Supabase/RLS acceptance remain separate deployment gates where those capabilities are advertised.
 
 ## Completion work performed
 
 ### Core operating system
 - Expanded Incident records with description, next move, priority, relations, archive state, and safer normalization.
-- Blackbox is now a genuine workbench rather than a static summary card.
-- Task open/done counts are derived from real routed Signal tasks instead of trusting decorative counters.
+- Blackbox is a real workbench rather than a static summary card.
+- Task open/done counts derive from routed Signal tasks.
 - Added bidirectional Incident relationships with dangling-relation cleanup.
-- Piles now support removal of individual members in addition to collapse/explode/delete.
-- Saved layout snapshots can be removed as well as restored.
+- Piles support collapse/explode/delete and individual membership removal.
+- Saved layout snapshots can be saved, restored, and removed.
 
 ### Signal / Hotwire
 - Signal records can be edited, retyped, routed/unrouted, pinned, completed, searched, or deleted.
-- Command grammar supports typed task/note/link capture and search, not just generic sparks.
+- Command grammar supports typed task/note/link capture and search.
 
 ### Black Vault
-- Added real local file ingestion through a standard file picker.
-- File blobs persist in IndexedDB instead of being stuffed into localStorage JSON.
+- Real local file ingestion through a file picker.
+- File blobs persist in IndexedDB rather than localStorage JSON.
 - Image/audio/video preview, download, favorite, archive/restore, and delete are implemented.
 - URL/reference assets remain supported.
-- Design Lab board metadata now appears as `studio://` Vault assets and stays synchronized on create/rename/delete.
+- Design Lab board metadata appears as `studio://` Vault assets and follows create/rename/delete events.
 
 ### Tape / backup
-- Added dedicated append-only Tape view.
-- Added normalized JSON workspace backup and restore from UI and Command Deck.
+- Dedicated append-only Tape view.
+- Normalized JSON workspace backup and restore from UI and Command Deck.
 
 ### Account / sync
-- Added an optional account sheet with email/password, signup, magic link, sign-out, and explicit local-only state when cloud is not configured.
+- Optional account sheet with email/password, signup, magic link, sign-out, and explicit local-only state when cloud is not configured.
 - Cloud sync remains local-first and nonfatal.
-- Binary Vault blobs deliberately remain device-local rather than being falsely represented as cloud-synced.
+- Binary Vault blobs intentionally remain device-local.
 
-### Truthfulness cleanup
-- Design Lab board index migrated from `xos-studio-boards-v1` to `xfactor-studio-boards-v1` while reading legacy data once for migration.
-- The build matrix explicitly states that the inherited 3D capability is a viewer, not a character modeling/rigging suite.
-- AI semantic routing and collaborative editing are not claimed.
+## Verified release evidence
 
-## Verification performed here
+### Clean web build and security
+GitHub Actions clean runner verification on Node 22 completed successfully:
+- `npm ci`: pass.
+- `npm audit --omit=dev --audit-level=high`: **0 vulnerabilities**.
+- `npm audit --audit-level=high`: **0 vulnerabilities**.
+- `npm run test:release`: **64/64 pass**.
+- `npm run lint`: **0 errors** (16 non-blocking warnings in inherited/current modules).
+- `npm run build`: TypeScript project build + Vite production build **pass**.
 
-- TypeScript/TSX/JSX syntax transpilation: **91 files, 0 syntax diagnostics** after the 0.3.0 pass.
-- Release smoke suite: **64 checks passed**.
-- Design Lab declared implementations: **25/25 routed**.
-- Runtime payload and Tauri icon existence checks: pass.
-- Workspace normalization, local persistence round-trip, backup export/import, relation cleanup, command grammar, Design Lab event integration and Vault-file implementation checks: pass.
+### Real Chromium acceptance
+The production Vite preview was launched in CI and exercised with Playwright/Chromium. Verified:
+- main shell loads;
+- production preview reports `crossOriginIsolated === true`;
+- first-run workspace is empty;
+- Incident creation survives reload;
+- Hotwire task capture works;
+- Command Deck navigation to Vault works;
+- a real Black Vault file is persisted to IndexedDB and survives reload;
+- Tape opens;
+- Terminal opens;
+- Python runtime boots;
+- Ruby runtime boots;
+- PHP runtime boots;
+- Go runtime boots;
+- Node.js/WebContainers runtime boots;
+- Design Lab opens.
 
-## Why the public-release verdict is not yet READY
+### Design Lab truth boundary
+- **25/25 declared Design Lab modes have concrete production routes.**
+- The Design Lab shell opens in the real browser acceptance run.
+- A full edit/import/export click-through for every one of the 25 tools has **not** been individually automated; this remains a deeper QA pass rather than a source-completeness blocker.
 
-This environment cannot complete a clean npm dependency installation and does not provide the Rust/Tauri compilation toolchain. Therefore the following cannot be honestly marked verified here:
+### Desktop/Tauri
+An isolated GitHub Actions matrix successfully executed `npm ci`, production dependency audit, Rust/Tauri compilation, packaging, and artifact upload on:
+- **Windows** — pass;
+- **macOS** — pass;
+- **Linux** — pass.
 
-1. `npm ci` from a clean checkout.
-2. `npm run lint` with installed project dependencies.
-3. `npm run build` with Vite and dependency type packages.
-4. Real browser interaction acceptance for all 25 Design Lab modes.
-5. Real Node/Python/Ruby/PHP/Go Terminal execution acceptance.
-6. Hosted COOP/COEP verification using the deployed production URL.
-7. Live Supabase authentication + RLS + two-session sync acceptance.
-8. Tauri package compilation, installation, signing, and platform smoke tests.
+Final 0.3.0 package artifacts were produced for all three platforms. They remain unsigned engineering artifacts until signing/notarization and physical install smoke are completed.
 
-Those are verification gates, not placeholders for missing 0.3.0 source features.
+## Remaining deployment gates
+
+1. Code-sign Windows installer and notarize/sign macOS distribution before broad public distribution.
+2. Install the generated packages on physical target machines and run tray/file-picker/restart smoke tests.
+3. If cloud sync is publicly enabled, run live Supabase sign-up/sign-in, RLS isolation, pull/push, reconnect, and two-session conflict acceptance.
+4. If claiming exhaustive Design Lab QA, individually exercise edit/import/export paths for all 25 tools.
+
+## Release-manager conclusion
+
+**0.3.0 is READY as a verified engineering release candidate.** The remaining items are distribution/platform acceptance and optional cloud/deep-tool QA gates, not hidden missing core source features.
