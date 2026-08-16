@@ -26,3 +26,18 @@ jobs:
       - run: npm run test:release
       - run: npm run lint
       - run: npm run build
+      - name: Install Chromium smoke runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.0
+          npx playwright install --with-deps chromium
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/xfactor-preview.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/xfactor-preview.log
+          exit 1
+      - name: Browser runtime smoke
+        run: node scripts/browser-smoke.mjs
