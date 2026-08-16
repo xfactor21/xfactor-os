@@ -68,6 +68,14 @@ await check('Terminal surface opens', async () => {
   await page.getByText('POWER TOOLS, NO TRAINING WHEELS.').waitFor();
 });
 
+for (const runtime of ['PYTHON', 'RUBY', 'PHP', 'GO', 'NODE.JS']) {
+  await check(`Terminal ${runtime} runtime boots`, async () => {
+    const chip = page.locator('#r-terminal .chip').filter({ hasText: runtime }).first();
+    await chip.click();
+    await page.locator('#r-terminal .terminalStatus.ready').waitFor({ state: 'visible', timeout: runtime === 'NODE.JS' ? 30000 : 20000 });
+  });
+}
+
 await check('Design Lab surface opens', async () => {
   await page.keyboard.press('Control+K');
   const input = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
