@@ -2,40 +2,51 @@
 
 Version: **0.3.0**
 
-This matrix exists to prevent “routed” or “scaffolded” from being mistaken for “finished.” `BUILT` means the feature has real source implementation in the production entry path. `VERIFICATION GATE` means the implementation is present but still requires a dependency-backed browser/desktop acceptance run before public release.
+This matrix exists so “routed,” “implemented,” “runtime-verified,” and “distribution-ready” are not conflated. `BUILT` means real source implementation exists in the production entry path. `VERIFIED` means the relevant behavior has passed dependency-backed CI and/or real browser/desktop execution. `DEPLOYMENT GATE` means signing, live cloud, or physical-device acceptance remains outside the engineering build.
 
-| Capability | Status | What is actually built |
+| Capability | Status | What is actually built / verified |
 |---|---|---|
-| The Floor | **BUILT** | Persistent draggable Incident shards, multi-select, manual positioning, status/priority/heat display, empty-state onboarding. |
-| Riot Mode | **BUILT** | Randomizes presentation coordinates/rotation only; canonical Incident data is untouched. |
-| Stack It | **BUILT** | Deterministic layout restoration independent of canonical content. |
+| The Floor | **BUILT + VERIFIED** | Persistent draggable Incident shards, multi-select, positioning, status/priority/heat display, empty-state onboarding. Main shell, first-run, Incident creation and reload persistence pass Chromium acceptance. |
+| Riot Mode | **BUILT** | Randomizes presentation coordinates/rotation only; canonical Incident data is untouched. Covered by release checks. |
+| Stack It | **BUILT** | Deterministic layout restoration independent of canonical content. Covered by release checks. |
 | Saved Damage | **BUILT** | Save, restore, and delete named layout snapshots. |
-| Incidents | **BUILT** | Editable name, type, tagline, long description, next move, status, priority, heat, tags, archive, permanent delete. |
+| Incidents | **BUILT + VERIFIED** | Editable name, type, tagline, description, next move, status, priority, heat, tags, archive, permanent delete; creation and persistence pass browser acceptance. |
 | Piles | **BUILT** | Multi-Incident pile creation, overlapping membership, collapse/explode, rename, remove membership, delete pile. |
-| Signal | **BUILT** | Sparks/tasks/notes/links, edit in place, route/unroute to Incidents, type conversion, pin, complete, delete, search. |
-| Hotwire | **BUILT** | One-line capture with task/note/link/spark modes and automatic routing to a singular selected Incident. |
-| Blackbox | **BUILT** | Full Incident workbench with editable metadata, derived open/done task counts, next move, quick task capture, relations, recent Tape. |
+| Signal | **BUILT + VERIFIED** | Sparks/tasks/notes/links, edit, route/unroute, type conversion, pin, complete, delete, search; Hotwire task capture passes browser acceptance. |
+| Hotwire | **BUILT + VERIFIED** | One-line capture with task/note/link/spark modes and selected-Incident routing; real browser capture passes. |
+| Blackbox | **BUILT** | Incident workbench with editable metadata, derived task counts, next move, quick task capture, relations, recent Tape. |
 | Incident relations | **BUILT** | Bidirectional related-Incident links with integrity cleanup when an Incident is removed. |
-| Tape | **BUILT** | Dedicated append-only activity ledger plus per-Incident recent activity. |
+| Tape | **BUILT + VERIFIED** | Dedicated append-only activity ledger plus per-Incident recent activity; Tape opens in browser acceptance. |
 | Black Vault references | **BUILT** | URL/reference records, project association, favorites, archive/restore, delete, search. |
-| Black Vault files | **BUILT** | Browser/Tauri file picker, IndexedDB blob persistence, image/audio/video previews, download, metadata linkage. |
-| Workspace backup/restore | **BUILT** | Branded JSON export/import with schema normalization before acceptance. |
-| Command Deck | **BUILT** | Keyboard palette, entity search, navigation/actions, natural grammar for new project, capture/task/note/link, search, Riot, Stack. |
-| Global search | **BUILT** | Incident, Signal, and Asset search inside the Command Deck; per-surface search in Signal and Vault. |
-| Design Lab | **BUILT / VERIFICATION GATE** | All 25 declared modes route to concrete implementations inherited from xOS. xFactor board metadata is mirrored into Black Vault and uses a migrated xFactor board index. Runtime behavior still requires browser acceptance testing. |
-| Design Lab → Vault | **BUILT** | New/renamed/deleted Design Lab board metadata emits xFactor events and creates/updates/removes `studio://` Vault records. Existing boards are discovered on app startup. |
-| Terminal | **BUILT / VERIFICATION GATE** | Existing Node/Python/Ruby/PHP/Go runtime surface is mounted directly. Runtime payloads exist, but each runtime still needs execution testing in a successful production build. |
-| Local persistence | **BUILT** | Schema-normalized localStorage workspace plus IndexedDB file blobs; malformed payloads are rejected/normalized. |
-| Cloud account UI | **BUILT / VERIFICATION GATE** | Optional email/password or magic-link account panel. Local-first remains available with no cloud configuration. Live Supabase acceptance/RLS test remains required. |
-| Cloud metadata sync | **BUILT / VERIFICATION GATE** | Owner-scoped Supabase workspace mirror with slow-pull overwrite protection and nonfatal offline behavior. Vault binary blobs intentionally remain device-local. |
-| Desktop route | **BUILT / VERIFICATION GATE** | Tauri identity, tray Hotwire capture, file support, build workflows, icons and capabilities are present. Signed installer build remains unverified here. |
-| First-run experience | **BUILT** | Empty Floor CTA, Hotwire and Command Deck discovery, no fake seeded projects. |
-| Error containment | **BUILT / VERIFICATION GATE** | Root ErrorBoundary, visible persistence/sync warnings, normalized payloads and graceful account errors. Runtime testing still required. |
+| Black Vault files | **BUILT + VERIFIED** | File picker, IndexedDB binary persistence, image/audio/video previews, download, metadata linkage. CI ingests a real file and verifies the blob plus metadata survive reload. |
+| Workspace backup/restore | **BUILT** | Branded JSON export/import with schema normalization before acceptance; release suite validates round-trip behavior. |
+| Command Deck | **BUILT + VERIFIED** | Keyboard palette, entity search, navigation/actions, deterministic natural grammar; browser acceptance verifies real navigation. |
+| Global search | **BUILT** | Incident, Signal, and Asset search inside Command Deck; per-surface search in Signal and Vault. |
+| Design Lab | **BUILT / ROUTES VERIFIED** | All **25/25** declared modes have concrete production routes. Real Chromium acceptance opens the Design Lab shell. Individual edit/import/export click-through for all 25 tools is not yet claimed. |
+| Design Lab → Vault | **BUILT** | New/renamed/deleted board metadata emits xFactor events and creates/updates/removes `studio://` Vault records. Existing boards are discovered on startup. |
+| Terminal | **BUILT + VERIFIED** | Mounted production Terminal surface. Chromium acceptance successfully boots **Python, Ruby, PHP, Go, and Node.js/WebContainers**. |
+| Cross-origin isolation | **VERIFIED** | Production Vite preview returns the required COOP/COEP behavior and `crossOriginIsolated === true` in Chromium. |
+| Local persistence | **BUILT + VERIFIED** | Schema-normalized localStorage workspace plus IndexedDB blobs; Incident metadata and Vault binary persistence survive reload in browser acceptance. |
+| Cloud account UI | **BUILT / DEPLOYMENT GATE** | Optional email/password or magic-link account panel. Local-first remains available with no cloud configuration. Live Supabase acceptance/RLS remains required before advertising cloud sync. |
+| Cloud metadata sync | **BUILT / DEPLOYMENT GATE** | Owner-scoped Supabase workspace mirror with slow-pull overwrite protection and nonfatal offline behavior. Vault binary blobs intentionally remain device-local. |
+| Desktop/Tauri | **BUILT + PACKAGE VERIFIED** | Tauri identity, tray Hotwire capture, file support, icons and capabilities. Clean GitHub Actions packaging passes on **Windows, macOS, and Linux**, with artifacts produced for each. Physical install/signing remains a deployment gate. |
+| First-run experience | **BUILT + VERIFIED** | Empty Floor CTA, Hotwire and Command Deck discovery, no fake seeded projects; browser acceptance passes. |
+| Error containment | **BUILT** | Root ErrorBoundary, visible persistence/sync warnings, normalized payloads and graceful account errors. |
+| Clean dependency install | **VERIFIED** | Node 22 `npm ci` passes from clean GitHub checkout. |
+| Dependency security audit | **VERIFIED** | Production and full npm audit both report **0 vulnerabilities** in release CI. |
+| TypeScript/Vite production build | **VERIFIED** | `tsc -b && vite build` passes in clean release CI. |
+| Release smoke suite | **VERIFIED** | **64/64** release checks pass. |
 
 ## Deliberately not claimed
 
 - xFactor.OS does **not** claim collaborative simultaneous editing.
-- Vault file blobs are **not** cloud-synced in 0.3.0; metadata is. This avoids pretending a JSON workspace row is a binary storage service.
-- The inherited 3D tool is a real GLB/glTF **viewer**, not a full 3D modeling/character-rigging suite.
-- AI semantic routing is not advertised as implemented. The current Command Deck parser is deterministic and local.
-- Public desktop/mobile store readiness is not claimed until package signing and store-specific acceptance are completed.
+- Vault file blobs are **not** cloud-synced in 0.3.0; metadata is.
+- The inherited 3D tool is a GLB/glTF **viewer**, not a full 3D modeling/character-rigging suite.
+- AI semantic routing is not advertised as implemented; Command Deck parsing is deterministic and local.
+- Live Supabase RLS/two-session behavior is not claimed verified until a production cloud target is configured and exercised.
+- All 25 Design Lab modes are routed, but exhaustive edit/import/export QA for every tool is not claimed.
+- Generated desktop packages are engineering artifacts; signed/notarized public distribution and physical installation smoke remain deployment tasks.
+
+## Current release posture
+
+**READY as a verified 0.3.0 engineering release candidate.** Public distribution should wait for the signing/notarization and physical installer smoke appropriate to the intended platform, plus live cloud acceptance only if cloud sync is enabled for users.
