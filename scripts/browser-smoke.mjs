@@ -5,6 +5,13 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const failures = [];
 
+const studioModes = [
+  'draw', 'wireframe', 'animation', 'vector', 'diagram', 'moodboard', 'presentation', 'iconDesign',
+  'imageConverter', 'backgroundRemover', 'paletteGenerator', 'quickPhotoEditor', 'logoMaker', 'pixelArt',
+  'videoTrimmer', 'audioTrimmer', 'pdfMarkup', 'qrGenerator', 'memeGenerator', 'fontPairing',
+  'screenshotAnnotator', 'gifMaker', 'chartBuilder', 'printLayout', 'modelViewer',
+];
+
 const check = async (label, fn) => {
   try { await fn(); console.log(`PASS: ${label}`); }
   catch (error) { failures.push(`${label}: ${error?.message || error}`); console.error(`FAIL: ${label}`); }
@@ -115,6 +122,40 @@ await check('Design Lab surface opens', async () => {
   await input.fill('open lab');
   await input.press('Enter');
   await page.getByRole('button', { name: /EXIT LAB/i }).waitFor();
+});
+
+await check('all 25 Design Lab modes mount in production browser', async () => {
+  await page.getByRole('button', { name: /EXIT LAB/i }).click();
+  await page.evaluate((modes) => {
+    const now = new Date().toISOString();
+    const boards = modes.map((mode, index) => ({
+      id: `browser-smoke-${index}-${mode}`,
+      name: `SMOKE ${mode}`,
+      mode,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    localStorage.setItem('xfactor-studio-boards-v1', JSON.stringify(boards));
+  }, studioModes);
+  await page.reload({ waitUntil: 'networkidle' });
+
+  for (const mode of studioModes) {
+    await page.keyboard.press('Control+K');
+    const input = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
+    await input.fill('open lab');
+    await input.press('Enter');
+    await page.getByRole('button', { name: /EXIT LAB/i }).waitFor();
+
+    const boardName = `SMOKE ${mode}`;
+    await page.locator('.dpBoardCard').filter({ hasText: boardName }).click();
+    await page.locator('#r-studio .rh').filter({ hasText: boardName }).waitFor({ timeout: 15000 });
+    const childCount = await page.locator('#r-studio').evaluate((el) => el.children.length);
+    if (childCount < 2) throw new Error(`${mode} did not mount a tool surface`);
+    console.log(`PASS: Design Lab mode mounts: ${mode}`);
+
+    await page.getByRole('button', { name: /EXIT LAB/i }).click();
+    await page.getByText('xFACTOR.OS').first().waitFor();
+  }
 });
 
 await browser.close();
