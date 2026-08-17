@@ -149,8 +149,7 @@ await check('all 25 Design Lab modes mount in production browser', async () => {
     const boardName = `SMOKE ${mode}`;
     await page.locator('.dpBoardCard').filter({ hasText: boardName }).click();
     await page.locator('#r-studio .rh').filter({ hasText: boardName }).waitFor({ timeout: 15000 });
-    const childCount = await page.locator('#r-studio').evaluate((el) => el.children.length);
-    if (childCount < 2) throw new Error(`${mode} did not mount a tool surface`);
+    await page.locator('#r-studio > :nth-child(2)').waitFor({ state: 'attached', timeout: 15000 });
     console.log(`PASS: Design Lab mode mounts: ${mode}`);
 
     await page.getByRole('button', { name: /EXIT LAB/i }).click();
