@@ -1,0 +1,45 @@
+name: Hosted Production Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'scripts/browser-smoke.mjs'
+      - 'vercel.json'
+      - '.github/workflows/hosted-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hosted:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium smoke runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.0
+          npx playwright install --with-deps chromium
+      - name: Wait for Vercel production to become reachable
+        run: |
+          for i in {1..60}; do
+            if curl -fsS https://xfactor-os-xfactor21s-projects.vercel.app/ >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Production URL did not become reachable in time"
+          exit 1
+      - name: Run full browser smoke against hosted production
+        env:
+          XFACTOR_BASE_URL: https://xfactor-os-xfactor21s-projects.vercel.app
+        run: node scripts/browser-smoke.mjs
