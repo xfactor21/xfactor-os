@@ -13,10 +13,10 @@ interface Props {
 /**
  * Shared editor shell for Design Lab 2.0.
  *
- * This deliberately starts small: every editor gets the same escape route,
- * keyboard-help surface, focus-safe global shortcuts, and status strip. The
- * deeper editors can progressively register their own undo/redo/zoom/save
- * handlers without re-implementing the surrounding UX twenty-five times.
+ * Every editor gets the same escape route, keyboard-help surface, focus-safe
+ * global shortcuts, and status strip. Deeper editors can progressively
+ * register undo/redo/zoom/save handlers without re-implementing the
+ * surrounding UX twenty-five times.
  */
 export default function StudioWorkbench({ boardName, modeLabel, onExit, children }: Props) {
   const [helpOpen, setHelpOpen] = useState(false);
@@ -75,9 +75,7 @@ export default function StudioWorkbench({ boardName, modeLabel, onExit, children
         <span style={{ opacity: 0.24 }}>//</span>
         <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{boardName}</strong>
         <span style={{ marginLeft: 'auto', opacity: 0.5 }}>ESC BACK · ? SHORTCUTS</span>
-        <button className="chip small" onClick={() => setHelpOpen(true)} title="Keyboard shortcuts">
-          ?
-        </button>
+        <button className="chip small" onClick={() => setHelpOpen(true)} title="Keyboard shortcuts">?</button>
       </div>
 
       {children}
@@ -102,7 +100,7 @@ export default function StudioWorkbench({ boardName, modeLabel, onExit, children
         >
           <div className="gpanel" style={{ width: 'min(620px, 94vw)', maxHeight: '82vh', overflow: 'auto', padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <Icon name="keyboard" size={16} />
+              <Icon name="designStudio" size={16} />
               <h3 style={{ margin: 0 }}>DESIGN LAB SHORTCUTS</h3>
               <button className="chip small" onClick={() => setHelpOpen(false)} style={{ marginLeft: 'auto' }}>CLOSE</button>
             </div>
