@@ -4,6 +4,7 @@ import Icon from '../../../design-system/icons/Icon';
 import { isEditableTarget, STUDIO_COMMANDS } from './editorCore';
 import { dispatchStudioCommand } from './studioCommandBus';
 import { dispatchLegacyStudioCommand } from './legacyCommandAdapters';
+import { useDrawPaintNavigation } from './useDrawPaintNavigation';
 
 interface Props {
   boardName: string;
@@ -15,6 +16,7 @@ interface Props {
 /** Shared editor shell for Design Lab 2.0. */
 export default function StudioWorkbench({ boardName, modeLabel, onExit, children }: Props) {
   const [helpOpen, setHelpOpen] = useState(false);
+  useDrawPaintNavigation();
 
   useEffect(() => {
     function runCommand(command: Parameters<typeof dispatchStudioCommand>[0], event: KeyboardEvent) {
@@ -50,6 +52,8 @@ export default function StudioWorkbench({ boardName, modeLabel, onExit, children
 
       if (!mod) {
         const key = event.key.toLowerCase();
+        if (event.altKey && event.key === '[') return runCommand('layerBelow', event);
+        if (event.altKey && event.key === ']') return runCommand('layerAbove', event);
         if (key === 'b') return runCommand('brushTool', event);
         if (key === 'e') return runCommand('eraserTool', event);
         if (key === 'm') return runCommand('marqueeTool', event);
@@ -63,12 +67,13 @@ export default function StudioWorkbench({ boardName, modeLabel, onExit, children
       }
 
       const key = event.key.toLowerCase();
-      let command: 'undo' | 'redo' | 'zoomIn' | 'zoomOut' | 'zoomReset' | 'save' | null = null;
+      let command: Parameters<typeof dispatchStudioCommand>[0] | null = null;
       if (key === 'z') command = event.shiftKey ? 'redo' : 'undo';
       else if (key === 'y') command = 'redo';
       else if (key === '+' || key === '=') command = 'zoomIn';
       else if (key === '-' || key === '_') command = 'zoomOut';
-      else if (key === '0') command = 'zoomReset';
+      else if (key === '0') command = event.shiftKey ? 'zoomFit' : 'zoomReset';
+      else if (key === 'j') command = 'duplicateLayer';
       else if (key === 's') command = 'save';
       if (command) runCommand(command, event);
     }
