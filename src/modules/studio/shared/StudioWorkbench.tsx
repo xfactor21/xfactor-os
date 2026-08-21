@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import Icon from '../../../design-system/icons/Icon';
 import { isEditableTarget, STUDIO_COMMANDS } from './editorCore';
+import { dispatchStudioCommand } from './studioCommandBus';
 
 interface Props {
   boardName: string;
@@ -25,6 +26,7 @@ export default function StudioWorkbench({ boardName, modeLabel, onExit, children
     function onKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
       const editable = isEditableTarget(event.target);
+      const mod = event.metaKey || event.ctrlKey;
 
       if (event.key === '?' && !editable) {
         event.preventDefault();
@@ -42,7 +44,22 @@ export default function StudioWorkbench({ boardName, modeLabel, onExit, children
           event.preventDefault();
           onExit();
         }
+        return;
       }
+
+      if (!mod || editable) return;
+
+      const key = event.key.toLowerCase();
+      let command: 'undo' | 'redo' | 'zoomIn' | 'zoomOut' | 'zoomReset' | 'save' | null = null;
+
+      if (key === 'z') command = event.shiftKey ? 'redo' : 'undo';
+      else if (key === 'y') command = 'redo';
+      else if (key === '+' || key === '=') command = 'zoomIn';
+      else if (key === '-' || key === '_') command = 'zoomOut';
+      else if (key === '0') command = 'zoomReset';
+      else if (key === 's') command = 'save';
+
+      if (command && dispatchStudioCommand(command)) event.preventDefault();
     }
 
     window.addEventListener('keydown', onKeyDown);
@@ -130,7 +147,7 @@ export default function StudioWorkbench({ boardName, modeLabel, onExit, children
               ))}
             </div>
             <p style={{ opacity: 0.48, fontSize: 9, margin: '14px 0 0' }}>
-              Design Lab 2.0 will progressively wire these commands into each editor. Shortcuts never steal keystrokes while typing in an input, textarea, select, or content-editable field.
+              Supported commands are claimed by the active editor. Unsupported shortcuts are left to the browser, and shortcuts never steal keystrokes while typing in an input, textarea, select, or content-editable field.
             </p>
           </div>
         </div>
