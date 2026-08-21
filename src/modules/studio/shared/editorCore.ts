@@ -6,6 +6,7 @@ export type StudioCommandId =
   | 'zoomIn'
   | 'zoomOut'
   | 'zoomReset'
+  | 'zoomFit'
   | 'save'
   | 'brushTool'
   | 'eraserTool'
@@ -15,7 +16,10 @@ export type StudioCommandId =
   | 'eyedropperTool'
   | 'textTool'
   | 'brushSmaller'
-  | 'brushLarger';
+  | 'brushLarger'
+  | 'layerAbove'
+  | 'layerBelow'
+  | 'duplicateLayer';
 
 export interface StudioCommand {
   id: StudioCommandId;
@@ -32,6 +36,7 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
   { id: 'zoomIn', label: 'Zoom in', keys: ['Ctrl/Cmd', '+'], description: 'Zoom the active canvas when supported' },
   { id: 'zoomOut', label: 'Zoom out', keys: ['Ctrl/Cmd', '-'], description: 'Zoom the active canvas when supported' },
   { id: 'zoomReset', label: 'Actual size', keys: ['Ctrl/Cmd', '0'], description: 'Reset canvas zoom to 100% when supported' },
+  { id: 'zoomFit', label: 'Fit canvas', keys: ['Ctrl/Cmd', 'Shift', '0'], description: 'Draw/Paint: fit the entire canvas into the visible workspace' },
   { id: 'save', label: 'Save', keys: ['Ctrl/Cmd', 'S'], description: 'Commit or persist the active document when supported' },
   { id: 'brushTool', label: 'Brush', keys: ['B'], description: 'Draw/Paint: switch to the brush tool' },
   { id: 'eraserTool', label: 'Eraser', keys: ['E'], description: 'Draw/Paint: switch to the eraser tool' },
@@ -42,6 +47,9 @@ export const STUDIO_COMMANDS: StudioCommand[] = [
   { id: 'textTool', label: 'Text', keys: ['T'], description: 'Draw/Paint: switch to the text tool' },
   { id: 'brushSmaller', label: 'Smaller brush', keys: ['['], description: 'Draw/Paint: reduce the active brush size' },
   { id: 'brushLarger', label: 'Larger brush', keys: [']'], description: 'Draw/Paint: increase the active brush size' },
+  { id: 'layerBelow', label: 'Layer below', keys: ['Alt', '['], description: 'Draw/Paint: select the layer immediately below the active layer' },
+  { id: 'layerAbove', label: 'Layer above', keys: ['Alt', ']'], description: 'Draw/Paint: select the layer immediately above the active layer' },
+  { id: 'duplicateLayer', label: 'Duplicate layer', keys: ['Ctrl/Cmd', 'J'], description: 'Draw/Paint: duplicate the active layer' },
 ];
 
 export function isEditableTarget(target: EventTarget | null): boolean {
