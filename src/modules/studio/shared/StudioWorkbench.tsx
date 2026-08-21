@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import Icon from '../../../design-system/icons/Icon';
 import { isEditableTarget, STUDIO_COMMANDS } from './editorCore';
 import { dispatchStudioCommand } from './studioCommandBus';
+import { dispatchLegacyStudioCommand } from './legacyCommandAdapters';
 
 interface Props {
   boardName: string;
@@ -59,7 +60,13 @@ export default function StudioWorkbench({ boardName, modeLabel, onExit, children
       else if (key === '0') command = 'zoomReset';
       else if (key === 's') command = 'save';
 
-      if (command && dispatchStudioCommand(command)) event.preventDefault();
+      if (!command) return;
+
+      // Native Design Lab 2.0 handlers get first refusal. Older editors then
+      // fall through to a conservative DOM adapter that only claims commands
+      // when an existing control performs the exact requested action.
+      const handled = dispatchStudioCommand(command) || dispatchLegacyStudioCommand(command);
+      if (handled) event.preventDefault();
     }
 
     window.addEventListener('keydown', onKeyDown);
