@@ -3,6 +3,8 @@ name: Build xFactor.OS Windows 0.4.0
 on:
   push:
     branches: ['windows-0.4.0']
+  pull_request:
+    branches: ['main']
   workflow_dispatch: {}
 
 permissions:
