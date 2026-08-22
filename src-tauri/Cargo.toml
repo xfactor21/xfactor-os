@@ -1,6 +1,6 @@
 [package]
 name = "xfactor-os"
-version = "0.3.0"
+version = "0.4.0"
 description = "xFactor.OS — controlled chaos for builders, creators, and operators."
 authors = ["xFactor / planet.X"]
 edition = "2021"
