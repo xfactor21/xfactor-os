@@ -4,9 +4,11 @@ import './index.css'
 import App from './App.tsx'
 import './xfactor/brand-refresh.css'
 import { installIncidentUx } from './xfactor/incidentUx'
+import { installIncidentContextUx } from './xfactor/incidentContextUx'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
 
 installIncidentUx()
+installIncidentContextUx()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
