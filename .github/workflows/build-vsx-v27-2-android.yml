@@ -1,12 +1,12 @@
 name: Build Voice Studio X v27.2 Android APK
 
 on:
-  push:
-    branches: ['build-vsx-v27-2-real-apk']
+  pull_request:
+    branches: ['main']
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   android:
@@ -91,3 +91,23 @@ jobs:
             VoiceStudioX-v27.2-verification.txt
           if-no-files-found: error
           retention-days: 7
+
+      - name: Publish temporary APK output branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          OUTDIR="$RUNNER_TEMP/vsx-output"
+          mkdir -p "$OUTDIR"
+          cp "$GITHUB_WORKSPACE/VoiceStudioX-v27.2-GRADLE.apk" "$OUTDIR/"
+          cp "$GITHUB_WORKSPACE/VoiceStudioX-v27.2-verification.txt" "$OUTDIR/"
+          cd "$OUTDIR"
+          git init
+          git config user.name 'VSX Android Builder'
+          git config user.email 'actions@github.com'
+          git checkout -b vsx-apk-output-27-2
+          git add .
+          git commit -m 'Voice Studio X v27.2 real Gradle APK'
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin HEAD:vsx-apk-output-27-2
