@@ -117,6 +117,10 @@ const studioTypes = fs.readFileSync('src/modules/studio/types.ts', 'utf8');
 const modeList = studioTypes.match(/export const IMPLEMENTED_MODES: StudioMode\[\] = \[(.*?)\];/s)?.[1] ?? '';
 const modes = [...modeList.matchAll(/'([A-Za-z]+)'/g)].map(match => match[1]);
 assert('Design Lab advertises exactly 25 implemented modes', modes.length === 25);
-for (const mode of modes) assert(`Design Lab routes implemented mode: ${mode}`, studioIndex.includes(`openBoard.mode === '${mode}'`));
+for (const mode of modes) {
+  const legacyRoute = studioIndex.includes(`openBoard.mode === '${mode}'`);
+  const switchRoute = studioIndex.includes(`case '${mode}':`);
+  assert(`Design Lab routes implemented mode: ${mode}`, legacyRoute || switchRoute);
+}
 
 console.log(`\nRelease smoke checks passed: ${passed}`);
