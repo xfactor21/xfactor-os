@@ -2,19 +2,29 @@ import { DrawEngine } from './DrawEngine';
 
 type Selection = NonNullable<DrawEngine['selection']>;
 type InternalLayer = { meta: { id: string; name: string; opacity: number; blendMode: string; locked: boolean }; canvas: HTMLCanvasElement };
-type InternalEngine = DrawEngine & {
+type InternalEngine = {
+  width: number;
+  height: number;
+  display: HTMLCanvasElement;
   layers: InternalLayer[];
+  activeLayerId: string;
+  selection: Selection | null;
+  activeLayer: () => InternalLayer | null;
+  addLayer: (name?: string, snapshot?: boolean) => string;
+  duplicateLayer: (id: string) => void;
+  composite: () => void;
   pushHistory: () => void;
   onLayersChange: (() => void) | null;
   onHistoryChange: (() => void) | null;
 };
 
-const engines = new WeakMap<HTMLCanvasElement, DrawEngine>();
+const engines = new WeakMap<HTMLCanvasElement, InternalEngine>();
 let installed = false;
 let constructorsPatched = false;
 
 function register(engine: DrawEngine) {
-  engines.set(engine.display, engine);
+  const internal = engine as unknown as InternalEngine;
+  engines.set(engine.display, internal);
   engine.display.dataset.drawProEngine = 'ready';
   return engine;
 }
@@ -32,7 +42,7 @@ function patchConstructors() {
 
 function activeEngine(): InternalEngine | null {
   const canvas = document.querySelector<HTMLCanvasElement>('#dpRoot canvas');
-  return (canvas ? engines.get(canvas) : null) as InternalEngine | null;
+  return canvas ? engines.get(canvas) ?? null : null;
 }
 
 function editableTarget(target: EventTarget | null) {
@@ -70,7 +80,7 @@ function shiftedMask(engine: InternalEngine, selection: Selection, dx: number, d
 function nudgeSelection(dx: number, dy: number) {
   const engine = activeEngine();
   const selection = engine?.selection;
-  const layer = engine?.activeLayer() as InternalLayer | null | undefined;
+  const layer = engine?.activeLayer();
   if (!engine || !selection || !layer || layer.meta.locked) return false;
 
   const b = selection.bounds;
@@ -94,7 +104,7 @@ function nudgeSelection(dx: number, dy: number) {
 function flipSelection(axis: 'horizontal' | 'vertical') {
   const engine = activeEngine();
   const selection = engine?.selection;
-  const layer = engine?.activeLayer() as InternalLayer | null | undefined;
+  const layer = engine?.activeLayer();
   if (!engine || !selection || !layer || layer.meta.locked) return;
 
   engine.pushHistory();
@@ -135,12 +145,12 @@ function flipSelection(axis: 'horizontal' | 'vertical') {
 function selectionToLayer() {
   const engine = activeEngine();
   const selection = engine?.selection;
-  const source = engine?.activeLayer() as InternalLayer | null | undefined;
+  const source = engine?.activeLayer();
   if (!engine || !selection || !source) return;
 
   const pixels = clippedPixels(engine, selection, source);
   engine.addLayer(`${source.meta.name} selection`);
-  const target = engine.activeLayer() as InternalLayer | null;
+  const target = engine.activeLayer();
   if (!target) return;
   target.canvas.getContext('2d')!.drawImage(pixels, 0, 0);
   engine.composite();
@@ -150,7 +160,7 @@ function selectionToLayer() {
 function clearSelectedPixels() {
   const engine = activeEngine();
   const selection = engine?.selection;
-  const layer = engine?.activeLayer() as InternalLayer | null | undefined;
+  const layer = engine?.activeLayer();
   if (!engine || !selection || !layer || layer.meta.locked) return;
   engine.pushHistory();
   eraseSelection(layer, selection);
@@ -161,7 +171,7 @@ function clearSelectedPixels() {
 function mergeDown() {
   const engine = activeEngine();
   if (!engine) return;
-  const idx = engine.layers.findIndex((l) => l.meta.id === engine.activeLayerId);
+  const idx = engine.layers.findIndex((layer) => layer.meta.id === engine.activeLayerId);
   if (idx <= 0) return;
   const top = engine.layers[idx];
   const bottom = engine.layers[idx - 1];
