@@ -5,10 +5,12 @@ import App from './App.tsx'
 import './xfactor/brand-refresh.css'
 import { installIncidentUx } from './xfactor/incidentUx'
 import { installIncidentContextUx } from './xfactor/incidentContextUx'
+import { installDrawProEnhancements } from './modules/studio/draw/drawProEnhancements'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
 
 installIncidentUx()
 installIncidentContextUx()
+installDrawProEnhancements()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
