@@ -1,0 +1,93 @@
+name: Build Voice Studio X v27.2 Android APK
+
+on:
+  push:
+    branches: ['build-vsx-v27-2-real-apk']
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
+
+      - name: Generate clean Capacitor Android project
+        shell: bash
+        run: |
+          set -euxo pipefail
+          WORK="$RUNNER_TEMP/vsx27"
+          mkdir -p "$WORK/dist"
+          cd "$WORK"
+          npm init -y
+          npm install --save-exact @capacitor/core@8.5.0 @capacitor/cli@8.5.0 @capacitor/android@8.5.0
+          printf '<!doctype html><html><body>Voice Studio X</body></html>\n' > dist/index.html
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "co.planetx.voicestudiox",
+            "appName": "Voice Studio X",
+            "webDir": "dist",
+            "server": {
+              "url": "https://vsx-9i09s894x-xfactor21s-projects.vercel.app/?_vercel_share=ugWHgi84EdrPPOi6O4vX1GNcDkx5Lghh",
+              "cleartext": false
+            }
+          }
+          EOF
+          npx cap add android
+          npx cap sync android
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/build.gradle')
+          s = p.read_text()
+          s = s.replace('versionCode 1', 'versionCode 272')
+          s = s.replace('versionName "1.0"', 'versionName "27.2.0"')
+          p.write_text(s)
+          PY
+
+      - name: Build APK with Gradle
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd "$RUNNER_TEMP/vsx27/android"
+          chmod +x gradlew
+          ./gradlew --no-daemon clean assembleDebug
+
+      - name: Verify APK package, icon and signatures
+        shell: bash
+        run: |
+          set -euxo pipefail
+          APK="$RUNNER_TEMP/vsx27/android/app/build/outputs/apk/debug/app-debug.apk"
+          OUT="$GITHUB_WORKSPACE/VoiceStudioX-v27.2-GRADLE.apk"
+          cp "$APK" "$OUT"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$OUT" | tee "$GITHUB_WORKSPACE/VoiceStudioX-v27.2-verification.txt"
+          "$BUILD_TOOLS/aapt" dump badging "$OUT" | tee -a "$GITHUB_WORKSPACE/VoiceStudioX-v27.2-verification.txt"
+          sha256sum "$OUT" | tee -a "$GITHUB_WORKSPACE/VoiceStudioX-v27.2-verification.txt"
+
+      - name: Upload real Gradle-built APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiceStudioX-v27.2-GRADLE-APK
+          path: |
+            VoiceStudioX-v27.2-GRADLE.apk
+            VoiceStudioX-v27.2-verification.txt
+          if-no-files-found: error
+          retention-days: 7
