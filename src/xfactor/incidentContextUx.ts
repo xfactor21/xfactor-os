@@ -11,6 +11,7 @@ type Workspace = {
 let installed = false;
 let host: HTMLElement | null = null;
 let selectedIncidentId: string | undefined;
+let renderScheduled = false;
 
 function readWorkspace(): Workspace | null {
   try {
@@ -23,11 +24,15 @@ function readWorkspace(): Workspace | null {
 
 function writeWorkspace(ws: Workspace) {
   localStorage.setItem(KEY, JSON.stringify(ws));
-  try { new BroadcastChannel('xfactor-os-workspace').postMessage({type:'incident-context-update'}); } catch { /* enhancement only */ }
+  try {
+    const channel = new BroadcastChannel('xfactor-os-workspace');
+    channel.postMessage({type:'incident-context-update'});
+    channel.close();
+  } catch { /* enhancement only */ }
 }
 
 function escapeHtml(value: string) {
-  return value.replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c] ?? c));
+  return value.replace(/[&<>'\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[c] ?? c));
 }
 
 function clickRail(label: string) {
@@ -53,7 +58,7 @@ function render() {
   const ws = readWorkspace();
   const id = selectedIncidentId ?? ws?.selectedIncidentId;
   const incident = ws?.incidents.find(i => i.id === id);
-  if (!ws || !incident) { host.innerHTML = ''; return; }
+  if (!ws || !incident) { host.replaceChildren(); return; }
 
   const signals = ws.signals.filter(s => s.incidentId === incident.id);
   const openTasks = signals.filter(s => s.type === 'task' && !s.done).length;
@@ -87,6 +92,15 @@ function render() {
   `;
 }
 
+function scheduleRender() {
+  if (renderScheduled) return;
+  renderScheduled = true;
+  requestAnimationFrame(() => {
+    renderScheduled = false;
+    render();
+  });
+}
+
 function onClick(event: Event) {
   const target = event.target as HTMLElement;
   const action = target.closest<HTMLButtonElement>('[data-context-action]')?.dataset.contextAction;
@@ -99,14 +113,14 @@ function onClick(event: Event) {
     const ws = readWorkspace(); const id = selectedIncidentId ?? ws?.selectedIncidentId;
     if (!ws || !id) return;
     ws.assets = ws.assets.map(a => a.id === select.value ? {...a, incidentId:id} : a);
-    writeWorkspace(ws); render(); return;
+    writeWorkspace(ws); scheduleRender(); return;
   }
   const detach = target.closest<HTMLButtonElement>('[data-detach-asset]')?.dataset.detachAsset;
   if (detach) {
     const ws = readWorkspace();
     if (!ws) return;
     ws.assets = ws.assets.map(a => a.id === detach ? {...a, incidentId:undefined} : a);
-    writeWorkspace(ws); render();
+    writeWorkspace(ws); scheduleRender();
   }
 }
 
@@ -119,13 +133,26 @@ function onChange(event: Event) {
 export function installIncidentContextUx() {
   if (installed || typeof window === 'undefined') return;
   installed = true;
-  const observer = new MutationObserver(() => { ensureHost(); render(); });
+
+  // React owns the main DOM. Observe only for Blackbox mount/unmount; never
+  // re-render in response to mutations inside our own panel. The previous
+  // implementation called render() for every child mutation while render()
+  // itself replaced innerHTML, creating an unbounded MutationObserver loop
+  // that could freeze the browser and leave the Tauri window white.
+  const observer = new MutationObserver(() => {
+    if (host?.isConnected) return;
+    if (document.querySelector('.xf-blackbox')) scheduleRender();
+  });
   observer.observe(document.documentElement, {childList:true, subtree:true});
+
   window.addEventListener('xfactor:incident-open', ((event: CustomEvent<{incidentId?:string}>) => {
     selectedIncidentId = event.detail?.incidentId;
-    window.setTimeout(render, 0);
+    scheduleRender();
   }) as EventListener);
-  window.addEventListener('storage', event => { if (event.key === KEY) render(); });
-  try { const channel = new BroadcastChannel('xfactor-os-workspace'); channel.onmessage = render; } catch { /* enhancement only */ }
-  window.setTimeout(render, 0);
+  window.addEventListener('storage', event => { if (event.key === KEY) scheduleRender(); });
+  try {
+    const channel = new BroadcastChannel('xfactor-os-workspace');
+    channel.onmessage = scheduleRender;
+  } catch { /* enhancement only */ }
+  scheduleRender();
 }
