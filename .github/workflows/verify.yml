@@ -39,5 +39,7 @@ jobs:
           done
           cat /tmp/xfactor-preview.log
           exit 1
+      - name: Tutorial browser acceptance
+        run: node scripts/tutorial-smoke.mjs
       - name: Browser runtime smoke
         run: node scripts/browser-smoke.mjs
