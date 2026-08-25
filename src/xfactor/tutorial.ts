@@ -170,7 +170,10 @@ export function installXfactorTutorial() {
     window.setTimeout(() => observer.disconnect(), 10000);
   }
 
-  if (!hasCompleted()) {
+  // Real users get the first-run walkthrough automatically. Browser automation
+  // can open it explicitly through the replay button/event so unrelated smoke
+  // flows are not blocked by the modal overlay.
+  if (!hasCompleted() && !navigator.webdriver) {
     window.setTimeout(() => openXfactorTutorial(), 650);
   }
 
