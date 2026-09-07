@@ -62,7 +62,6 @@ await check('component instances attach to a frame and expose variants/constrain
 });
 
 await check('alignment controls operate on multi-selection', async () => {
-  // The newly created component is already selected; duplicate from that state.
   await page.getByRole('button', { name: 'DUPLICATE', exact: true }).click();
   const components = page.locator('.wf2-item.wf2-component');
   if (await components.count() < 2) throw new Error('duplicate did not create a second component');
@@ -85,7 +84,9 @@ await check('prototype link creates a navigable preview', async () => {
   await page.locator('.wf2-playoverlay').waitFor();
   const previewComponent = page.locator('.wf2-previewitem.component').first();
   await previewComponent.waitFor();
-  await previewComponent.click();
+  // Components were deliberately center-aligned above, so they can overlap. Trigger the linked
+  // source directly here; ordinary pointer hit-testing correctly favors the topmost sibling.
+  await previewComponent.evaluate((element) => element.click());
   await page.locator('.wf2-playbar').getByText('Desktop 1440').waitFor();
   await page.getByRole('button', { name: 'EXIT PREVIEW' }).click();
 });
