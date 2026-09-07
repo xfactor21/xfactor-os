@@ -1,447 +1,90 @@
 import { useEffect, useRef, useState } from 'react';
 import Icon from '../../design-system/icons/Icon';
 
-/**
- * MOODBOARD / COLLAGE — item #6 batch 2, tool 3 of 5. A free-form board of
- * draggable/resizable/rotatable tiles (uploaded images, color swatches,
- * text notes) with real z-ordering, a real board background color, and a
- * real PNG export that rasterizes every tile — including rotation — onto
- * an offscreen canvas via context transforms (not a DOM screenshot hack).
- *
- * Honest scope note: this is a 2D freeform collage board (the Milanote-
- * caliber reference in the picker's blurb refers to the free-arrangement
- * interaction model), not a full research/linking/board-hierarchy product
- * — there's one board per Studio board, no nested boards or note-linking.
- */
-
 type TileKind = 'image' | 'swatch' | 'note';
-
+type BoardPreset = 'landscape' | 'square' | 'portrait';
 interface Tile {
-  id: string;
-  kind: TileKind;
-  x: number; // center, board px
-  y: number;
-  w: number;
-  h: number;
-  rot: number; // degrees
-  z: number;
-  // image
-  src?: string;
-  // swatch
-  color?: string;
-  // note
-  text?: string;
-  fg?: string;
-  bg?: string;
+  id:string; kind:TileKind; x:number; y:number; w:number; h:number; rot:number; z:number;
+  visible:boolean; locked:boolean; opacity:number; src?:string; color?:string; text?:string; fg?:string; bg?:string;
 }
+interface MoodDoc { version:2; tiles:Tile[]; bg:string; width:number; height:number; snap:boolean; grid:number; }
 
-const BOARD_W = 1000;
-const BOARD_H = 680;
-const SWATCH_COLORS = ['#7A5CFF', '#00F5FF', '#FF5C8A', '#FFD166', '#3DDC97', '#F4F4F5', '#1A1A2E', '#FF8C42'];
+const PRESETS:Record<BoardPreset,{w:number;h:number}>={landscape:{w:1000,h:680},square:{w:800,h:800},portrait:{w:680,h:960}};
+const SWATCHES=['#FF2D78','#00F5FF','#9D4EDD','#FFD166','#3DDC97','#F4F4F5','#1A1A2E','#FF8C42'];
+let ids=0; const nid=()=>`mt-${Date.now().toString(36)}-${++ids}`;
+const key=(boardId:string)=>`xos-studio-moodboard2-${boardId}`;
+const legacyKey=(boardId:string)=>`xos-studio-moodboard-${boardId}`;
+const blank=():MoodDoc=>({version:2,tiles:[],bg:'#0e0e1a',width:1000,height:680,snap:true,grid:10});
 
-function storageKey(boardId: string) {
-  return `xos-studio-moodboard-${boardId}`;
+function normalize(input:Partial<MoodDoc>):MoodDoc{
+  return {version:2,tiles:(input.tiles??[]).map(t=>({...t,visible:t.visible!==false,locked:!!t.locked,opacity:Number.isFinite(t.opacity)?t.opacity:1})),bg:input.bg??'#0e0e1a',width:Math.max(320,input.width??1000),height:Math.max(320,input.height??680),snap:input.snap!==false,grid:Math.max(4,Math.min(40,input.grid??10))};
 }
-
-let idCounter = 0;
-const genId = () => `mt-${++idCounter}-${Date.now().toString(36)}`;
-
-interface MoodDoc {
-  tiles: Tile[];
-  bg: string;
+function load(boardId:string):MoodDoc{
+  try{const raw=localStorage.getItem(key(boardId));if(raw)return normalize(JSON.parse(raw) as MoodDoc);const old=localStorage.getItem(legacyKey(boardId));if(old)return normalize({...blank(),...(JSON.parse(old) as object)});}catch{/* corrupt */}
+  return blank();
 }
+function nextZ(ts:Tile[]){return ts.reduce((m,t)=>Math.max(m,t.z),0)+1;}
+function snap(v:number,d:MoodDoc){return d.snap?Math.round(v/d.grid)*d.grid:v;}
+function download(blob:Blob,name:string){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);}
 
-function loadDoc(boardId: string): MoodDoc {
-  try {
-    const raw = localStorage.getItem(storageKey(boardId));
-    if (raw) return JSON.parse(raw) as MoodDoc;
-  } catch {
-    /* corrupt storage */
-  }
-  return { tiles: [], bg: '#0e0e1a' };
-}
+export default function MoodboardEditor({boardId,onExit}:{boardId:string;onExit:()=>void}){
+  const [doc,setDoc]=useState<MoodDoc>(()=>load(boardId));
+  const [selectedIds,setSelectedIds]=useState<string[]>([]);
+  const [zoom,setZoom]=useState(1);
+  const boardRef=useRef<HTMLDivElement>(null);
+  const fileInputRef=useRef<HTMLInputElement>(null);
+  const history=useRef<string[]>([]),future=useRef<string[]>([]);
+  const drag=useRef<{kind:'move'|'resize'|'rotate';ids:string[];before:string;startX:number;startY:number;orig:Record<string,{x:number;y:number;w:number;h:number;rot:number}>}|null>(null);
 
-function nextZ(tiles: Tile[]): number {
-  return tiles.reduce((m, t) => Math.max(m, t.z), 0) + 1;
-}
+  useEffect(()=>{const t=setTimeout(()=>{try{localStorage.setItem(key(boardId),JSON.stringify(doc));}catch{/* best effort */}},200);return()=>clearTimeout(t);},[doc,boardId]);
+  const selected=selectedIds.length===1?doc.tiles.find(t=>t.id===selectedIds[0])??null:null;
 
-export default function MoodboardEditor({ boardId, onExit }: { boardId: string; onExit: () => void }) {
-  const [doc, setDoc] = useState<MoodDoc>(() => loadDoc(boardId));
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const boardRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const initDone = useRef(false);
-  const dragRef = useRef<{
-    kind: 'move' | 'resize' | 'rotate';
-    id: string;
-    startClientX: number;
-    startClientY: number;
-    origX: number;
-    origY: number;
-    origW: number;
-    origH: number;
-    origRot: number;
-  } | null>(null);
+  function commit(mutator:(d:MoodDoc)=>void){history.current.push(JSON.stringify(doc));if(history.current.length>80)history.current.shift();future.current=[];const n=structuredClone(doc);mutator(n);setDoc(normalize(n));}
+  function undo(){if(!history.current.length)return;future.current.push(JSON.stringify(doc));setDoc(normalize(JSON.parse(history.current.pop()!) as MoodDoc));}
+  function redo(){if(!future.current.length)return;history.current.push(JSON.stringify(doc));setDoc(normalize(JSON.parse(future.current.pop()!) as MoodDoc));}
+  function patch(id:string,p:Partial<Tile>){commit(d=>{d.tiles=d.tiles.map(t=>t.id===id?{...t,...p}:t);});}
+  function addTile(tile:Omit<Tile,'id'|'z'|'visible'|'locked'|'opacity'>){const id=nid();commit(d=>d.tiles.push({...tile,id,z:nextZ(d.tiles),visible:true,locked:false,opacity:1}));setSelectedIds([id]);}
+  function addSwatch(color:string){addTile({kind:'swatch',x:doc.width/2,y:doc.height/2,w:150,h:150,rot:0,color});}
+  function addNote(){addTile({kind:'note',x:doc.width/2,y:doc.height/2,w:220,h:150,rot:0,text:'New note',fg:'#0e0e1a',bg:'#FFD166'});}
+  function duplicate(){if(!selectedIds.length)return;const newIds:string[]=[];commit(d=>{const originals=d.tiles.filter(t=>selectedIds.includes(t.id));for(const t of originals){const id=nid();newIds.push(id);d.tiles.push({...t,id,x:t.x+20,y:t.y+20,z:nextZ(d.tiles)});}});setSelectedIds(newIds);}
+  function removeSelection(){if(!selectedIds.length)return;commit(d=>{d.tiles=d.tiles.filter(t=>!selectedIds.includes(t.id));});setSelectedIds([]);}
+  function bringFront(id:string){commit(d=>{const t=d.tiles.find(x=>x.id===id);if(t)t.z=nextZ(d.tiles);});}
+  function sendBack(id:string){commit(d=>{const t=d.tiles.find(x=>x.id===id);if(!t)return;const min=Math.min(0,...d.tiles.map(x=>x.z));t.z=min-1;});}
 
-  useEffect(() => {
-    initDone.current = true;
-  }, []);
-  useEffect(() => {
-    if (!initDone.current) return;
-    const t = setTimeout(() => localStorage.setItem(storageKey(boardId), JSON.stringify(doc)), 300);
-    return () => clearTimeout(t);
-  }, [doc, boardId]);
+  function onFilePicked(e:React.ChangeEvent<HTMLInputElement>){const file=e.target.files?.[0];e.target.value='';if(!file)return;const reader=new FileReader();reader.onload=()=>{const src=String(reader.result||'');const img=new Image();img.onload=()=>{const max=320,scale=Math.min(1,max/Math.max(img.width,img.height));addTile({kind:'image',x:doc.width/2,y:doc.height/2,w:img.width*scale,h:img.height*scale,rot:0,src});};img.src=src;};reader.readAsDataURL(file);}
 
-  const tiles = doc.tiles;
-  const selected = tiles.find((t) => t.id === selectedId) ?? null;
+  function boardScale(){const r=boardRef.current?.getBoundingClientRect();return r?r.width/doc.width:1;}
+  function startDrag(kind:'move'|'resize'|'rotate',tile:Tile,e:React.PointerEvent){e.stopPropagation();if(tile.locked)return;const idsToMove=selectedIds.includes(tile.id)?selectedIds:[tile.id];setSelectedIds(idsToMove);const orig:Record<string,{x:number;y:number;w:number;h:number;rot:number}>={};idsToMove.forEach(id=>{const t=doc.tiles.find(x=>x.id===id);if(t)orig[id]={x:t.x,y:t.y,w:t.w,h:t.h,rot:t.rot};});drag.current={kind,ids:idsToMove,before:JSON.stringify(doc),startX:e.clientX,startY:e.clientY,orig};}
+  function onMove(e:React.PointerEvent){const g=drag.current;if(!g)return;const s=boardScale(),dx=(e.clientX-g.startX)/s,dy=(e.clientY-g.startY)/s;setDoc(d=>({...d,tiles:d.tiles.map(t=>{const o=g.orig[t.id];if(!o)return t;if(g.kind==='move')return{...t,x:snap(o.x+dx,d),y:snap(o.y+dy,d)};if(g.kind==='resize'&&g.ids.length===1)return{...t,w:Math.max(30,snap(o.w+dx,d)),h:Math.max(30,snap(o.h+dy,d))};if(g.kind==='rotate'&&g.ids.length===1){const r=boardRef.current?.getBoundingClientRect();if(!r)return t;const cx=r.left+(o.x/doc.width)*r.width,cy=r.top+(o.y/doc.height)*r.height;return{...t,rot:Math.round(Math.atan2(e.clientY-cy,e.clientX-cx)*180/Math.PI+90)};}return t;})}));}
+  function onUp(){if(!drag.current)return;history.current.push(drag.current.before);if(history.current.length>80)history.current.shift();future.current=[];drag.current=null;}
 
-  function updateTile(id: string, patch: Partial<Tile>) {
-    setDoc((d) => ({ ...d, tiles: d.tiles.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
-  }
+  function align(kind:'left'|'center'|'right'|'top'|'middle'|'bottom'){const ts=doc.tiles.filter(t=>selectedIds.includes(t.id));if(ts.length<2)return;const left=Math.min(...ts.map(t=>t.x-t.w/2)),right=Math.max(...ts.map(t=>t.x+t.w/2)),top=Math.min(...ts.map(t=>t.y-t.h/2)),bottom=Math.max(...ts.map(t=>t.y+t.h/2)),cx=(left+right)/2,cy=(top+bottom)/2;commit(d=>{d.tiles=d.tiles.map(t=>!selectedIds.includes(t.id)?t:{...t,x:kind==='left'?left+t.w/2:kind==='right'?right-t.w/2:kind==='center'?cx:t.x,y:kind==='top'?top+t.h/2:kind==='bottom'?bottom-t.h/2:kind==='middle'?cy:t.y});});}
+  function distribute(axis:'h'|'v'){const ts=doc.tiles.filter(t=>selectedIds.includes(t.id)).sort((a,b)=>axis==='h'?a.x-b.x:a.y-b.y);if(ts.length<3)return;const first=ts[0],last=ts[ts.length-1],span=(axis==='h'?last.x-first.x:last.y-first.y);commit(d=>{d.tiles=d.tiles.map(t=>{const i=ts.findIndex(x=>x.id===t.id);if(i<=0||i===ts.length-1)return t;return axis==='h'?{...t,x:first.x+span*i/(ts.length-1)}:{...t,y:first.y+span*i/(ts.length-1)};});});}
 
-  function addTile(t: Omit<Tile, 'id' | 'z'>) {
-    const id = genId();
-    setDoc((d) => ({ ...d, tiles: [...d.tiles, { ...t, id, z: nextZ(d.tiles) }] }));
-    setSelectedId(id);
-  }
+  useEffect(()=>{function keydown(e:KeyboardEvent){const el=e.target as HTMLElement|null;if(el?.matches('input,textarea,select,[contenteditable="true"]'))return;const mod=e.metaKey||e.ctrlKey;if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return;}if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redo();return;}if(mod&&e.key.toLowerCase()==='d'){e.preventDefault();duplicate();return;}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();removeSelection();return;}if(selectedIds.length){const dx=e.key==='ArrowLeft'?-1:e.key==='ArrowRight'?1:0,dy=e.key==='ArrowUp'?-1:e.key==='ArrowDown'?1:0;if(dx||dy){e.preventDefault();const step=e.shiftKey?10:1;commit(d=>{d.tiles=d.tiles.map(t=>selectedIds.includes(t.id)&&!t.locked?{...t,x:t.x+dx*step,y:t.y+dy*step}:t);});}}}window.addEventListener('keydown',keydown);return()=>window.removeEventListener('keydown',keydown);},[doc,selectedIds]);
 
-  function addSwatch(color: string) {
-    addTile({ kind: 'swatch', x: BOARD_W / 2, y: BOARD_H / 2, w: 140, h: 140, rot: 0, color });
-  }
+  async function exportPng(){const c=document.createElement('canvas');c.width=doc.width;c.height=doc.height;const ctx=c.getContext('2d');if(!ctx)return;ctx.fillStyle=doc.bg;ctx.fillRect(0,0,doc.width,doc.height);const sorted=[...doc.tiles].filter(t=>t.visible).sort((a,b)=>a.z-b.z);const cache=new Map<string,HTMLImageElement>();for(const t of sorted){ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,t.opacity));ctx.translate(t.x,t.y);ctx.rotate(t.rot*Math.PI/180);if(t.kind==='image'&&t.src){let img=cache.get(t.src);if(!img){img=await new Promise<HTMLImageElement>((resolve,reject)=>{const x=new Image();x.onload=()=>resolve(x);x.onerror=reject;x.src=t.src!;});cache.set(t.src,img);}ctx.drawImage(img,-t.w/2,-t.h/2,t.w,t.h);}else if(t.kind==='swatch'){ctx.fillStyle=t.color??'#FF2D78';ctx.fillRect(-t.w/2,-t.h/2,t.w,t.h);}else{ctx.fillStyle=t.bg??'#FFD166';ctx.fillRect(-t.w/2,-t.h/2,t.w,t.h);ctx.fillStyle=t.fg??'#0e0e1a';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';wrapText(ctx,t.text??'',0,0,t.w-20,20);}ctx.restore();}c.toBlob(b=>b&&download(b,'moodboard.png'),'image/png');}
+  function exportJson(){download(new Blob([JSON.stringify(doc,null,2)],{type:'application/json'}),'moodboard.json');}
+  function applyPreset(p:BoardPreset){const s=PRESETS[p];commit(d=>{d.width=s.w;d.height=s.h;d.tiles=d.tiles.map(t=>({...t,x:Math.min(s.w-20,Math.max(20,t.x)),y:Math.min(s.h-20,Math.max(20,t.y))}));});}
 
-  function addNote() {
-    addTile({ kind: 'note', x: BOARD_W / 2, y: BOARD_H / 2, w: 200, h: 140, rot: 0, text: 'New note', fg: '#0e0e1a', bg: '#FFD166' });
-  }
-
-  function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const src = reader.result as string;
-      const img = new Image();
-      img.onload = () => {
-        const maxDim = 260;
-        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-        addTile({ kind: 'image', x: BOARD_W / 2, y: BOARD_H / 2, w: img.width * scale, h: img.height * scale, rot: 0, src });
-      };
-      img.src = src;
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function bringToFront(id: string) {
-    setDoc((d) => ({ ...d, tiles: d.tiles.map((t) => (t.id === id ? { ...t, z: nextZ(d.tiles) } : t)) }));
-  }
-
-  function deleteSelected() {
-    if (!selectedId) return;
-    setDoc((d) => ({ ...d, tiles: d.tiles.filter((t) => t.id !== selectedId) }));
-    setSelectedId(null);
-  }
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.key === 'Backspace' || e.key === 'Delete') && selectedId) {
-        const tag = (e.target as HTMLElement)?.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-        e.preventDefault();
-        deleteSelected();
-      }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
-
-  function startDrag(kind: 'move' | 'resize' | 'rotate', tile: Tile, e: React.PointerEvent) {
-    e.stopPropagation();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    setSelectedId(tile.id);
-    bringToFront(tile.id);
-    dragRef.current = {
-      kind,
-      id: tile.id,
-      startClientX: e.clientX,
-      startClientY: e.clientY,
-      origX: tile.x,
-      origY: tile.y,
-      origW: tile.w,
-      origH: tile.h,
-      origRot: tile.rot,
-    };
-  }
-
-  function boardScale(): number {
-    const el = boardRef.current;
-    if (!el) return 1;
-    return el.getBoundingClientRect().width / BOARD_W;
-  }
-
-  function onPointerMove(e: React.PointerEvent) {
-    const drag = dragRef.current;
-    if (!drag) return;
-    const scale = boardScale();
-    const dx = (e.clientX - drag.startClientX) / scale;
-    const dy = (e.clientY - drag.startClientY) / scale;
-    if (drag.kind === 'move') {
-      updateTile(drag.id, { x: drag.origX + dx, y: drag.origY + dy });
-    } else if (drag.kind === 'resize') {
-      updateTile(drag.id, {
-        w: Math.max(30, drag.origW + dx),
-        h: Math.max(30, drag.origH + dy),
-      });
-    } else if (drag.kind === 'rotate') {
-      const el = boardRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const cx = rect.left + (drag.origX / BOARD_W) * rect.width;
-      const cy = rect.top + (drag.origY / BOARD_H) * rect.height;
-      const angle = (Math.atan2(e.clientY - cy, e.clientX - cx) * 180) / Math.PI + 90;
-      updateTile(drag.id, { rot: Math.round(angle) });
-    }
-  }
-
-  function onPointerUp() {
-    dragRef.current = null;
-  }
-
-  // Real PNG export: rasterizes every tile (image/swatch/note) onto an
-  // offscreen canvas, honoring each tile's rotation via ctx transforms —
-  // not a DOM-to-image screenshot shortcut.
-  async function exportPng() {
-    const canvas = document.createElement('canvas');
-    canvas.width = BOARD_W;
-    canvas.height = BOARD_H;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.fillStyle = doc.bg;
-    ctx.fillRect(0, 0, BOARD_W, BOARD_H);
-
-    const sorted = [...doc.tiles].sort((a, b) => a.z - b.z);
-    const imageCache = new Map<string, HTMLImageElement>();
-    async function loadImg(src: string): Promise<HTMLImageElement> {
-      if (imageCache.has(src)) return imageCache.get(src)!;
-      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const im = new Image();
-        im.onload = () => resolve(im);
-        im.onerror = reject;
-        im.src = src;
-      });
-      imageCache.set(src, img);
-      return img;
-    }
-
-    for (const t of sorted) {
-      ctx.save();
-      ctx.translate(t.x, t.y);
-      ctx.rotate((t.rot * Math.PI) / 180);
-      if (t.kind === 'image' && t.src) {
-        try {
-          const img = await loadImg(t.src);
-          ctx.drawImage(img, -t.w / 2, -t.h / 2, t.w, t.h);
-        } catch {
-          /* skip unloadable image */
-        }
-      } else if (t.kind === 'swatch') {
-        ctx.fillStyle = t.color ?? '#7A5CFF';
-        ctx.fillRect(-t.w / 2, -t.h / 2, t.w, t.h);
-      } else if (t.kind === 'note') {
-        ctx.fillStyle = t.bg ?? '#FFD166';
-        ctx.fillRect(-t.w / 2, -t.h / 2, t.w, t.h);
-        ctx.fillStyle = t.fg ?? '#0e0e1a';
-        ctx.font = '16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        wrapText(ctx, t.text ?? '', 0, 0, t.w - 20, 20);
-      }
-      ctx.restore();
-    }
-
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'moodboard.png';
-      a.click();
-      URL.revokeObjectURL(url);
-    }, 'image/png');
-  }
-
-  function wrapText(ctx: CanvasRenderingContext2D, text: string, cx: number, cy: number, maxWidth: number, lineHeight: number) {
-    const words = text.split(/\s+/);
-    const lines: string[] = [];
-    let cur = '';
-    for (const w of words) {
-      const test = cur ? `${cur} ${w}` : w;
-      if (ctx.measureText(test).width > maxWidth && cur) {
-        lines.push(cur);
-        cur = w;
-      } else {
-        cur = test;
-      }
-    }
-    if (cur) lines.push(cur);
-    const startY = cy - ((lines.length - 1) * lineHeight) / 2;
-    lines.forEach((line, i) => ctx.fillText(line, cx, startY + i * lineHeight));
-  }
-
-  return (
-    <div className="toolShell" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-      <div className="toolShellBar">
-        <button className="toolBtn" onClick={onExit}>
-          <Icon name="chevronLeft" size={16} /> Boards
-        </button>
-        <div className="toolRow" style={{ gap: 8 }}>
-          <button className="toolBtn" onClick={() => fileInputRef.current?.click()}>
-            <Icon name="image" size={16} /> Add Image
-          </button>
-          <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={onFilePicked} />
-          <button className="toolBtn" onClick={addNote}>
-            <Icon name="text" size={16} /> Add Note
-          </button>
-          {selected && (
-            <button className="toolBtn" onClick={deleteSelected}>
-              <Icon name="trash" size={16} /> Delete
-            </button>
-          )}
-        </div>
-        <div className="toolRow" style={{ gap: 8, marginLeft: 'auto' }}>
-          <label className="toolHint">
-            Background{' '}
-            <input type="color" value={doc.bg} onChange={(e) => setDoc((d) => ({ ...d, bg: e.target.value }))} />
-          </label>
-          <button className="toolBtn" onClick={exportPng}>
-            Export PNG
-          </button>
-        </div>
-      </div>
-      <div className="toolShellBody" style={{ display: 'flex', gap: 16 }}>
-        <div className="toolCol" style={{ width: 180, gap: 8 }}>
-          <div className="toolHint">Swatches</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-            {SWATCH_COLORS.map((c) => (
-              <button
-                key={c}
-                onClick={() => addSwatch(c)}
-                style={{ width: 32, height: 32, borderRadius: 6, background: c, border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer' }}
-                title={c}
-              />
-            ))}
-          </div>
-          {selected && (
-            <div className="toolField" style={{ marginTop: 12 }}>
-              <div className="toolHint">Selected tile</div>
-              {selected.kind === 'swatch' && (
-                <input
-                  type="color"
-                  value={selected.color ?? '#7A5CFF'}
-                  onChange={(e) => updateTile(selected.id, { color: e.target.value })}
-                />
-              )}
-              {selected.kind === 'note' && (
-                <>
-                  <textarea
-                    value={selected.text ?? ''}
-                    onChange={(e) => updateTile(selected.id, { text: e.target.value })}
-                    rows={3}
-                    style={{ width: '100%' }}
-                  />
-                  <div className="toolRow" style={{ gap: 6, marginTop: 6 }}>
-                    <label className="toolHint">
-                      BG <input type="color" value={selected.bg ?? '#FFD166'} onChange={(e) => updateTile(selected.id, { bg: e.target.value })} />
-                    </label>
-                    <label className="toolHint">
-                      Text <input type="color" value={selected.fg ?? '#0e0e1a'} onChange={(e) => updateTile(selected.id, { fg: e.target.value })} />
-                    </label>
-                  </div>
-                </>
-              )}
-              <div className="toolHint" style={{ marginTop: 6 }}>
-                Rotation: {selected.rot}°
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="toolCanvasWrap" style={{ display: 'inline-block' }}>
-          <div
-            ref={boardRef}
-            style={{
-              position: 'relative',
-              width: BOARD_W,
-              height: BOARD_H,
-              background: doc.bg,
-              overflow: 'hidden',
-              borderRadius: 8,
-              userSelect: 'none',
-            }}
-            onPointerDown={() => setSelectedId(null)}
-          >
-            {[...tiles]
-              .sort((a, b) => a.z - b.z)
-              .map((t) => {
-                const isSel = t.id === selectedId;
-                const leftPct = ((t.x - t.w / 2) / BOARD_W) * 100;
-                const topPct = ((t.y - t.h / 2) / BOARD_H) * 100;
-                const wPct = (t.w / BOARD_W) * 100;
-                const hPct = (t.h / BOARD_H) * 100;
-                return (
-                  <div
-                    key={t.id}
-                    onPointerDown={(e) => startDrag('move', t, e)}
-                    style={{
-                      position: 'absolute',
-                      left: `${leftPct}%`,
-                      top: `${topPct}%`,
-                      width: `${wPct}%`,
-                      height: `${hPct}%`,
-                      transform: `rotate(${t.rot}deg)`,
-                      outline: isSel ? '2px solid #00F5FF' : 'none',
-                      cursor: 'move',
-                      boxShadow: t.kind === 'image' ? '0 4px 14px rgba(0,0,0,0.35)' : 'none',
-                    }}
-                  >
-                    {t.kind === 'image' && t.src && (
-                      <img src={t.src} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 4, pointerEvents: 'none' }} />
-                    )}
-                    {t.kind === 'swatch' && <div style={{ width: '100%', height: '100%', background: t.color, borderRadius: 4 }} />}
-                    {t.kind === 'note' && (
-                      <div
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          background: t.bg,
-                          color: t.fg,
-                          borderRadius: 4,
-                          padding: 10,
-                          fontSize: 13,
-                          overflow: 'hidden',
-                          whiteSpace: 'pre-wrap',
-                          pointerEvents: 'none',
-                        }}
-                      >
-                        {t.text}
-                      </div>
-                    )}
-                    {isSel && (
-                      <>
-                        <div
-                          onPointerDown={(e) => startDrag('resize', t, e)}
-                          style={{ position: 'absolute', right: -6, bottom: -6, width: 14, height: 14, background: '#00F5FF', borderRadius: 3, cursor: 'nwse-resize' }}
-                        />
-                        <div
-                          onPointerDown={(e) => startDrag('rotate', t, e)}
-                          style={{ position: 'absolute', left: '50%', top: -26, width: 12, height: 12, marginLeft: -6, background: '#FF5C8A', borderRadius: '50%', cursor: 'grab' }}
-                        />
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      </div>
+  const sorted=[...doc.tiles].sort((a,b)=>a.z-b.z);
+  return <div className="toolShell moodboard2" data-testid="moodboard-2-root" onPointerMove={onMove} onPointerUp={onUp}>
+    <div className="toolShellBar"><button className="chip" onClick={onExit}><Icon name="chevronLeft" size={12}/> ALL BOARDS</button><h3 className="toolShellTitle">MOODBOARD / COLLAGE 2.0</h3><div className="toolShellActions" style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+      <button className="chip small" onClick={()=>fileInputRef.current?.click()}>+ IMAGE</button><input ref={fileInputRef} hidden type="file" accept="image/*" onChange={onFilePicked}/><button className="chip small" onClick={addNote}>+ NOTE</button><button className="chip small" disabled={!history.current.length} onClick={undo}>UNDO</button><button className="chip small" disabled={!future.current.length} onClick={redo}>REDO</button><button className={`chip small ${doc.snap?'on':''}`} onClick={()=>commit(d=>{d.snap=!d.snap;})}>SNAP {doc.grid}</button><button className="wbtn" onClick={exportPng}>PNG</button><button className="wbtn ghost" onClick={exportJson}>JSON</button>
+    </div></div>
+    <div className="toolShellBody" style={{display:'grid',gridTemplateColumns:'225px minmax(0,1fr) 210px',gap:12}}>
+      <aside className="gpanel" style={{padding:10}}><h3>ADD / INSPECT</h3><div className="toolHint">SWATCHES</div><div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>{SWATCHES.map(c=><button key={c} aria-label={`swatch ${c}`} onClick={()=>addSwatch(c)} style={{height:34,borderRadius:5,background:c,border:'1px solid rgba(255,255,255,.18)'}}/>)}</div>
+        {selectedIds.length>1&&<><h3 style={{marginTop:14}}>{selectedIds.length} SELECTED</h3><div className="toolRow" style={{gap:4,flexWrap:'wrap'}}>{(['left','center','right','top','middle','bottom'] as const).map(k=><button className="chip small" key={k} onClick={()=>align(k)}>{k.toUpperCase()}</button>)}</div><div className="toolRow" style={{gap:4,marginTop:5}}><button className="chip small" onClick={()=>distribute('h')}>DIST H</button><button className="chip small" onClick={()=>distribute('v')}>DIST V</button></div></>}
+        {selected&&<><h3 style={{marginTop:14}}>SELECTED TILE</h3>{selected.kind==='note'&&<><textarea rows={4} value={selected.text??''} onChange={e=>patch(selected.id,{text:e.target.value})} style={{width:'100%'}}/><div className="toolRow"><label className="toolHint">BG <input type="color" value={selected.bg??'#FFD166'} onChange={e=>patch(selected.id,{bg:e.target.value})}/></label><label className="toolHint">TEXT <input type="color" value={selected.fg??'#0e0e1a'} onChange={e=>patch(selected.id,{fg:e.target.value})}/></label></div></>}{selected.kind==='swatch'&&<input type="color" value={selected.color??'#FF2D78'} onChange={e=>patch(selected.id,{color:e.target.value})}/>}<div className="toolRow"><label className="toolField">X<input type="number" value={Math.round(selected.x)} onChange={e=>patch(selected.id,{x:Number(e.target.value)})}/></label><label className="toolField">Y<input type="number" value={Math.round(selected.y)} onChange={e=>patch(selected.id,{y:Number(e.target.value)})}/></label></div><div className="toolRow"><label className="toolField">W<input type="number" min={30} value={Math.round(selected.w)} onChange={e=>patch(selected.id,{w:Number(e.target.value)})}/></label><label className="toolField">H<input type="number" min={30} value={Math.round(selected.h)} onChange={e=>patch(selected.id,{h:Number(e.target.value)})}/></label></div><label className="toolField">ROTATION<input type="number" value={selected.rot} onChange={e=>patch(selected.id,{rot:Number(e.target.value)})}/></label><label className="toolField">OPACITY<input type="range" min={0} max={1} step={.05} value={selected.opacity} onChange={e=>patch(selected.id,{opacity:Number(e.target.value)})}/></label><div className="toolRow" style={{gap:4,flexWrap:'wrap'}}><button className="chip small" onClick={duplicate}>DUPLICATE</button><button className="chip small" onClick={()=>bringFront(selected.id)}>FRONT</button><button className="chip small" onClick={()=>sendBack(selected.id)}>BACK</button><button className={`chip small ${selected.locked?'on':''}`} onClick={()=>patch(selected.id,{locked:!selected.locked})}>{selected.locked?'LOCKED':'UNLOCKED'}</button></div></>}
+      </aside>
+      <div style={{overflow:'auto',minWidth:0}}><div style={{display:'flex',gap:4,justifyContent:'flex-end',marginBottom:6}}><button className="chip small" onClick={()=>setZoom(z=>Math.max(.4,z-.1))}>−</button><span className="chip small">{Math.round(zoom*100)}%</span><button className="chip small" onClick={()=>setZoom(z=>Math.min(1.6,z+.1))}>+</button><button className="chip small" onClick={()=>setZoom(1)}>100%</button></div><div style={{width:doc.width*zoom,height:doc.height*zoom}}><div ref={boardRef} data-testid="moodboard-stage" onPointerDown={()=>setSelectedIds([])} style={{position:'relative',width:doc.width,height:doc.height,transform:`scale(${zoom})`,transformOrigin:'top left',background:doc.bg,backgroundImage:doc.snap?'linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px)':'none',backgroundSize:`${doc.grid}px ${doc.grid}px`,overflow:'hidden',border:'1px solid var(--edge)',borderRadius:8,userSelect:'none'}}>
+        {sorted.filter(t=>t.visible).map(t=>{const sel=selectedIds.includes(t.id);return <div key={t.id} data-testid={`mood-tile-${t.kind}`} onPointerDown={e=>{e.stopPropagation();const next=e.shiftKey?(selectedIds.includes(t.id)?selectedIds.filter(x=>x!==t.id):[...selectedIds,t.id]):(selectedIds.includes(t.id)?selectedIds:[t.id]);setSelectedIds(next);if(!t.locked)startDrag('move',t,e);}} style={{position:'absolute',left:t.x-t.w/2,top:t.y-t.h/2,width:t.w,height:t.h,transform:`rotate(${t.rot}deg)`,zIndex:t.z,opacity:t.opacity,border:sel?'2px solid #FF2D78':'1px solid rgba(255,255,255,.12)',boxSizing:'border-box',cursor:t.locked?'not-allowed':'move',background:t.kind==='swatch'?t.color:t.kind==='note'?t.bg:'transparent',color:t.fg,overflow:'hidden'}}>
+          {t.kind==='image'&&t.src&&<img src={t.src} alt="moodboard" draggable={false} style={{width:'100%',height:'100%',objectFit:'cover',display:'block',pointerEvents:'none'}}/>}{t.kind==='note'&&<div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',padding:10,textAlign:'center',boxSizing:'border-box',whiteSpace:'pre-wrap',pointerEvents:'none'}}>{t.text}</div>}{sel&&selectedIds.length===1&&!t.locked&&<><div onPointerDown={e=>startDrag('resize',t,e)} style={{position:'absolute',right:-1,bottom:-1,width:12,height:12,background:'#00F5FF',cursor:'nwse-resize'}}/><div onPointerDown={e=>startDrag('rotate',t,e)} style={{position:'absolute',left:'50%',top:-2,width:12,height:12,marginLeft:-6,background:'#FF2D78',borderRadius:'50%',cursor:'grab'}}/></>}
+        </div>;})}
+      </div></div><div className="toolHint" style={{marginTop:6}}>Shift-click multi-select · drag to arrange · cyan handle resizes · pink handle rotates · Ctrl/Cmd+D duplicate · arrows nudge · Shift+arrows 10px.</div></div>
+      <aside className="gpanel" style={{padding:10}}><h3>BOARD / LAYERS</h3><label className="toolField">BACKGROUND<input type="color" value={doc.bg} onChange={e=>commit(d=>{d.bg=e.target.value;})}/></label><div className="toolRow" style={{gap:4,flexWrap:'wrap'}}>{(['landscape','square','portrait'] as BoardPreset[]).map(p=><button key={p} className="chip small" onClick={()=>applyPreset(p)}>{p.toUpperCase()}</button>)}</div><div className="toolHint" style={{marginTop:10}}>{doc.width} × {doc.height}</div><h3 style={{marginTop:14}}>LAYERS</h3><div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:390,overflow:'auto'}}>{[...doc.tiles].sort((a,b)=>b.z-a.z).map(t=><div key={t.id} className="layer-row" onClick={()=>setSelectedIds([t.id])} style={{borderColor:selectedIds.includes(t.id)?'var(--cyan)':undefined,opacity:t.visible?1:.45}}><span className="lbl">{t.kind.toUpperCase()} · {t.kind==='note'?(t.text??'').slice(0,14):t.kind==='swatch'?t.color:'IMAGE'}</span><span style={{display:'flex',gap:2}}><button className="chip small" onClick={e=>{e.stopPropagation();patch(t.id,{visible:!t.visible});}}>{t.visible?'◉':'○'}</button><button className={`chip small ${t.locked?'on':''}`} onClick={e=>{e.stopPropagation();patch(t.id,{locked:!t.locked});}}>{t.locked?'L':'U'}</button></span></div>)}</div></aside>
     </div>
-  );
+  </div>;
 }
+
+function wrapText(ctx:CanvasRenderingContext2D,text:string,cx:number,cy:number,maxWidth:number,lineHeight:number){const words=text.split(/\s+/),lines:string[]=[];let cur='';for(const w of words){const test=cur?`${cur} ${w}`:w;if(ctx.measureText(test).width>maxWidth&&cur){lines.push(cur);cur=w;}else cur=test;}if(cur)lines.push(cur);const start=cy-((lines.length-1)*lineHeight)/2;lines.forEach((line,i)=>ctx.fillText(line,cx,start+i*lineHeight));}
