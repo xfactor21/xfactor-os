@@ -9,6 +9,7 @@ const check = async (label, fn) => {
   catch (error) { failures.push(`${label}: ${error?.message || error}`); console.error(`FAIL: ${label}`, error); }
 };
 page.on('pageerror', (error) => failures.push(`pageerror: ${error.message}`));
+const allowAutosave = () => page.waitForTimeout(300);
 
 await page.goto(base, { waitUntil: 'networkidle' });
 await page.evaluate(() => {
@@ -42,11 +43,11 @@ await check('device-frame presets create real frames', async () => {
 });
 
 await check('component instances attach to a frame and expose variants/constraints', async () => {
-  const mobileLayer = page.locator('.wf2-layer').filter({ hasText: 'Mobile 390' });
-  await mobileLayer.click();
+  await page.locator('.wf2-layer').filter({ hasText: 'Mobile 390' }).click();
   await page.getByRole('button', { name: /Primary Button/ }).first().click();
   const component = page.locator('.wf2-item.wf2-component');
   await component.waitFor();
+  await allowAutosave();
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('xos-studio-wf-wireframe-2-acceptance') || '{}'));
   const item = stored.items?.find((entry) => entry.type === 'component');
   if (!item?.componentId) throw new Error('component instance has no componentId');
@@ -57,24 +58,25 @@ await check('component instances attach to a frame and expose variants/constrain
   await v.selectOption('bottom');
   const state = page.locator('.wf2-inspector label').filter({ hasText: 'STATE' }).locator('select');
   await state.selectOption('hover');
+  await allowAutosave();
 });
 
 await check('alignment controls operate on multi-selection', async () => {
-  const components = page.locator('.wf2-item.wf2-component');
-  await components.first().click({ modifiers: ['Shift'] });
+  // The newly created component is already selected; duplicate from that state.
   await page.getByRole('button', { name: 'DUPLICATE', exact: true }).click();
-  const count = await page.locator('.wf2-item.wf2-component').count();
-  if (count < 2) throw new Error('duplicate did not create a second component');
-  await page.locator('.wf2-item.wf2-component').nth(0).click();
-  await page.locator('.wf2-item.wf2-component').nth(1).click({ modifiers: ['Shift'] });
+  const components = page.locator('.wf2-item.wf2-component');
+  if (await components.count() < 2) throw new Error('duplicate did not create a second component');
+  await components.nth(0).click();
+  await components.nth(1).click({ modifiers: ['Shift'] });
   await page.getByRole('button', { name: 'CX', exact: true }).click();
+  await allowAutosave();
 });
 
 await check('prototype link creates a navigable preview', async () => {
-  // Use the first component as interaction source and desktop frame as destination.
   await page.getByRole('button', { name: 'LINK', exact: true }).click();
   await page.locator('.wf2-item.wf2-component').first().click();
   await page.locator('.wf2-item.wf2-frame').nth(1).click();
+  await allowAutosave();
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('xos-studio-wf-wireframe-2-acceptance') || '{}'));
   if (!stored.links?.length) throw new Error('prototype link was not persisted');
 
@@ -89,7 +91,7 @@ await check('prototype link creates a navigable preview', async () => {
 });
 
 await check('document persists across reload with no render crash', async () => {
-  await page.waitForTimeout(350);
+  await allowAutosave();
   await page.reload({ waitUntil: 'networkidle' });
   await page.keyboard.press('Control+K');
   const command = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
