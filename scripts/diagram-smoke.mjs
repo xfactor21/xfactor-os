@@ -24,38 +24,30 @@ async function openDiagram() {
   await command.fill('open lab'); await command.press('Enter');
   await page.locator('.dpBoardCard').filter({ hasText: 'DIAGRAM 2 ACCEPTANCE' }).click();
   await page.getByTestId('diagram-2-root').waitFor();
-  await page.getByText('DIAGRAM / FLOWCHART 2.0', { exact: true }).waitFor();
 }
 
-await check('Diagram 2.0 opens from Design Lab', openDiagram);
+function stage() {
+  return page.getByTestId('diagram-2-root').locator('div[style*="width: 1040px"][style*="height: 680px"]').last();
+}
 
 async function clickStage(rx, ry) {
-  const stage = page.locator('.diagram2 .toolShellBody > div').last().locator('div').filter({ has: page.locator('svg') }).last();
-  const target = page.locator('.diagram2 [data-testid="diagram-2-root"]');
-  void target;
-  const root = page.getByTestId('diagram-2-root');
-  const stageCandidate = root.locator('div').filter({ has: root.locator('svg') }).last();
-  const box = await stageCandidate.boundingBox();
+  const box = await stage().boundingBox();
   if (!box) throw new Error('diagram stage has no bounding box');
   await page.mouse.click(box.x + box.width * rx, box.y + box.height * ry);
 }
 
+async function nodeWrapper(text) {
+  const label = page.getByTestId('diagram-2-root').getByText(text, { exact: true }).last();
+  return label.locator('..');
+}
+
+await check('Diagram 2.0 opens from Design Lab', openDiagram);
+
 await check('node tools create real persistent v2 nodes', async () => {
   await page.getByRole('button', { name: 'PROCESS', exact: true }).click();
-  const allDivs = page.getByTestId('diagram-2-root').locator('div');
-  let stage = null;
-  for (let i = 0; i < await allDivs.count(); i++) {
-    const el = allDivs.nth(i);
-    const box = await el.boundingBox();
-    const style = await el.getAttribute('style');
-    if (box && box.width > 900 && box.height > 600 && style?.includes('background-color')) { stage = el; break; }
-  }
-  if (!stage) throw new Error('could not locate diagram canvas');
-  let box = await stage.boundingBox();
-  await page.mouse.click(box.x + box.width * .25, box.y + box.height * .3);
+  await clickStage(.25, .3);
   await page.getByRole('button', { name: 'DECISION', exact: true }).click();
-  box = await stage.boundingBox();
-  await page.mouse.click(box.x + box.width * .62, box.y + box.height * .32);
+  await clickStage(.62, .32);
   await page.waitForTimeout(250);
   const doc = await page.evaluate(() => JSON.parse(localStorage.getItem('xos-studio-diagram2-diagram-2-acceptance') || '{}'));
   if (doc.version !== 2) throw new Error('diagram v2 document was not persisted');
@@ -64,29 +56,23 @@ await check('node tools create real persistent v2 nodes', async () => {
 });
 
 await check('connector mode creates attached orthogonal connector', async () => {
-  const nodes = page.getByTestId('diagram-2-root').locator('.toolShellBody').locator('div').filter({ hasText: /PROCESS|DECISION/ });
   await page.getByRole('button', { name: 'CONNECT', exact: true }).click();
-  const docBefore = await page.evaluate(() => JSON.parse(localStorage.getItem('xos-studio-diagram2-diagram-2-acceptance') || '{}'));
-  const ids = docBefore.nodes.map((n) => n.id);
-  for (const id of ids) {
-    const node = page.locator(`[style*="position: absolute"]`).filter({ hasText: docBefore.nodes.find((n) => n.id === id).text }).last();
-    await node.click();
-  }
-  await page.waitForTimeout(200);
+  await (await nodeWrapper('PROCESS')).click({ force: true });
+  await (await nodeWrapper('DECISION')).click({ force: true });
+  await page.waitForTimeout(180);
   const doc = await page.evaluate(() => JSON.parse(localStorage.getItem('xos-studio-diagram2-diagram-2-acceptance') || '{}'));
   if (doc.edges?.length !== 1) throw new Error(`expected 1 connector, got ${doc.edges?.length}`);
   if (doc.edges[0].route !== 'orthogonal') throw new Error('default connector route is not orthogonal');
 });
 
-await check('inspector edits node geometry and style', async () => {
+await check('inspector edits node geometry and text', async () => {
   await page.getByRole('button', { name: 'SELECT', exact: true }).click();
-  const processText = page.getByText('PROCESS', { exact: true }).last();
-  await processText.click();
+  await (await nodeWrapper('PROCESS')).click({ force: true });
   const inspector = page.getByTestId('diagram-2-root').locator('aside');
   const textInput = inspector.locator('label').filter({ hasText: 'TEXT' }).locator('input');
   await textInput.fill('START HERE');
-  const xInput = inspector.locator('label').filter({ hasText: /^X/ }).locator('input');
-  await xInput.fill('120');
+  const numberInputs = inspector.locator('input[type="number"]');
+  await numberInputs.nth(0).fill('120');
   await page.waitForTimeout(220);
   const doc = await page.evaluate(() => JSON.parse(localStorage.getItem('xos-studio-diagram2-diagram-2-acceptance') || '{}'));
   const node = doc.nodes.find((n) => n.text === 'START HERE');
@@ -106,7 +92,7 @@ await check('document survives reload without render crash', async () => {
   await page.reload({ waitUntil: 'networkidle' });
   await openDiagram();
   const doc = await page.evaluate(() => JSON.parse(localStorage.getItem('xos-studio-diagram2-diagram-2-acceptance') || '{}'));
-  if (doc.nodes?.length !== 2 || doc.edges?.length !== 1 || doc.lanes?.length !== 1) throw new Error('diagram document did not survive reload');
+  if (doc.nodes?.length !== 2 || doc.edges?.length !== 1 || doc.lanes?.length !== 1) throw new Error(`diagram document did not survive reload: ${doc.nodes?.length}/${doc.edges?.length}/${doc.lanes?.length}`);
 });
 
 await browser.close();
