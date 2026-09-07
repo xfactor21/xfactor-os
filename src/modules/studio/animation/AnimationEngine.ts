@@ -1,54 +1,13 @@
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
-/**
- * ANIMATION MODE ENGINE — Blueprint v0.3 Amendment v0.2/v0.3, built out fully
- * in Amendment v0.4 item 3. Flagship reference: After Effects / Rive.
- *
- * Genuinely real (not decorative) pieces built here:
- *  - A real per-property keyframe timeline (x, y, rotation, scaleX, scaleY,
- *    opacity), each keyframe independently placeable at any frame.
- *  - Real tweening: `getValue()` linearly interpolates between the two
- *    keyframes surrounding a given frame, with a per-segment easing curve
- *    (linear/ease-in/ease-out/ease-in-out — real cubic/quadratic easing
- *    math, not a lookup of canned CSS strings).
- *  - A real bone/puppet rig: bones form a parent→child chain, and rotating
- *    a parent bone rigidly carries every descendant with it every frame
- *    (forward kinematics, computed fresh per frame by walking the chain —
- *    not baked). Explicitly NOT inverse kinematics (dragging a bone's tip
- *    to auto-solve the joint chain above it) — that's a materially bigger
- *    numerical-solver problem and is disclosed as out of scope for this
- *    pass in the Studio's own doc comment and the README.
- *  - Real GIF export: every frame is rendered to an offscreen canvas, its
- *    actual pixels are color-quantized and palette-indexed via `gifenc`
- *    (a real GIF89a encoder — median-cut-style quantization + LZW-ish
- *    packing under the hood), not a canned animated image.
- *  - Real sprite-sheet PNG export: every frame rendered into one grid
- *    canvas at its actual pixel content.
- *  - Real undo/redo via JSON document snapshots (the document is small
- *    enough that whole-document snapshotting is the right tool, unlike
- *    Draw/Paint's per-layer pixel canvases which needed a different
- *    strategy).
- *
- * Deliberately deferred (disclosed, not faked): mesh deformation, a
- * particle emitter, gravity/bounce physics, audio-waveform sync, nested
- * reusable animated symbols, and Lottie/MP4/WebM export. GIF + PNG sprite
- * sheet are the two real, working export formats this pass ships.
- */
-
 export type AnimObjType = 'rect' | 'ellipse' | 'text' | 'bone';
-
 export type EaseType = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
-
 export type AnimProp = 'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY' | 'opacity';
-
 export const ANIM_PROPS: AnimProp[] = ['x', 'y', 'rotation', 'scaleX', 'scaleY', 'opacity'];
 
 export interface AnimKeyframe {
   frame: number;
   value: number;
-  /** Easing applied to the segment arriving AT this keyframe from the
-   * previous one (the GIF/After Effects convention: the curve describes
-   * how you get TO this point, not away from it). */
   ease: EaseType;
 }
 
@@ -62,13 +21,8 @@ export interface AnimObject {
   text?: string;
   fontSize?: number;
   visible: boolean;
-  /** Bone-only: parent bone id in the FK chain, or null/undefined for a
-   * root bone (root bones use their own keyframed x/y as the rig's base
-   * position; child bones ignore x/y entirely and inherit their origin
-   * from the parent bone's tip every frame). */
+  locked?: boolean;
   parentId?: string | null;
-  /** Bone-only: static segment length in px (not keyframed — animating
-   * bone length is a mesh-deformation problem, explicitly out of scope). */
   length?: number;
   keys: Record<AnimProp, AnimKeyframe[]>;
 }
@@ -78,14 +32,21 @@ export interface AnimDocument {
   frameCount: number;
   loop: boolean;
   onionSkin: boolean;
-  onionRange: number; // 1-3 frames each direction
+  onionRange: number;
   objects: AnimObject[];
   width: number;
   height: number;
+  workStart?: number;
+  workEnd?: number;
+}
+
+export interface KeyframeClipboard {
+  sourceFrame: number;
+  values: Partial<Record<AnimProp, AnimKeyframe>>;
 }
 
 const DEG2RAD = Math.PI / 180;
-const MAX_HISTORY = 60;
+const MAX_HISTORY = 80;
 
 function defaultKeys(x: number, y: number): Record<AnimProp, AnimKeyframe[]> {
   return {
@@ -100,14 +61,10 @@ function defaultKeys(x: number, y: number): Record<AnimProp, AnimKeyframe[]> {
 
 function ease(t: number, type: EaseType): number {
   switch (type) {
-    case 'easeIn':
-      return t * t;
-    case 'easeOut':
-      return 1 - (1 - t) * (1 - t);
-    case 'easeInOut':
-      return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-    default:
-      return t;
+    case 'easeIn': return t * t;
+    case 'easeOut': return 1 - (1 - t) * (1 - t);
+    case 'easeInOut': return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    default: return t;
   }
 }
 
@@ -121,7 +78,20 @@ export function docKey(boardId: string) {
 }
 
 export function defaultDocument(): AnimDocument {
-  return { fps: 24, frameCount: 60, loop: true, onionSkin: false, onionRange: 1, objects: [], width: 900, height: 560 };
+  return { fps: 24, frameCount: 60, loop: true, onionSkin: false, onionRange: 1, objects: [], width: 900, height: 560, workStart: 0, workEnd: 59 };
+}
+
+function normalizeDocument(input: AnimDocument): AnimDocument {
+  const doc: AnimDocument = {
+    ...defaultDocument(),
+    ...input,
+    objects: Array.isArray(input.objects) ? input.objects.map((o) => ({ ...o, visible: o.visible !== false, locked: !!o.locked })) : [],
+  };
+  doc.frameCount = Math.max(2, Math.round(doc.frameCount || 60));
+  doc.fps = Math.max(1, Math.min(60, Math.round(doc.fps || 24)));
+  doc.workStart = Math.max(0, Math.min(doc.frameCount - 1, Math.round(doc.workStart ?? 0)));
+  doc.workEnd = Math.max(doc.workStart, Math.min(doc.frameCount - 1, Math.round(doc.workEnd ?? doc.frameCount - 1)));
+  return doc;
 }
 
 export class AnimationEngine {
@@ -132,7 +102,7 @@ export class AnimationEngine {
 
   constructor(boardId: string, doc?: AnimDocument) {
     this.boardId = boardId;
-    this.doc = doc ?? defaultDocument();
+    this.doc = normalizeDocument(doc ?? defaultDocument());
   }
 
   static load(boardId: string): AnimationEngine {
@@ -142,15 +112,11 @@ export class AnimationEngine {
     } catch {
       /* ignore corrupt storage */
     }
-    return new AnimationEngine(boardId, defaultDocument());
+    return new AnimationEngine(boardId);
   }
 
   persist() {
-    try {
-      localStorage.setItem(docKey(this.boardId), JSON.stringify(this.doc));
-    } catch {
-      /* best-effort — quota/access errors are non-fatal here */
-    }
+    try { localStorage.setItem(docKey(this.boardId), JSON.stringify(this.doc)); } catch { /* best effort */ }
   }
 
   private snapshot() {
@@ -159,377 +125,285 @@ export class AnimationEngine {
     this.future = [];
   }
 
-  canUndo() {
-    return this.history.length > 0;
+  checkpoint(mutator: () => void) {
+    this.snapshot();
+    mutator();
+    this.doc = normalizeDocument(this.doc);
+    this.persist();
   }
-  canRedo() {
-    return this.future.length > 0;
-  }
+
+  canUndo() { return this.history.length > 0; }
+  canRedo() { return this.future.length > 0; }
   undo() {
     if (!this.history.length) return;
     this.future.push(JSON.stringify(this.doc));
-    const prev = this.history.pop()!;
-    this.doc = JSON.parse(prev) as AnimDocument;
+    this.doc = normalizeDocument(JSON.parse(this.history.pop()!) as AnimDocument);
     this.persist();
   }
   redo() {
     if (!this.future.length) return;
     this.history.push(JSON.stringify(this.doc));
-    const next = this.future.pop()!;
-    this.doc = JSON.parse(next) as AnimDocument;
+    this.doc = normalizeDocument(JSON.parse(this.future.pop()!) as AnimDocument);
     this.persist();
   }
-
-  // ---------------- objects ----------------
 
   addShape(type: 'rect' | 'ellipse' | 'text', x: number, y: number): AnimObject {
     this.snapshot();
     const obj: AnimObject = {
-      id: nid('ao'),
-      type,
-      name: `${type[0].toUpperCase()}${type.slice(1)} ${this.doc.objects.length + 1}`,
-      w: type === 'text' ? 160 : 90,
-      h: type === 'text' ? 30 : 90,
+      id: nid('ao'), type, name: `${type[0].toUpperCase()}${type.slice(1)} ${this.doc.objects.length + 1}`,
+      w: type === 'text' ? 160 : 90, h: type === 'text' ? 30 : 90,
       fill: type === 'text' ? '#00F5FF' : ['#00F5FF', '#FF2D78', '#9D4EDD', '#FFB000'][this.doc.objects.length % 4],
-      text: type === 'text' ? 'Text' : undefined,
-      fontSize: 22,
-      visible: true,
-      keys: defaultKeys(x, y),
+      text: type === 'text' ? 'Text' : undefined, fontSize: 22, visible: true, locked: false, keys: defaultKeys(x, y),
     };
-    this.doc.objects.push(obj);
-    this.persist();
-    return obj;
+    this.doc.objects.push(obj); this.persist(); return obj;
   }
 
   addBone(x: number, y: number, parentId: string | null = null): AnimObject {
     this.snapshot();
-    let originX = x;
-    let originY = y;
-    let length = 90;
+    let originX = x, originY = y, length = 90;
     if (parentId) {
       const parent = this.find(parentId);
-      if (parent) {
-        const w = this.boneWorld(parent, 0);
-        originX = w.tipX;
-        originY = w.tipY;
-        length = parent.length ?? 90;
-      }
+      if (parent) { const w = this.boneWorld(parent, 0); originX = w.tipX; originY = w.tipY; length = parent.length ?? 90; }
     }
     const obj: AnimObject = {
-      id: nid('bone'),
-      type: 'bone',
-      name: `Bone ${this.doc.objects.filter((o) => o.type === 'bone').length + 1}`,
-      w: 0,
-      h: 0,
-      fill: '#FFB000',
-      visible: true,
-      parentId,
-      length,
-      keys: defaultKeys(originX, originY),
+      id: nid('bone'), type: 'bone', name: `Bone ${this.doc.objects.filter((o) => o.type === 'bone').length + 1}`,
+      w: 0, h: 0, fill: '#FFB000', visible: true, locked: false, parentId, length, keys: defaultKeys(originX, originY),
     };
-    this.doc.objects.push(obj);
-    this.persist();
-    return obj;
+    this.doc.objects.push(obj); this.persist(); return obj;
   }
+
+  find(id: string) { return this.doc.objects.find((o) => o.id === id); }
 
   removeObject(id: string) {
     this.snapshot();
-    // Re-parent any children of a removed bone to its own parent, so the
-    // rest of the chain doesn't silently vanish or dangle on a bad id.
     const removed = this.find(id);
     const removedParent = removed?.parentId ?? null;
-    this.doc.objects = this.doc.objects
-      .filter((o) => o.id !== id)
-      .map((o) => (o.parentId === id ? { ...o, parentId: removedParent } : o));
+    this.doc.objects = this.doc.objects.filter((o) => o.id !== id).map((o) => (o.parentId === id ? { ...o, parentId: removedParent } : o));
     this.persist();
   }
 
-  find(id: string): AnimObject | undefined {
-    return this.doc.objects.find((o) => o.id === id);
+  duplicateObject(id: string): AnimObject | null {
+    const source = this.find(id); if (!source) return null;
+    this.snapshot();
+    const copy = JSON.parse(JSON.stringify(source)) as AnimObject;
+    copy.id = nid(source.type === 'bone' ? 'bone' : 'ao');
+    copy.name = `${source.name} copy`;
+    if (!copy.parentId) {
+      for (const p of ['x', 'y'] as AnimProp[]) copy.keys[p] = copy.keys[p].map((k) => ({ ...k, value: k.value + 20 }));
+    }
+    this.doc.objects.push(copy); this.persist(); return copy;
   }
 
-  // ---------------- keyframes / tweening ----------------
+  renameObject(id: string, name: string) { this.checkpoint(() => { const o = this.find(id); if (o) o.name = name.trim() || o.name; }); }
+  setObjectVisible(id: string, visible: boolean) { this.checkpoint(() => { const o = this.find(id); if (o) o.visible = visible; }); }
+  setObjectLocked(id: string, locked: boolean) { this.checkpoint(() => { const o = this.find(id); if (o) o.locked = locked; }); }
+  moveObjectLayer(id: string, delta: -1 | 1) {
+    this.checkpoint(() => {
+      const i = this.doc.objects.findIndex((o) => o.id === id); const j = i + delta;
+      if (i < 0 || j < 0 || j >= this.doc.objects.length) return;
+      [this.doc.objects[i], this.doc.objects[j]] = [this.doc.objects[j], this.doc.objects[i]];
+    });
+  }
+
+  setDuration(frameCount: number) {
+    const next = Math.max(2, Math.min(3600, Math.round(frameCount)));
+    this.checkpoint(() => {
+      this.doc.frameCount = next;
+      for (const o of this.doc.objects) for (const p of ANIM_PROPS) o.keys[p] = o.keys[p].filter((k) => k.frame < next);
+      this.doc.workStart = Math.min(this.doc.workStart ?? 0, next - 1);
+      this.doc.workEnd = Math.min(this.doc.workEnd ?? next - 1, next - 1);
+      if ((this.doc.workEnd ?? 0) < (this.doc.workStart ?? 0)) this.doc.workStart = this.doc.workEnd;
+    });
+  }
+
+  setWorkArea(start: number, end: number) {
+    this.checkpoint(() => {
+      const a = Math.max(0, Math.min(this.doc.frameCount - 1, Math.round(start)));
+      const b = Math.max(a, Math.min(this.doc.frameCount - 1, Math.round(end)));
+      this.doc.workStart = a; this.doc.workEnd = b;
+    });
+  }
 
   getValue(obj: AnimObject, prop: AnimProp, frame: number): number {
     const kfs = obj.keys[prop];
-    if (!kfs || !kfs.length) return prop === 'scaleX' || prop === 'scaleY' || prop === 'opacity' ? 1 : 0;
-    if (kfs.length === 1) return kfs[0].value;
+    if (!kfs?.length) return prop === 'scaleX' || prop === 'scaleY' || prop === 'opacity' ? 1 : 0;
     if (frame <= kfs[0].frame) return kfs[0].value;
-    const last = kfs[kfs.length - 1];
-    if (frame >= last.frame) return last.value;
+    const last = kfs[kfs.length - 1]; if (frame >= last.frame) return last.value;
     for (let i = 0; i < kfs.length - 1; i++) {
-      const a = kfs[i];
-      const b = kfs[i + 1];
+      const a = kfs[i], b = kfs[i + 1];
       if (frame >= a.frame && frame <= b.frame) {
-        const span = b.frame - a.frame;
-        const t = span === 0 ? 1 : (frame - a.frame) / span;
+        const t = (frame - a.frame) / Math.max(1, b.frame - a.frame);
         return a.value + (b.value - a.value) * ease(t, b.ease);
       }
     }
     return last.value;
   }
 
-  hasKeyAt(obj: AnimObject, prop: AnimProp, frame: number): boolean {
-    return !!obj.keys[prop]?.some((k) => k.frame === frame);
-  }
-
-  /** True if ANY property has a keyframe at this frame — used to draw the
-   * combined diamond marker on an object's single timeline row. */
-  hasAnyKeyAt(obj: AnimObject, frame: number): boolean {
-    return ANIM_PROPS.some((p) => this.hasKeyAt(obj, p, frame));
-  }
-
-  allKeyframedFrames(obj: AnimObject): number[] {
-    const set = new Set<number>();
-    for (const p of ANIM_PROPS) for (const k of obj.keys[p] ?? []) set.add(k.frame);
+  hasKeyAt(obj: AnimObject, prop: AnimProp, frame: number) { return !!obj.keys[prop]?.some((k) => k.frame === frame); }
+  hasAnyKeyAt(obj: AnimObject, frame: number) { return ANIM_PROPS.some((p) => this.hasKeyAt(obj, p, frame)); }
+  allKeyframedFrames(obj: AnimObject) {
+    const set = new Set<number>(); for (const p of ANIM_PROPS) for (const k of obj.keys[p] ?? []) set.add(k.frame);
     return Array.from(set).sort((a, b) => a - b);
   }
 
   setKeyframe(objId: string, prop: AnimProp, frame: number, value: number, easeType: EaseType = 'linear') {
-    const obj = this.find(objId);
-    if (!obj) return;
+    const obj = this.find(objId); if (!obj) return;
     this.snapshot();
-    const kfs = obj.keys[prop];
-    const idx = kfs.findIndex((k) => k.frame === frame);
-    if (idx >= 0) kfs[idx] = { frame, value, ease: easeType };
-    else {
-      kfs.push({ frame, value, ease: easeType });
-      kfs.sort((a, b) => a.frame - b.frame);
-    }
+    const kfs = obj.keys[prop], idx = kfs.findIndex((k) => k.frame === frame);
+    if (idx >= 0) kfs[idx] = { frame, value, ease: easeType }; else { kfs.push({ frame, value, ease: easeType }); kfs.sort((a, b) => a.frame - b.frame); }
     this.persist();
   }
 
-  /** Call once at the start of a pointer-drag gesture (canvas move/rotate)
-   * to snapshot pre-drag state for undo. Follow with any number of
-   * `pokeValue()` calls during the drag (cheap, no history/persist churn),
-   * then `commitLiveEdit()` once at drag-end to persist the final state —
-   * so a whole drag gesture becomes exactly one undo step, not one per
-   * pointermove event. */
-  beginLiveEdit() {
+  setAllKeyframes(objId: string, frame: number, easeType: EaseType = 'linear') {
+    const obj = this.find(objId); if (!obj) return;
     this.snapshot();
-  }
-
-  /** Mutates a keyframe's value in place with NO undo snapshot and NO
-   * localStorage write — only for live drag-preview rendering between
-   * beginLiveEdit() and commitLiveEdit(). */
-  pokeValue(objId: string, prop: AnimProp, frame: number, value: number) {
-    const obj = this.find(objId);
-    if (!obj) return;
-    const kfs = obj.keys[prop];
-    const idx = kfs.findIndex((k) => k.frame === frame);
-    if (idx >= 0) kfs[idx] = { ...kfs[idx], value };
-    else {
-      kfs.push({ frame, value, ease: 'linear' });
+    for (const prop of ANIM_PROPS) {
+      const value = this.getValue(obj, prop, frame), kfs = obj.keys[prop], idx = kfs.findIndex((k) => k.frame === frame);
+      if (idx >= 0) kfs[idx] = { frame, value, ease: easeType }; else kfs.push({ frame, value, ease: easeType });
       kfs.sort((a, b) => a.frame - b.frame);
     }
-  }
-
-  commitLiveEdit() {
     this.persist();
   }
 
   removeKeyframe(objId: string, prop: AnimProp, frame: number) {
-    const obj = this.find(objId);
-    if (!obj) return;
-    if (obj.keys[prop].length <= 1) return; // always keep at least one baseline keyframe
-    this.snapshot();
-    obj.keys[prop] = obj.keys[prop].filter((k) => k.frame !== frame);
-    this.persist();
+    const obj = this.find(objId); if (!obj || obj.keys[prop].length <= 1) return;
+    this.snapshot(); obj.keys[prop] = obj.keys[prop].filter((k) => k.frame !== frame); this.persist();
   }
 
   removeAllKeyframesAt(objId: string, frame: number) {
-    const obj = this.find(objId);
-    if (!obj) return;
+    const obj = this.find(objId); if (!obj) return;
+    this.snapshot();
+    for (const p of ANIM_PROPS) if (obj.keys[p].length > 1) obj.keys[p] = obj.keys[p].filter((k) => k.frame !== frame);
+    this.persist();
+  }
+
+  copyKeyframesAt(objId: string, frame: number): KeyframeClipboard | null {
+    const obj = this.find(objId); if (!obj) return null;
+    const values: KeyframeClipboard['values'] = {};
+    for (const p of ANIM_PROPS) { const k = obj.keys[p].find((x) => x.frame === frame); if (k) values[p] = { ...k }; }
+    return Object.keys(values).length ? { sourceFrame: frame, values } : null;
+  }
+
+  pasteKeyframesAt(objId: string, frame: number, clip: KeyframeClipboard) {
+    const obj = this.find(objId); if (!obj) return;
     this.snapshot();
     for (const p of ANIM_PROPS) {
-      if (obj.keys[p].length > 1) obj.keys[p] = obj.keys[p].filter((k) => k.frame !== frame);
+      const src = clip.values[p]; if (!src) continue;
+      const kfs = obj.keys[p], idx = kfs.findIndex((k) => k.frame === frame), next = { frame, value: src.value, ease: src.ease };
+      if (idx >= 0) kfs[idx] = next; else kfs.push(next);
+      kfs.sort((a, b) => a.frame - b.frame);
     }
     this.persist();
   }
 
-  // ---------------- bone FK chain ----------------
+  moveKeyframesAt(objId: string, fromFrame: number, toFrame: number) {
+    const obj = this.find(objId); if (!obj || fromFrame === toFrame) return;
+    const target = Math.max(0, Math.min(this.doc.frameCount - 1, Math.round(toFrame)));
+    if (!this.hasAnyKeyAt(obj, fromFrame)) return;
+    this.snapshot();
+    for (const p of ANIM_PROPS) {
+      const moving = obj.keys[p].find((k) => k.frame === fromFrame); if (!moving) continue;
+      obj.keys[p] = obj.keys[p].filter((k) => k.frame !== fromFrame && k.frame !== target);
+      obj.keys[p].push({ ...moving, frame: target }); obj.keys[p].sort((a, b) => a.frame - b.frame);
+    }
+    this.persist();
+  }
 
-  /** Walks the parent chain to compute this bone's world origin, tip, and
-   * absolute angle at a given frame — real forward kinematics, recomputed
-   * fresh every frame (never baked/cached), so edits to a parent's
-   * rotation keyframes correctly ripple to every descendant immediately. */
+  setEaseAt(objId: string, frame: number, easeType: EaseType) {
+    const obj = this.find(objId); if (!obj) return;
+    this.snapshot();
+    for (const p of ANIM_PROPS) obj.keys[p] = obj.keys[p].map((k) => k.frame === frame ? { ...k, ease: easeType } : k);
+    this.persist();
+  }
+
+  beginLiveEdit() { this.snapshot(); }
+  pokeValue(objId: string, prop: AnimProp, frame: number, value: number) {
+    const obj = this.find(objId); if (!obj) return;
+    const kfs = obj.keys[prop], idx = kfs.findIndex((k) => k.frame === frame);
+    if (idx >= 0) kfs[idx] = { ...kfs[idx], value }; else { kfs.push({ frame, value, ease: 'linear' }); kfs.sort((a, b) => a.frame - b.frame); }
+  }
+  commitLiveEdit() { this.persist(); }
+
   boneWorld(obj: AnimObject, frame: number): { originX: number; originY: number; angle: number; tipX: number; tipY: number } {
-    const localAngle = this.getValue(obj, 'rotation', frame);
-    const length = obj.length ?? 90;
+    const localAngle = this.getValue(obj, 'rotation', frame), length = obj.length ?? 90;
     if (!obj.parentId) {
-      const originX = this.getValue(obj, 'x', frame);
-      const originY = this.getValue(obj, 'y', frame);
-      const tipX = originX + Math.cos(localAngle * DEG2RAD) * length;
-      const tipY = originY + Math.sin(localAngle * DEG2RAD) * length;
-      return { originX, originY, angle: localAngle, tipX, tipY };
+      const originX = this.getValue(obj, 'x', frame), originY = this.getValue(obj, 'y', frame);
+      return { originX, originY, angle: localAngle, tipX: originX + Math.cos(localAngle * DEG2RAD) * length, tipY: originY + Math.sin(localAngle * DEG2RAD) * length };
     }
     const parent = this.find(obj.parentId);
     if (!parent) {
-      const originX = this.getValue(obj, 'x', frame);
-      const originY = this.getValue(obj, 'y', frame);
-      const tipX = originX + Math.cos(localAngle * DEG2RAD) * length;
-      const tipY = originY + Math.sin(localAngle * DEG2RAD) * length;
-      return { originX, originY, angle: localAngle, tipX, tipY };
+      const originX = this.getValue(obj, 'x', frame), originY = this.getValue(obj, 'y', frame);
+      return { originX, originY, angle: localAngle, tipX: originX + Math.cos(localAngle * DEG2RAD) * length, tipY: originY + Math.sin(localAngle * DEG2RAD) * length };
     }
-    const pw = this.boneWorld(parent, frame);
-    const angle = pw.angle + localAngle;
-    const tipX = pw.tipX + Math.cos(angle * DEG2RAD) * length;
-    const tipY = pw.tipY + Math.sin(angle * DEG2RAD) * length;
-    return { originX: pw.tipX, originY: pw.tipY, angle, tipX, tipY };
+    const pw = this.boneWorld(parent, frame), angle = pw.angle + localAngle;
+    return { originX: pw.tipX, originY: pw.tipY, angle, tipX: pw.tipX + Math.cos(angle * DEG2RAD) * length, tipY: pw.tipY + Math.sin(angle * DEG2RAD) * length };
   }
 
-  // ---------------- rendering ----------------
-
-  /** Draws every object at `frame` onto `ctx`. `tint` + `alphaMul` support
-   * onion-skin ghost passes (a past-frame pass tinted blue, a future-frame
-   * pass tinted amber, both drawn at reduced opacity underneath the real
-   * current-frame pass). */
   renderFrame(ctx: CanvasRenderingContext2D, frame: number, opts?: { tint?: string; alphaMul?: number }) {
     const alphaMul = opts?.alphaMul ?? 1;
     for (const obj of this.doc.objects) {
       if (!obj.visible) continue;
-      const opacity = Math.max(0, Math.min(1, this.getValue(obj, 'opacity', frame))) * alphaMul;
-      if (opacity <= 0.002) continue;
-      ctx.save();
-      ctx.globalAlpha = opacity;
+      const opacity = Math.max(0, Math.min(1, this.getValue(obj, 'opacity', frame))) * alphaMul; if (opacity <= 0.002) continue;
+      ctx.save(); ctx.globalAlpha = opacity;
       if (obj.type === 'bone') {
-        const w = this.boneWorld(obj, frame);
-        ctx.strokeStyle = opts?.tint ?? obj.fill;
-        ctx.lineWidth = 7;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(w.originX, w.originY);
-        ctx.lineTo(w.tipX, w.tipY);
-        ctx.stroke();
-        ctx.fillStyle = opts?.tint ?? '#fff';
-        ctx.beginPath();
-        ctx.arc(w.originX, w.originY, 5, 0, Math.PI * 2);
-        ctx.fill();
+        const w = this.boneWorld(obj, frame); ctx.strokeStyle = opts?.tint ?? obj.fill; ctx.lineWidth = 7; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(w.originX, w.originY); ctx.lineTo(w.tipX, w.tipY); ctx.stroke();
+        ctx.fillStyle = opts?.tint ?? '#fff'; ctx.beginPath(); ctx.arc(w.originX, w.originY, 5, 0, Math.PI * 2); ctx.fill();
       } else {
-        const x = this.getValue(obj, 'x', frame);
-        const y = this.getValue(obj, 'y', frame);
-        const rotation = this.getValue(obj, 'rotation', frame);
-        const scaleX = this.getValue(obj, 'scaleX', frame);
-        const scaleY = this.getValue(obj, 'scaleY', frame);
-        ctx.translate(x, y);
-        ctx.rotate(rotation * DEG2RAD);
-        ctx.scale(scaleX || 0.001, scaleY || 0.001);
-        ctx.fillStyle = opts?.tint ?? obj.fill;
-        if (obj.type === 'rect') {
-          ctx.fillRect(-obj.w / 2, -obj.h / 2, obj.w, obj.h);
-        } else if (obj.type === 'ellipse') {
-          ctx.beginPath();
-          ctx.ellipse(0, 0, obj.w / 2, obj.h / 2, 0, 0, Math.PI * 2);
-          ctx.fill();
-        } else if (obj.type === 'text') {
-          ctx.font = `${obj.fontSize ?? 22}px 'Share Tech Mono', monospace`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(obj.text || 'Text', 0, 0);
-        }
+        const x = this.getValue(obj, 'x', frame), y = this.getValue(obj, 'y', frame), rotation = this.getValue(obj, 'rotation', frame);
+        const scaleX = this.getValue(obj, 'scaleX', frame), scaleY = this.getValue(obj, 'scaleY', frame);
+        ctx.translate(x, y); ctx.rotate(rotation * DEG2RAD); ctx.scale(scaleX || 0.001, scaleY || 0.001); ctx.fillStyle = opts?.tint ?? obj.fill;
+        if (obj.type === 'rect') ctx.fillRect(-obj.w / 2, -obj.h / 2, obj.w, obj.h);
+        else if (obj.type === 'ellipse') { ctx.beginPath(); ctx.ellipse(0, 0, obj.w / 2, obj.h / 2, 0, 0, Math.PI * 2); ctx.fill(); }
+        else { ctx.font = `${obj.fontSize ?? 22}px 'Share Tech Mono', monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(obj.text || 'Text', 0, 0); }
       }
       ctx.restore();
     }
   }
 
-  /** Hit-tests objects (topmost/last-added first) at a canvas point, for
-   * click-to-select and drag-to-move. Bones hit-test against a capsule
-   * around the origin→tip segment; shapes hit-test their rotated bbox via
-   * an inverse transform into local space. */
   hitTest(px: number, py: number, frame: number): AnimObject | null {
     for (let i = this.doc.objects.length - 1; i >= 0; i--) {
-      const obj = this.doc.objects[i];
-      if (!obj.visible) continue;
-      if (obj.type === 'bone') {
-        const w = this.boneWorld(obj, frame);
-        const d = distToSegment(px, py, w.originX, w.originY, w.tipX, w.tipY);
-        if (d < 14) return obj;
-      } else {
-        const x = this.getValue(obj, 'x', frame);
-        const y = this.getValue(obj, 'y', frame);
-        const rotation = this.getValue(obj, 'rotation', frame) * DEG2RAD;
-        const scaleX = this.getValue(obj, 'scaleX', frame) || 0.001;
-        const scaleY = this.getValue(obj, 'scaleY', frame) || 0.001;
-        const dx = px - x;
-        const dy = py - y;
-        const cos = Math.cos(-rotation);
-        const sin = Math.sin(-rotation);
-        const lx = (dx * cos - dy * sin) / scaleX;
-        const ly = (dx * sin + dy * cos) / scaleY;
+      const obj = this.doc.objects[i]; if (!obj.visible || obj.locked) continue;
+      if (obj.type === 'bone') { const w = this.boneWorld(obj, frame); if (distToSegment(px, py, w.originX, w.originY, w.tipX, w.tipY) < 14) return obj; }
+      else {
+        const x = this.getValue(obj, 'x', frame), y = this.getValue(obj, 'y', frame), rotation = this.getValue(obj, 'rotation', frame) * DEG2RAD;
+        const scaleX = this.getValue(obj, 'scaleX', frame) || 0.001, scaleY = this.getValue(obj, 'scaleY', frame) || 0.001;
+        const dx = px - x, dy = py - y, cos = Math.cos(-rotation), sin = Math.sin(-rotation);
+        const lx = (dx * cos - dy * sin) / scaleX, ly = (dx * sin + dy * cos) / scaleY;
         if (Math.abs(lx) <= obj.w / 2 && Math.abs(ly) <= obj.h / 2) return obj;
       }
     }
     return null;
   }
 
-  // ---------------- export ----------------
-
-  /** Real GIF89a export: renders every frame in [0, frameCount) to an
-   * offscreen canvas, quantizes its actual RGBA pixels to a palette, and
-   * writes each as a real indexed GIF frame via `gifenc`. Returns a Blob
-   * ready for download — no server, no ffmpeg. */
-  exportGif(): Blob {
-    const { width, height, fps, frameCount, loop } = this.doc;
-    const off = document.createElement('canvas');
-    off.width = width;
-    off.height = height;
-    const octx = off.getContext('2d')!;
-    const gif = GIFEncoder();
-    const delayMs = Math.round(1000 / fps);
-    for (let f = 0; f < frameCount; f++) {
-      octx.clearRect(0, 0, width, height);
-      octx.fillStyle = '#05080d';
-      octx.fillRect(0, 0, width, height);
-      this.renderFrame(octx, f);
-      const { data } = octx.getImageData(0, 0, width, height);
-      const palette = quantize(data, 256);
-      const index = applyPalette(data, palette);
-      gif.writeFrame(index, width, height, { palette, delay: delayMs, repeat: loop ? 0 : -1 });
-    }
-    gif.finish();
-    // gif.bytes() returns a real Uint8Array copy of the encoded GIF89a
-    // stream; the `as BlobPart` cast below is purely to satisfy a strict
-    // lib.dom ArrayBufferLike/ArrayBuffer generic mismatch in newer
-    // TypeScript — the underlying bytes are unaffected either way.
-    return new Blob([gif.bytes() as BlobPart], { type: 'image/gif' });
+  exportDocument(): Blob {
+    return new Blob([JSON.stringify({ version: 2, boardId: this.boardId, document: this.doc }, null, 2)], { type: 'application/json' });
   }
 
-  /** Real PNG sprite-sheet export: every frame's actual rendered pixels
-   * laid out left-to-right in one grid canvas, returned as a PNG blob. */
-  exportSpriteSheet(): Promise<Blob> {
-    const { width, height, frameCount } = this.doc;
-    const cols = Math.ceil(Math.sqrt(frameCount));
-    const rows = Math.ceil(frameCount / cols);
-    const sheet = document.createElement('canvas');
-    sheet.width = width * cols;
-    sheet.height = height * rows;
-    const sctx = sheet.getContext('2d')!;
-    sctx.fillStyle = '#05080d';
-    sctx.fillRect(0, 0, sheet.width, sheet.height);
-    const off = document.createElement('canvas');
-    off.width = width;
-    off.height = height;
-    const octx = off.getContext('2d')!;
-    for (let f = 0; f < frameCount; f++) {
-      octx.clearRect(0, 0, width, height);
-      this.renderFrame(octx, f);
-      const col = f % cols;
-      const row = Math.floor(f / cols);
-      sctx.drawImage(off, col * width, row * height);
+  exportGif(): Blob {
+    const { width, height, fps, loop } = this.doc, start = this.doc.workStart ?? 0, end = this.doc.workEnd ?? this.doc.frameCount - 1;
+    const off = document.createElement('canvas'); off.width = width; off.height = height; const octx = off.getContext('2d')!;
+    const gif = GIFEncoder(), delayMs = Math.round(1000 / fps);
+    for (let f = start; f <= end; f++) {
+      octx.clearRect(0, 0, width, height); octx.fillStyle = '#05080d'; octx.fillRect(0, 0, width, height); this.renderFrame(octx, f);
+      const { data } = octx.getImageData(0, 0, width, height), palette = quantize(data, 256), index = applyPalette(data, palette);
+      gif.writeFrame(index, width, height, { palette, delay: delayMs, repeat: loop ? 0 : -1 });
     }
-    return new Promise((resolve, reject) => {
-      sheet.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))), 'image/png');
-    });
+    gif.finish(); return new Blob([gif.bytes() as BlobPart], { type: 'image/gif' });
+  }
+
+  exportSpriteSheet(): Promise<Blob> {
+    const { width, height } = this.doc, start = this.doc.workStart ?? 0, end = this.doc.workEnd ?? this.doc.frameCount - 1, frameCount = end - start + 1;
+    const cols = Math.ceil(Math.sqrt(frameCount)), rows = Math.ceil(frameCount / cols), sheet = document.createElement('canvas');
+    sheet.width = width * cols; sheet.height = height * rows; const sctx = sheet.getContext('2d')!; sctx.fillStyle = '#05080d'; sctx.fillRect(0, 0, sheet.width, sheet.height);
+    const off = document.createElement('canvas'); off.width = width; off.height = height; const octx = off.getContext('2d')!;
+    for (let i = 0, f = start; f <= end; f++, i++) { octx.clearRect(0, 0, width, height); this.renderFrame(octx, f); sctx.drawImage(off, (i % cols) * width, Math.floor(i / cols) * height); }
+    return new Promise((resolve, reject) => sheet.toBlob((blob) => blob ? resolve(blob) : reject(new Error('toBlob failed')), 'image/png'));
   }
 }
 
-function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const lenSq = dx * dx + dy * dy;
-  let t = lenSq === 0 ? 0 : ((px - x1) * dx + (py - y1) * dy) / lenSq;
-  t = Math.max(0, Math.min(1, t));
-  const cx = x1 + t * dx;
-  const cy = y1 + t * dy;
-  return Math.hypot(px - cx, py - cy);
+function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
+  const dx = x2 - x1, dy = y2 - y1, lenSq = dx * dx + dy * dy;
+  let t = lenSq === 0 ? 0 : ((px - x1) * dx + (py - y1) * dy) / lenSq; t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
 }
