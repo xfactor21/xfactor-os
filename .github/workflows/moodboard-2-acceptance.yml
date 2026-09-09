@@ -1,16 +1,15 @@
-name: Verify Release Candidate
+name: Moodboard 2.0 Acceptance
 
 on:
   pull_request:
-  push:
-    branches: ['main']
+    paths:
+      - 'src/modules/studio/MoodboardEditor.tsx'
+      - 'scripts/moodboard-smoke.mjs'
+      - '.github/workflows/moodboard-2-acceptance.yml'
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
-  web:
+  moodboard:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -19,27 +18,20 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
-      - name: Audit full dependency tree
-        run: npm audit --audit-level=high
-      - run: npm run test:release
       - run: npm run lint
       - run: npm run build
-      - name: Install Chromium smoke runner
+      - name: Install Chromium
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.62.0
           npx playwright install --with-deps chromium
       - name: Start production preview
         run: |
-          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/xfactor-preview.log 2>&1 &
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/xfactor-moodboard-preview.log 2>&1 &
           for i in {1..30}; do
             if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
             sleep 1
           done
-          cat /tmp/xfactor-preview.log
+          cat /tmp/xfactor-moodboard-preview.log
           exit 1
-      - name: Tutorial browser acceptance
-        run: node scripts/tutorial-smoke.mjs
-      - name: Browser runtime smoke
-        run: node scripts/browser-smoke.mjs
+      - name: Moodboard browser acceptance
+        run: node scripts/moodboard-smoke.mjs
