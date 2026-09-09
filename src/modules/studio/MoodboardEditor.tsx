@@ -36,12 +36,13 @@ export default function MoodboardEditor({boardId,onExit}:{boardId:string;onExit:
   const history=useRef<string[]>([]),future=useRef<string[]>([]);
   const drag=useRef<{kind:'move'|'resize'|'rotate';ids:string[];before:string;startX:number;startY:number;orig:Record<string,{x:number;y:number;w:number;h:number;rot:number}>}|null>(null);
 
-  useEffect(()=>{const t=setTimeout(()=>{try{localStorage.setItem(key(boardId),JSON.stringify(doc));}catch{/* best effort */}},200);return()=>clearTimeout(t);},[doc,boardId]);
+  function persist(next:MoodDoc){try{localStorage.setItem(key(boardId),JSON.stringify(next));}catch{/* best effort */}}
+  useEffect(()=>{const t=setTimeout(()=>persist(doc),200);return()=>clearTimeout(t);},[doc,boardId]);
   const selected=selectedIds.length===1?doc.tiles.find(t=>t.id===selectedIds[0])??null:null;
 
-  function commit(mutator:(d:MoodDoc)=>void){history.current.push(JSON.stringify(doc));if(history.current.length>80)history.current.shift();future.current=[];const n=structuredClone(doc);mutator(n);setDoc(normalize(n));}
-  function undo(){if(!history.current.length)return;future.current.push(JSON.stringify(doc));setDoc(normalize(JSON.parse(history.current.pop()!) as MoodDoc));}
-  function redo(){if(!future.current.length)return;history.current.push(JSON.stringify(doc));setDoc(normalize(JSON.parse(future.current.pop()!) as MoodDoc));}
+  function commit(mutator:(d:MoodDoc)=>void){setDoc(current=>{history.current.push(JSON.stringify(current));if(history.current.length>80)history.current.shift();future.current=[];const n=structuredClone(current);mutator(n);const next=normalize(n);persist(next);return next;});}
+  function undo(){if(!history.current.length)return;setDoc(current=>{future.current.push(JSON.stringify(current));const next=normalize(JSON.parse(history.current.pop()!) as MoodDoc);persist(next);return next;});}
+  function redo(){if(!future.current.length)return;setDoc(current=>{history.current.push(JSON.stringify(current));const next=normalize(JSON.parse(future.current.pop()!) as MoodDoc);persist(next);return next;});}
   function patch(id:string,p:Partial<Tile>){commit(d=>{d.tiles=d.tiles.map(t=>t.id===id?{...t,...p}:t);});}
   function addTile(tile:Omit<Tile,'id'|'z'|'visible'|'locked'|'opacity'>){const id=nid();commit(d=>d.tiles.push({...tile,id,z:nextZ(d.tiles),visible:true,locked:false,opacity:1}));setSelectedIds([id]);}
   function addSwatch(color:string){addTile({kind:'swatch',x:doc.width/2,y:doc.height/2,w:150,h:150,rot:0,color});}
@@ -56,7 +57,7 @@ export default function MoodboardEditor({boardId,onExit}:{boardId:string;onExit:
   function boardScale(){const r=boardRef.current?.getBoundingClientRect();return r?r.width/doc.width:1;}
   function startDrag(kind:'move'|'resize'|'rotate',tile:Tile,e:React.PointerEvent){e.stopPropagation();if(tile.locked)return;const idsToMove=selectedIds.includes(tile.id)?selectedIds:[tile.id];setSelectedIds(idsToMove);const orig:Record<string,{x:number;y:number;w:number;h:number;rot:number}>={};idsToMove.forEach(id=>{const t=doc.tiles.find(x=>x.id===id);if(t)orig[id]={x:t.x,y:t.y,w:t.w,h:t.h,rot:t.rot};});drag.current={kind,ids:idsToMove,before:JSON.stringify(doc),startX:e.clientX,startY:e.clientY,orig};}
   function onMove(e:React.PointerEvent){const g=drag.current;if(!g)return;const s=boardScale(),dx=(e.clientX-g.startX)/s,dy=(e.clientY-g.startY)/s;setDoc(d=>({...d,tiles:d.tiles.map(t=>{const o=g.orig[t.id];if(!o)return t;if(g.kind==='move')return{...t,x:snap(o.x+dx,d),y:snap(o.y+dy,d)};if(g.kind==='resize'&&g.ids.length===1)return{...t,w:Math.max(30,snap(o.w+dx,d)),h:Math.max(30,snap(o.h+dy,d))};if(g.kind==='rotate'&&g.ids.length===1){const r=boardRef.current?.getBoundingClientRect();if(!r)return t;const cx=r.left+(o.x/doc.width)*r.width,cy=r.top+(o.y/doc.height)*r.height;return{...t,rot:Math.round(Math.atan2(e.clientY-cy,e.clientX-cx)*180/Math.PI+90)};}return t;})}));}
-  function onUp(){if(!drag.current)return;history.current.push(drag.current.before);if(history.current.length>80)history.current.shift();future.current=[];drag.current=null;}
+  function onUp(){if(!drag.current)return;history.current.push(drag.current.before);if(history.current.length>80)history.current.shift();future.current=[];drag.current=null;setDoc(current=>{persist(current);return current;});}
 
   function align(kind:'left'|'center'|'right'|'top'|'middle'|'bottom'){const ts=doc.tiles.filter(t=>selectedIds.includes(t.id));if(ts.length<2)return;const left=Math.min(...ts.map(t=>t.x-t.w/2)),right=Math.max(...ts.map(t=>t.x+t.w/2)),top=Math.min(...ts.map(t=>t.y-t.h/2)),bottom=Math.max(...ts.map(t=>t.y+t.h/2)),cx=(left+right)/2,cy=(top+bottom)/2;commit(d=>{d.tiles=d.tiles.map(t=>!selectedIds.includes(t.id)?t:{...t,x:kind==='left'?left+t.w/2:kind==='right'?right-t.w/2:kind==='center'?cx:t.x,y:kind==='top'?top+t.h/2:kind==='bottom'?bottom-t.h/2:kind==='middle'?cy:t.y});});}
   function distribute(axis:'h'|'v'){const ts=doc.tiles.filter(t=>selectedIds.includes(t.id)).sort((a,b)=>axis==='h'?a.x-b.x:a.y-b.y);if(ts.length<3)return;const first=ts[0],last=ts[ts.length-1],span=(axis==='h'?last.x-first.x:last.y-first.y);commit(d=>{d.tiles=d.tiles.map(t=>{const i=ts.findIndex(x=>x.id===t.id);if(i<=0||i===ts.length-1)return t;return axis==='h'?{...t,x:first.x+span*i/(ts.length-1)}:{...t,y:first.y+span*i/(ts.length-1)};});});}
