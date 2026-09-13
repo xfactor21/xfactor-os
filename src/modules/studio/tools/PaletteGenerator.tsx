@@ -1,311 +1,33 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ToolShell from './ToolShell';
 
-type Mode = 'image' | 'color';
-type Harmony = 'complementary' | 'analogous' | 'triadic' | 'monochrome';
+type Mode='image'|'color';
+type Harmony='complementary'|'analogous'|'triadic'|'split'|'tetradic'|'monochrome';
+interface SavedPalette{id:string;name:string;colors:string[];createdAt:string;}
+interface PaletteDoc{version:2;mode:Mode;baseColor:string;harmony:Harmony;count:number;imageSwatches:string[];saved:SavedPalette[];}
+const KEY='xfactor-studio-palette2-';const LEGACY='xos-studio-palette-';const HARMONIES:Harmony[]=['complementary','analogous','triadic','split','tetradic','monochrome'];
+const initial:PaletteDoc={version:2,mode:'image',baseColor:'#00e5ff',harmony:'complementary',count:6,imageSwatches:[],saved:[]};
+function load(boardId:string):PaletteDoc{try{const raw=localStorage.getItem(`${KEY}${boardId}`);if(raw)return {...initial,...JSON.parse(raw),version:2};const old=localStorage.getItem(`${LEGACY}${boardId}`);if(old){const p=JSON.parse(old);return {...initial,mode:p.mode||'image',baseColor:p.baseColor||'#00e5ff',harmony:HARMONIES.includes(p.harmony)?p.harmony:'complementary'};}}catch{}return initial;}
+function hexToRgb(hex:string):[number,number,number]{let h=hex.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16)||0;return[(n>>16)&255,(n>>8)&255,n&255];}
+function rgbToHex(r:number,g:number,b:number){const h=(n:number)=>Math.max(0,Math.min(255,Math.round(n))).toString(16).padStart(2,'0');return`#${h(r)}${h(g)}${h(b)}`;}
+function rgbToHsv(r:number,g:number,b:number):[number,number,number]{r/=255;g/=255;b/=255;const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;let h=0;if(d){if(max===r)h=((g-b)/d)%6;else if(max===g)h=(b-r)/d+2;else h=(r-g)/d+4;h/=6;if(h<0)h+=1;}return[h,max?d/max:0,max];}
+function hsvToRgb(h:number,s:number,v:number):[number,number,number]{h=((h%1)+1)%1;const i=Math.floor(h*6),f=h*6-i,p=v*(1-s),q=v*(1-f*s),t=v*(1-(1-f)*s);const sets:[[number,number,number],[number,number,number],[number,number,number],[number,number,number],[number,number,number],[number,number,number]]=[[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]];return sets[i%6].map(n=>Math.round(n*255)) as [number,number,number];}
+function harmony(base:string,type:Harmony,count:number){const [r,g,b]=hexToRgb(base),[h,s,v]=rgbToHsv(r,g,b);const offsets:Record<Harmony,number[]>={complementary:[0,.5],analogous:[-.12,-.06,0,.06,.12],triadic:[0,1/3,2/3],split:[0,.42,.58],tetradic:[0,.25,.5,.75],monochrome:[0]};const o=offsets[type];const out:string[]=[];for(let i=0;i<count;i++){const off=o[i%o.length];const cycle=Math.floor(i/o.length);const sat=Math.max(.12,Math.min(1,s*(1-cycle*.12)));const val=Math.max(.16,Math.min(1,v*(1-cycle*.13)+(i%2?0.08:0)));out.push(rgbToHex(...hsvToRgb(h+off,sat,val)));}return out;}
+function extract(data:ImageData,count:number){const buckets=new Map<string,{r:number;g:number;b:number;n:number}>();for(let i=0;i<data.data.length;i+=16){const r=data.data[i],g=data.data[i+1],b=data.data[i+2],a=data.data[i+3];if(a<96)continue;const key=`${Math.round(r/24)},${Math.round(g/24)},${Math.round(b/24)}`;const x=buckets.get(key);if(x){x.r+=r;x.g+=g;x.b+=b;x.n++;}else buckets.set(key,{r,g,b,n:1});}const ranked=[...buckets.values()].sort((a,b)=>b.n-a.n);const picked:{hex:string;rgb:[number,number,number]}[]=[];for(const x of ranked){const rgb:[number,number,number]=[x.r/x.n,x.g/x.n,x.b/x.n];if(picked.every(p=>Math.hypot(rgb[0]-p.rgb[0],rgb[1]-p.rgb[1],rgb[2]-p.rgb[2])>42)){picked.push({hex:rgbToHex(...rgb),rgb});if(picked.length>=count)break;}}return picked.map(p=>p.hex);}
+function dl(name:string,text:string,type:string){const u=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2500);}
 
-const STORAGE_PREFIX = 'xos-studio-palette-';
-
-// ---- color math helpers (kept local/self-contained on purpose) ----
-
-function hexToRgb(hex: string): [number, number, number] {
-  let h = hex.replace('#', '').trim();
-  if (h.length === 3) {
-    h = h
-      .split('')
-      .map((c) => c + c)
-      .join('');
-  }
-  const num = parseInt(h, 16) || 0;
-  const r = (num >> 16) & 255;
-  const g = (num >> 8) & 255;
-  const b = num & 255;
-  return [r, g, b];
-}
-
-function rgbToHsb(r: number, g: number, b: number): [number, number, number] {
-  const rn = r / 255;
-  const gn = g / 255;
-  const bn = b / 255;
-  const max = Math.max(rn, gn, bn);
-  const min = Math.min(rn, gn, bn);
-  const delta = max - min;
-  let h = 0;
-  if (delta !== 0) {
-    if (max === rn) h = ((gn - bn) / delta) % 6;
-    else if (max === gn) h = (bn - rn) / delta + 2;
-    else h = (rn - gn) / delta + 4;
-    h /= 6;
-    if (h < 0) h += 1;
-  }
-  const s = max === 0 ? 0 : delta / max;
-  const v = max;
-  return [h, s, v];
-}
-
-function hsbToRgb(h: number, s: number, v: number): [number, number, number] {
-  const hh = ((h % 1) + 1) % 1;
-  const i = Math.floor(hh * 6);
-  const f = hh * 6 - i;
-  const p = v * (1 - s);
-  const q = v * (1 - f * s);
-  const t = v * (1 - (1 - f) * s);
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  switch (i % 6) {
-    case 0:
-      r = v;
-      g = t;
-      b = p;
-      break;
-    case 1:
-      r = q;
-      g = v;
-      b = p;
-      break;
-    case 2:
-      r = p;
-      g = v;
-      b = t;
-      break;
-    case 3:
-      r = p;
-      g = q;
-      b = v;
-      break;
-    case 4:
-      r = t;
-      g = p;
-      b = v;
-      break;
-    default:
-      r = v;
-      g = p;
-      b = q;
-      break;
-  }
-  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-}
-
-function rgbToHex(r: number, g: number, b: number): string {
-  const clamp = (x: number) => Math.max(0, Math.min(255, Math.round(x)));
-  const toHex = (x: number) => clamp(x).toString(16).padStart(2, '0');
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-// ---- palette generation ----
-
-function generateHarmony(hex: string, harmony: Harmony): string[] {
-  const [r, g, b] = hexToRgb(hex);
-  const [h, s, v] = rgbToHsb(r, g, b);
-
-  const mk = (hueOffset: number, satMul: number, briMul: number) => {
-    const hue = h + hueOffset;
-    const sat = Math.max(0, Math.min(1, s * satMul));
-    const bri = Math.max(0, Math.min(1, v * briMul));
-    const [rr, gg, bb] = hsbToRgb(hue, sat, bri);
-    return rgbToHex(rr, gg, bb);
-  };
-
-  switch (harmony) {
-    case 'complementary':
-      return [mk(0, 1, 1), mk(0, 1, 1.3), mk(0.5, 1, 1), mk(0.5, 1, 0.7), mk(0, 1, 0.5)];
-    case 'analogous':
-      return [mk(-0.166, 1, 1), mk(-0.083, 1, 1), mk(0, 1, 1), mk(0.083, 1, 1), mk(0.166, 1, 1)];
-    case 'triadic':
-      return [mk(0, 1, 1), mk(0.333, 1, 1), mk(0.667, 1, 1), mk(0, 1, 1.25), mk(0, 1, 0.6)];
-    case 'monochrome':
-      return [mk(0, 1, 0.3), mk(0, 1, 0.55), mk(0, 1, 0.8), mk(0, 1, 1), mk(0, 0.5, 1)];
-    default:
-      return [];
-  }
-}
-
-function extractPalette(imageData: ImageData): string[] {
-  const data = imageData.data;
-  const buckets = new Map<string, { rSum: number; gSum: number; bSum: number; count: number }>();
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    const a = data[i + 3];
-    if (a < 128) continue;
-
-    const qr = Math.round(r / 32) * 32;
-    const qg = Math.round(g / 32) * 32;
-    const qb = Math.round(b / 32) * 32;
-    const key = `${qr},${qg},${qb}`;
-
-    const entry = buckets.get(key);
-    if (entry) {
-      entry.rSum += r;
-      entry.gSum += g;
-      entry.bSum += b;
-      entry.count += 1;
-    } else {
-      buckets.set(key, { rSum: r, gSum: g, bSum: b, count: 1 });
-    }
-  }
-
-  const top = Array.from(buckets.values())
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
-
-  return top.map((e) => rgbToHex(e.rSum / e.count, e.gSum / e.count, e.bSum / e.count));
-}
-
-const HARMONIES: Harmony[] = ['complementary', 'analogous', 'triadic', 'monochrome'];
-
-export default function PaletteGenerator({ boardId, onExit }: { boardId: string; onExit: () => void }) {
-  const [mode, setMode] = useState<Mode>('image');
-  const [baseColor, setBaseColor] = useState('#00e5ff');
-  const [harmony, setHarmony] = useState<Harmony>('complementary');
-  const [imageSwatches, setImageSwatches] = useState<string[]>([]);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
-
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const loadedOnceRef = useRef(false);
-
-  // load persisted state on mount
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(`${STORAGE_PREFIX}${boardId}`);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { mode?: Mode; baseColor?: string; harmony?: Harmony };
-        if (parsed.mode === 'image' || parsed.mode === 'color') setMode(parsed.mode);
-        if (typeof parsed.baseColor === 'string') setBaseColor(parsed.baseColor);
-        if (parsed.harmony && HARMONIES.includes(parsed.harmony)) setHarmony(parsed.harmony);
-      }
-    } catch {
-      // ignore corrupt/inaccessible storage
-    }
-    loadedOnceRef.current = true;
-  }, [boardId]);
-
-  // persist state on change
-  useEffect(() => {
-    if (!loadedOnceRef.current) return;
-    try {
-      localStorage.setItem(`${STORAGE_PREFIX}${boardId}`, JSON.stringify({ mode, baseColor, harmony }));
-    } catch {
-      // ignore quota/access errors
-    }
-  }, [boardId, mode, baseColor, harmony]);
-
-  const colorSwatches = useMemo(() => generateHarmony(baseColor, harmony), [baseColor, harmony]);
-
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setFileName(file.name);
-
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const maxDim = 200;
-      let w = img.width;
-      let h = img.height;
-      if (w > maxDim || h > maxDim) {
-        const scale = Math.min(maxDim / w, maxDim / h);
-        w = Math.max(1, Math.round(w * scale));
-        h = Math.max(1, Math.round(h * scale));
-      }
-      const canvas = canvasRef.current;
-      if (!canvas) {
-        URL.revokeObjectURL(url);
-        return;
-      }
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        URL.revokeObjectURL(url);
-        return;
-      }
-      ctx.drawImage(img, 0, 0, w, h);
-      const imageData = ctx.getImageData(0, 0, w, h);
-      setImageSwatches(extractPalette(imageData));
-      URL.revokeObjectURL(url);
-    };
-    img.src = url;
-  };
-
-  const handleCopy = (hex: string, key: string) => {
-    navigator.clipboard.writeText(hex).catch(() => {
-      // clipboard may be unavailable; swatch still shows the hex text
-    });
-    setCopied(key);
-    setTimeout(() => {
-      setCopied((prev) => (prev === key ? null : prev));
-    }, 1200);
-  };
-
-  const renderSwatch = (hex: string, key: string) => (
-    <div key={key} className="toolSwatch" style={{ cursor: 'pointer' }} onClick={() => handleCopy(hex, key)}>
-      <div className="sw" style={{ background: hex }} />
-      <div className="hex">{copied === key ? 'Copied!' : hex}</div>
-    </div>
-  );
-
-  return (
-    <ToolShell title="PALETTE GENERATOR" onExit={onExit}>
-      <div className="toolCol">
-        <div className="toolRow">
-          <button className={`chip ${mode === 'image' ? 'on' : ''}`} onClick={() => setMode('image')}>
-            FROM IMAGE
-          </button>
-          <button className={`chip ${mode === 'color' ? 'on' : ''}`} onClick={() => setMode('color')}>
-            FROM COLOR
-          </button>
-        </div>
-
-        {mode === 'image' && (
-          <div className="toolCol">
-            <label className="toolDrop" style={{ cursor: 'pointer', display: 'block' }}>
-              <input type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
-              <span>{fileName ? fileName : 'Click to upload an image and extract its palette'}</span>
-            </label>
-
-            <div className="toolRow" style={{ alignItems: 'flex-start', gap: 16 }}>
-              <div className="toolCanvasWrap">
-                <canvas ref={canvasRef} style={{ maxWidth: 160, maxHeight: 160, display: 'block' }} />
-              </div>
-              <div className="toolSwatchGrid">
-                {imageSwatches.length === 0 ? (
-                  <div className="toolHint">Upload an image above — the 6 most common colors will appear here.</div>
-                ) : (
-                  imageSwatches.map((hex, i) => renderSwatch(hex, `img-${i}`))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {mode === 'color' && (
-          <div className="toolCol">
-            <div className="toolField">
-              <div className="rsub">BASE COLOR</div>
-              <div className="toolRow">
-                <input type="color" value={baseColor} onChange={(e) => setBaseColor(e.target.value)} />
-                <span style={{ color: 'var(--text-dim)' }}>{baseColor.toUpperCase()}</span>
-              </div>
-            </div>
-
-            <div className="toolRow">
-              {HARMONIES.map((h) => (
-                <button key={h} className={`chip small ${harmony === h ? 'on' : ''}`} onClick={() => setHarmony(h)}>
-                  {h.toUpperCase()}
-                </button>
-              ))}
-            </div>
-
-            <div className="toolSwatchGrid">{colorSwatches.map((hex, i) => renderSwatch(hex, `col-${i}`))}</div>
-          </div>
-        )}
-      </div>
-    </ToolShell>
-  );
+export default function PaletteGenerator({boardId,onExit}:{boardId:string;onExit:()=>void}){
+ const [doc,setDoc]=useState<PaletteDoc>(()=>load(boardId));const [fileName,setFileName]=useState('');const [copied,setCopied]=useState('');const canvasRef=useRef<HTMLCanvasElement>(null);
+ useEffect(()=>{try{localStorage.setItem(`${KEY}${boardId}`,JSON.stringify(doc));}catch{}},[boardId,doc]);
+ const generated=useMemo(()=>harmony(doc.baseColor,doc.harmony,doc.count),[doc.baseColor,doc.harmony,doc.count]);const active=doc.mode==='image'?doc.imageSwatches:generated;
+ async function copy(text:string,label:string){try{await navigator.clipboard.writeText(text);setCopied(label);setTimeout(()=>setCopied(''),1000);}catch{}}
+ function onImage(file:File){setFileName(file.name);const u=URL.createObjectURL(file),img=new Image();img.onload=()=>{const max=320,scale=Math.min(1,max/img.naturalWidth,max/img.naturalHeight),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));const c=canvasRef.current;if(!c){URL.revokeObjectURL(u);return;}c.width=w;c.height=h;const ctx=c.getContext('2d');if(!ctx){URL.revokeObjectURL(u);return;}ctx.drawImage(img,0,0,w,h);setDoc(d=>({...d,imageSwatches:extract(ctx.getImageData(0,0,w,h),d.count)}));URL.revokeObjectURL(u);};img.src=u;}
+ function savePalette(){if(!active.length)return;const name=`Palette ${doc.saved.length+1}`;setDoc(d=>({...d,saved:[{id:`p-${Date.now()}`,name,colors:[...active],createdAt:new Date().toISOString()},...d.saved].slice(0,12)}));}
+ function css(colors:string[]){return`:root {\n${colors.map((c,i)=>`  --color-${i+1}: ${c};`).join('\n')}\n}\n`;}
+ return <ToolShell title="PALETTE GENERATOR 2.0" onExit={onExit}><div className="toolCol" data-testid="palette-generator-2-root"><div className="toolRow"><button className={`chip ${doc.mode==='image'?'on':''}`} onClick={()=>setDoc(d=>({...d,mode:'image'}))}>FROM IMAGE</button><button className={`chip ${doc.mode==='color'?'on':''}`} onClick={()=>setDoc(d=>({...d,mode:'color'}))}>FROM COLOR</button><label className="toolHint">COLORS <input aria-label="Palette size" type="number" min="3" max="10" value={doc.count} onChange={e=>setDoc(d=>({...d,count:Math.max(3,Math.min(10,Number(e.target.value)||3))}))} style={{width:52}}/></label></div>
+ {doc.mode==='image'?<div className="toolCol"><label className="toolDrop"><input aria-label="Palette image" type="file" accept="image/*" hidden onChange={e=>e.target.files?.[0]&&onImage(e.target.files[0])}/>{fileName||'UPLOAD IMAGE TO EXTRACT COLORS'}</label><canvas ref={canvasRef} style={{maxWidth:240,maxHeight:180,borderRadius:8}}/></div>:<div className="toolCol"><div className="toolRow"><input aria-label="Base color" type="color" value={doc.baseColor} onChange={e=>setDoc(d=>({...d,baseColor:e.target.value}))}/><strong>{doc.baseColor.toUpperCase()}</strong></div><div className="toolRow" style={{flexWrap:'wrap'}}>{HARMONIES.map(h=><button key={h} className={`chip small ${doc.harmony===h?'on':''}`} onClick={()=>setDoc(d=>({...d,harmony:h}))}>{h.toUpperCase()}</button>)}</div></div>}
+ <div className="toolSwatchGrid">{active.length?active.map((c,i)=><div key={`${c}-${i}`} className="toolSwatch" onClick={()=>void copy(c,`${i}`)} style={{cursor:'pointer'}}><div className="sw" style={{background:c}}/><div className="hex">{copied===`${i}`?'COPIED':c.toUpperCase()}</div></div>):<div className="toolHint">{doc.mode==='image'?'Upload an image to extract a palette.':'Choose a base color and harmony.'}</div>}</div>
+ {active.length>0&&<div className="toolRow" style={{flexWrap:'wrap'}}><button className="wbtn" onClick={savePalette}>SAVE PALETTE</button><button className="wbtn ghost" onClick={()=>void copy(active.join(', '),'all')}>{copied==='all'?'COPIED':'COPY ALL'}</button><button className="wbtn ghost" onClick={()=>dl('palette.css',css(active),'text/css')}>EXPORT CSS</button><button className="wbtn ghost" onClick={()=>dl('palette.json',JSON.stringify({colors:active},null,2),'application/json')}>EXPORT JSON</button></div>}
+ {doc.saved.length>0&&<><div className="rsub">SAVED PALETTES</div>{doc.saved.map(p=><div key={p.id} className="toolRow" style={{justifyContent:'space-between',alignItems:'center'}}><input aria-label="Saved palette name" value={p.name} onChange={e=>setDoc(d=>({...d,saved:d.saved.map(x=>x.id===p.id?{...x,name:e.target.value}:x)}))} style={{width:140}}/><div style={{display:'flex'}}>{p.colors.map((c,i)=><span key={i} style={{width:22,height:22,background:c,display:'inline-block'}}/>)}</div><button className="toolBtn" onClick={()=>void copy(p.colors.join(', '),p.id)}>Copy</button><button className="toolBtn" onClick={()=>setDoc(d=>({...d,saved:d.saved.filter(x=>x.id!==p.id)}))}>Delete</button></div>)}</>}
+ </div></ToolShell>;
 }
