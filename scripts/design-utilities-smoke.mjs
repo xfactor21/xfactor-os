@@ -17,7 +17,7 @@ await page.evaluate(b=>localStorage.setItem('xfactor-studio-boards-v1',JSON.stri
 await page.reload({waitUntil:'networkidle'});
 async function openLab(){await page.keyboard.press('Control+K');const cmd=page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');await cmd.fill('open lab');await cmd.press('Enter');}
 async function openBoard(name,testId){await openLab();await page.locator('.dpBoardCard').filter({hasText:name}).click();await page.getByTestId(testId).waitFor();}
-async function backToBoards(){await page.getByRole('button',{name:/Boards/i}).click();}
+async function backToBoards(){await page.getByRole('button',{name:'ALL BOARDS',exact:true}).click();await page.locator('.dpBoardCard').first().waitFor();}
 
 await check('Image Converter 2.0 batch resize and persistence',async()=>{
  await openBoard('UTILITY CONVERTER','image-converter-2-root');
