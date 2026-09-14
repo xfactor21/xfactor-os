@@ -11,11 +11,13 @@ import { installIncidentContextUx } from './xfactor/incidentContextUx'
 import { installDrawProEnhancements } from './modules/studio/draw/drawProEnhancements'
 import { installXfactorTutorial } from './xfactor/tutorial'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
+import { startPlanetXAnalytics } from './services/planetxAnalytics'
 
 installIncidentUx()
 installIncidentContextUx()
 installDrawProEnhancements()
 installXfactorTutorial()
+startPlanetXAnalytics()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
