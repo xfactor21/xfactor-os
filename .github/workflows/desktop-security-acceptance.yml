@@ -35,8 +35,10 @@ jobs:
           const html = fs.readFileSync('dist/widget.html', 'utf8');
           if (!html.includes('<title>xFactor.OS // Hotwire Capture</title>')) throw new Error('Built Hotwire title is not xFactor.OS branded');
           if (html.includes('xOS // Quick Capture')) throw new Error('Built Hotwire page still contains legacy xOS title');
+          if (html.includes('fonts.googleapis.com')) throw new Error('Hotwire page should not depend on remote fonts');
           const config = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
           const csp = config?.app?.security?.csp;
           if (typeof csp !== 'string' || !csp.includes("object-src 'none'") || !csp.includes("worker-src 'self' blob:")) throw new Error('Desktop CSP contract is incomplete');
+          if (!csp.includes('https://fonts.googleapis.com') || !csp.includes('https://fonts.gstatic.com')) throw new Error('Desktop CSP must preserve intentional Font Pairing previews');
           console.log('Desktop security acceptance passed.');
           NODE
