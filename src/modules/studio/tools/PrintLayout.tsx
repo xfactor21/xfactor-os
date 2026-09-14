@@ -1,336 +1,50 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as RPointerEvent } from 'react';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import ToolShell from './ToolShell';
 import Icon from '../../../design-system/icons/Icon';
 
-/**
- * Item #6 (batch 1). Real multi-page print layout: place image and text
- * blocks on a real page-size canvas (Letter or A4, portrait or landscape),
- * arrange multiple pages, then export an actual multi-page PDF via
- * `pdf-lib` — genuine embedded images and real drawn text at real point
- * coordinates (not a screenshot of the editor), sized to the exact paper
- * dimensions selected.
- */
-type PageSize = 'letter' | 'a4';
-type Orientation = 'portrait' | 'landscape';
+type PageSize='letter'|'a4'; type Orientation='portrait'|'landscape';
+type Item={id:string;kind:'image'|'text';x:number;y:number;w:number;h:number;src?:string;text?:string;fontSize?:number;color?:string};
+type Page={id:string;items:Item[]};
+type Doc={version:2;size:PageSize;orientation:Orientation;pages:Page[];outputName:string};
+const SIZE:Record<PageSize,[number,number]>={letter:[612,792],a4:[595.28,841.89]};
+const pagePt=(s:PageSize,o:Orientation):[number,number]=>o==='landscape'?[SIZE[s][1],SIZE[s][0]]:SIZE[s];
+const safe=(v:string)=>(v.trim()||'print-layout').replace(/[^a-z0-9._-]+/gi,'-');
+const fallback=():Doc=>({version:2,size:'letter',orientation:'portrait',pages:[{id:'p1',items:[]}],outputName:'print-layout'});
 
-interface LayoutItem {
-  id: string;
-  kind: 'image' | 'text';
-  // Stored as page-fraction coordinates (0..1) so the same item definition
-  // is resolution-independent between the on-screen canvas and the
-  // real-point PDF export.
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  src?: string; // image data URL
-  imgW?: number;
-  imgH?: number;
-  text?: string;
-  fontSize?: number;
-  color?: string;
-}
-
-interface LayoutPage {
-  id: string;
-  items: LayoutItem[];
-}
-
-// Real paper sizes in PDF points (72pt/inch) — Letter 8.5x11", A4 210x297mm.
-const SIZE_PT: Record<PageSize, [number, number]> = {
-  letter: [612, 792],
-  a4: [595.28, 841.89],
-};
-
-function pagePt(size: PageSize, orientation: Orientation): [number, number] {
-  const [w, h] = SIZE_PT[size];
-  return orientation === 'landscape' ? [h, w] : [w, h];
-}
-
-export default function PrintLayout({ onExit }: { boardId: string; onExit: () => void }) {
-  const [size, setSize] = useState<PageSize>('letter');
-  const [orientation, setOrientation] = useState<Orientation>('portrait');
-  const [pages, setPages] = useState<LayoutPage[]>([{ id: 'p1', items: [] }]);
-  const [pageIdx, setPageIdx] = useState(0);
-  const [selId, setSelId] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const stageRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ id: string; offX: number; offY: number } | null>(null);
-  const idCounter = useRef(0);
-  const genId = () => `item-${++idCounter.current}`;
-
-  const page = pages[pageIdx];
-  const [ptW, ptH] = pagePt(size, orientation);
-  const aspect = ptW / ptH;
-
-  function updateItems(fn: (items: LayoutItem[]) => LayoutItem[]) {
-    setPages((prev) => prev.map((p, i) => (i === pageIdx ? { ...p, items: fn(p.items) } : p)));
-  }
-
-  function addImage(file: File | null) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const src = reader.result as string;
-        const targetW = 0.4;
-        const targetH = targetW * (img.naturalHeight / img.naturalWidth) * aspect;
-        const id = genId();
-        updateItems((items) => [...items, { id, kind: 'image', x: 0.3, y: 0.3, w: targetW, h: targetH, src, imgW: img.naturalWidth, imgH: img.naturalHeight }]);
-        setSelId(id);
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function addText() {
-    const id = genId();
-    updateItems((items) => [...items, { id, kind: 'text', x: 0.15, y: 0.15, w: 0.7, h: 0.08, text: 'Heading text', fontSize: 24, color: '#111111' }]);
-    setSelId(id);
-  }
-
-  function removeSelected() {
-    if (!selId) return;
-    updateItems((items) => items.filter((i) => i.id !== selId));
-    setSelId(null);
-  }
-
-  function addPage() {
-    const id = `p${pages.length + 1}-${Date.now()}`;
-    setPages((prev) => [...prev, { id, items: [] }]);
-    setPageIdx(pages.length);
-  }
-  function removePage(i: number) {
-    if (pages.length <= 1) return;
-    setPages((prev) => prev.filter((_, idx) => idx !== i));
-    setPageIdx((cur) => Math.max(0, Math.min(cur, pages.length - 2)));
-  }
-
-  function onItemPointerDown(e: RPointerEvent<HTMLDivElement>, item: LayoutItem) {
-    e.stopPropagation();
-    setSelId(item.id);
-    const stage = stageRef.current;
-    if (!stage) return;
-    const rect = stage.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width;
-    const py = (e.clientY - rect.top) / rect.height;
-    dragRef.current = { id: item.id, offX: px - item.x, offY: py - item.y };
-    (e.target as Element).setPointerCapture(e.pointerId);
-  }
-  function onStagePointerMove(e: RPointerEvent<HTMLDivElement>) {
-    if (!dragRef.current) return;
-    const stage = stageRef.current;
-    if (!stage) return;
-    const rect = stage.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width;
-    const py = (e.clientY - rect.top) / rect.height;
-    const { id, offX, offY } = dragRef.current;
-    updateItems((items) => items.map((it) => (it.id === id ? { ...it, x: Math.max(0, Math.min(1 - it.w, px - offX)), y: Math.max(0, Math.min(1 - it.h, py - offY)) } : it)));
-  }
-  function onStagePointerUp() {
-    dragRef.current = null;
-  }
-
-  function updateSelected(patch: Partial<LayoutItem>) {
-    if (!selId) return;
-    updateItems((items) => items.map((it) => (it.id === selId ? { ...it, ...patch } : it)));
-  }
-
-  async function exportPdf() {
-    setExporting(true);
-    setError(null);
-    try {
-      const doc = await PDFDocument.create();
-      const font = await doc.embedFont(StandardFonts.Helvetica);
-      for (const pg of pages) {
-        const pdfPage = doc.addPage([ptW, ptH]);
-        for (const item of pg.items) {
-          const x = item.x * ptW;
-          const wPt = item.w * ptW;
-          const hPt = item.h * ptH;
-          // PDF origin is bottom-left; our editor's y is top-down.
-          const yTop = item.y * ptH;
-          const yPdf = ptH - yTop - hPt;
-          if (item.kind === 'image' && item.src) {
-            const isPng = item.src.startsWith('data:image/png');
-            const bytes = await fetch(item.src).then((r) => r.arrayBuffer());
-            const img = isPng ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
-            pdfPage.drawImage(img, { x, y: yPdf, width: wPt, height: hPt });
-          } else if (item.kind === 'text' && item.text) {
-            const fontSize = item.fontSize ?? 18;
-            const [r, g, b] = hexToRgb(item.color ?? '#111111');
-            pdfPage.drawText(item.text, { x, y: yPdf + hPt - fontSize, size: fontSize, font, color: rgb(r, g, b), maxWidth: wPt });
-          }
-        }
-      }
-      const bytes = await doc.save();
-      const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'print-layout.pdf';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-    } catch (err) {
-      console.error('PrintLayout export failed', err);
-      setError("Couldn't export the PDF.");
-    } finally {
-      setExporting(false);
-    }
-  }
-
-  function hexToRgb(hex: string): [number, number, number] {
-    const m = hex.replace('#', '');
-    const n = parseInt(m.length === 3 ? m.split('').map((c) => c + c).join('') : m, 16);
-    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
-  }
-
-  const selectedItem = page?.items.find((i) => i.id === selId) ?? null;
-
-  return (
-    <ToolShell
-      title="PRINT LAYOUT DESIGNER"
-      onExit={onExit}
-      actions={
-        <button className="wbtn" onClick={exportPdf} disabled={exporting}>
-          {exporting ? 'EXPORTING…' : `EXPORT PDF (${pages.length} PAGE${pages.length === 1 ? '' : 'S'})`}
-        </button>
-      }
-    >
-      <div className="toolRow">
-        <div className="toolCol">
-          <div className="toolField">
-            <label>PAPER</label>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {(['letter', 'a4'] as PageSize[]).map((s) => (
-                <span key={s} className={`chip small ${size === s ? 'on' : ''}`} onClick={() => setSize(s)}>
-                  {s.toUpperCase()}
-                </span>
-              ))}
-              {(['portrait', 'landscape'] as Orientation[]).map((o) => (
-                <span key={o} className={`chip small ${orientation === o ? 'on' : ''}`} onClick={() => setOrientation(o)}>
-                  {o.toUpperCase()}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="toolField">
-            <label>ADD</label>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <label className="wbtn ghost" style={{ cursor: 'pointer' }}>
-                <Icon name="image" size={12} /> IMAGE
-                <input type="file" accept="image/png,image/jpeg" hidden onChange={(e) => addImage(e.target.files?.[0] ?? null)} />
-              </label>
-              <button className="wbtn ghost" onClick={addText}>
-                <Icon name="text" size={12} /> TEXT
-              </button>
-            </div>
-          </div>
-          <div className="toolField">
-            <label>PAGES</label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {pages.map((p, i) => (
-                <span key={p.id} className={`chip small ${i === pageIdx ? 'on' : ''}`} onClick={() => setPageIdx(i)}>
-                  {i + 1}
-                  {pages.length > 1 && (
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removePage(i);
-                      }}
-                      style={{ marginLeft: 4, display: 'inline-flex' }}
-                    >
-                      <Icon name="close" size={10} />
-                    </span>
-                  )}
-                </span>
-              ))}
-              <span className="chip small" onClick={addPage}>
-                <Icon name="plus" size={10} />
-              </span>
-            </div>
-            {pages.length > 1 && (
-              <button className="wbtn ghost" style={{ marginTop: 6 }} onClick={() => removePage(pageIdx)}>
-                DELETE THIS PAGE
-              </button>
-            )}
-          </div>
-          {selectedItem && (
-            <div className="toolField">
-              <label>SELECTED {selectedItem.kind.toUpperCase()}</label>
-              {selectedItem.kind === 'text' && (
-                <>
-                  <textarea rows={2} value={selectedItem.text} onChange={(e) => updateSelected({ text: e.target.value })} />
-                  <label style={{ marginTop: 6 }}>SIZE {selectedItem.fontSize}</label>
-                  <input type="range" min={8} max={72} value={selectedItem.fontSize} onChange={(e) => updateSelected({ fontSize: +e.target.value })} />
-                  <input type="color" value={selectedItem.color} onChange={(e) => updateSelected({ color: e.target.value })} />
-                </>
-              )}
-              <button className="wbtn ghost" style={{ marginTop: 6 }} onClick={removeSelected}>
-                <Icon name="trash" size={11} /> DELETE ELEMENT
-              </button>
-            </div>
-          )}
-          {error && (
-            <div className="toolHint" style={{ color: 'var(--magenta)' }}>
-              {error}
-            </div>
-          )}
-        </div>
-        <div className="toolCol">
-          <div
-            ref={stageRef}
-            onPointerMove={onStagePointerMove}
-            onPointerUp={onStagePointerUp}
-            onPointerLeave={onStagePointerUp}
-            onPointerDown={() => setSelId(null)}
-            style={{
-              position: 'relative',
-              width: '100%',
-              maxWidth: 460,
-              aspectRatio: `${aspect}`,
-              background: '#fff',
-              boxShadow: '0 0 24px rgba(0,245,255,.15)',
-              overflow: 'hidden',
-            }}
-          >
-            {page?.items.map((item) => (
-              <div
-                key={item.id}
-                onPointerDown={(e) => onItemPointerDown(e, item)}
-                style={{
-                  position: 'absolute',
-                  left: `${item.x * 100}%`,
-                  top: `${item.y * 100}%`,
-                  width: `${item.w * 100}%`,
-                  height: `${item.h * 100}%`,
-                  border: selId === item.id ? '2px solid #FF2D78' : '1px dashed rgba(0,0,0,.2)',
-                  cursor: 'move',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  alignItems: 'flex-end',
-                }}
-              >
-                {item.kind === 'image' && item.src && <img src={item.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />}
-                {item.kind === 'text' && (
-                  <span style={{ color: item.color, fontSize: (item.fontSize ?? 18) * 0.6, fontFamily: 'Helvetica, sans-serif', pointerEvents: 'none' }}>{item.text}</span>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="toolHint" style={{ marginTop: 8 }}>
-            Drag elements to position them. Real {size === 'letter' ? '8.5×11"' : '210×297mm'} {orientation} page — matches the exported PDF exactly.
-          </div>
-        </div>
-      </div>
-    </ToolShell>
-  );
+export default function PrintLayout({boardId,onExit}:{boardId:string;onExit:()=>void}){
+ const key=`xfactor-studio-print2-${boardId}`;
+ const [doc,setDoc]=useState<Doc>(()=>{try{const raw=localStorage.getItem(key);if(!raw)return fallback();const p=JSON.parse(raw) as Partial<Doc>;return p.version===2&&Array.isArray(p.pages)&&p.pages.length?{...fallback(),...p,version:2,pages:p.pages as Page[]}:fallback();}catch{return fallback();}});
+ const [pageIdx,setPageIdx]=useState(0),[selId,setSelId]=useState<string|null>(null),[exporting,setExporting]=useState(false),[status,setStatus]=useState('READY');
+ const stageRef=useRef<HTMLDivElement>(null),dragRef=useRef<{id:string;offX:number;offY:number}|null>(null),idRef=useRef(0);
+ useEffect(()=>{try{localStorage.setItem(key,JSON.stringify(doc));setStatus('SAVED');}catch{setStatus('LOCAL SAVE FULL — EXPORT PROJECT JSON');}},[doc,key]);
+ const page=doc.pages[Math.min(pageIdx,doc.pages.length-1)], [ptW,ptH]=pagePt(doc.size,doc.orientation), aspect=ptW/ptH;
+ const patch=(p:Partial<Doc>)=>setDoc(d=>({...d,...p}));
+ const updateItems=(fn:(i:Item[])=>Item[])=>setDoc(d=>({...d,pages:d.pages.map((p,i)=>i===pageIdx?{...p,items:fn(p.items)}:p)}));
+ const id=()=>`item-${Date.now()}-${++idRef.current}`;
+ function addText(){const n=id();updateItems(i=>[...i,{id:n,kind:'text',x:.15,y:.15,w:.7,h:.1,text:'Heading text',fontSize:24,color:'#111111'}]);setSelId(n);}
+ function addImage(file:File|null){if(!file)return;const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const src=r.result as string,w=.4,h=Math.min(.6,w*(img.naturalHeight/img.naturalWidth)*aspect),n=id();updateItems(i=>[...i,{id:n,kind:'image',x:.3,y:.3,w,h,src}]);setSelId(n);};img.src=r.result as string;};r.readAsDataURL(file);}
+ function updateSelected(p:Partial<Item>){if(selId)updateItems(items=>items.map(i=>i.id===selId?{...i,...p}:i));}
+ function removeSelected(){if(selId){updateItems(i=>i.filter(x=>x.id!==selId));setSelId(null);}}
+ function addPage(){setDoc(d=>({...d,pages:[...d.pages,{id:`p${Date.now()}`,items:[]}]}));setPageIdx(doc.pages.length);setSelId(null);}
+ function removePage(i:number){if(doc.pages.length<=1)return;setDoc(d=>({...d,pages:d.pages.filter((_,x)=>x!==i)}));setPageIdx(x=>Math.max(0,Math.min(x,doc.pages.length-2)));setSelId(null);}
+ function down(e:RPointerEvent<HTMLDivElement>,item:Item){e.stopPropagation();setSelId(item.id);const r=stageRef.current?.getBoundingClientRect();if(!r)return;dragRef.current={id:item.id,offX:(e.clientX-r.left)/r.width-item.x,offY:(e.clientY-r.top)/r.height-item.y};try{e.currentTarget.setPointerCapture(e.pointerId);}catch{/*optional*/}}
+ function move(e:RPointerEvent<HTMLDivElement>){const d=dragRef.current,r=stageRef.current?.getBoundingClientRect();if(!d||!r)return;const px=(e.clientX-r.left)/r.width,py=(e.clientY-r.top)/r.height;updateItems(items=>items.map(i=>i.id===d.id?{...i,x:Math.max(0,Math.min(1-i.w,px-d.offX)),y:Math.max(0,Math.min(1-i.h,py-d.offY))}:i));}
+ const up=()=>{dragRef.current=null;};
+ function download(blob:Blob,name:string){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2500);}
+ function exportJson(){download(new Blob([JSON.stringify(doc,null,2)],{type:'application/json'}),`${safe(doc.outputName)}.layout.json`);}
+ async function importJson(file:File){try{const p=JSON.parse(await file.text()) as Partial<Doc>;if(p.version!==2||!Array.isArray(p.pages)||!p.pages.length||(p.size!=='letter'&&p.size!=='a4')||(p.orientation!=='portrait'&&p.orientation!=='landscape'))throw new Error();setDoc({...fallback(),...p,version:2,pages:p.pages as Page[]});setPageIdx(0);setSelId(null);setStatus('PROJECT IMPORTED');}catch{setStatus('INVALID LAYOUT PROJECT');}}
+ function hex(hex:string){const m=hex.replace('#',''),n=parseInt(m.length===3?m.split('').map(c=>c+c).join(''):m,16);return [((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255] as [number,number,number];}
+ async function exportPdf(){setExporting(true);setStatus('EXPORTING PDF…');try{const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica);for(const pg of doc.pages){const p=pdf.addPage([ptW,ptH]);for(const item of pg.items){const x=item.x*ptW,w=item.w*ptW,h=item.h*ptH,y=ptH-item.y*ptH-h;if(item.kind==='image'&&item.src){const bytes=await fetch(item.src).then(r=>r.arrayBuffer()),im=item.src.startsWith('data:image/png')?await pdf.embedPng(bytes):await pdf.embedJpg(bytes);p.drawImage(im,{x,y,width:w,height:h});}else if(item.kind==='text'&&item.text){const fs=item.fontSize??18,[r,g,b]=hex(item.color??'#111111');p.drawText(item.text,{x,y:y+h-fs,size:fs,font,color:rgb(r,g,b),maxWidth:w});}}}download(new Blob([await pdf.save() as BlobPart],{type:'application/pdf'}),`${safe(doc.outputName)}.pdf`);setStatus(`EXPORTED ${doc.pages.length} PAGE PDF`);}catch{setStatus('PDF EXPORT FAILED');}finally{setExporting(false);}}
+ const selected=page?.items.find(i=>i.id===selId)??null;
+ return <ToolShell title="PRINT LAYOUT DESIGNER 2.0" onExit={onExit} actions={<button className="wbtn" onClick={exportPdf} disabled={exporting}>{exporting?'EXPORTING…':`EXPORT PDF (${doc.pages.length})`}</button>}><div data-testid="print-layout-2-root" className="toolRow">
+  <div className="toolCol"><label className="toolField">OUTPUT<input value={doc.outputName} onChange={e=>patch({outputName:e.target.value})}/></label><div className="toolRow">{(['letter','a4'] as PageSize[]).map(s=><button key={s} className={doc.size===s?'chip on':'chip'} onClick={()=>patch({size:s})}>{s.toUpperCase()}</button>)}{(['portrait','landscape'] as Orientation[]).map(o=><button key={o} className={doc.orientation===o?'chip on':'chip'} onClick={()=>patch({orientation:o})}>{o.toUpperCase()}</button>)}</div>
+   <div className="toolRow"><label className="wbtn ghost"><Icon name="image" size={12}/> IMAGE<input type="file" accept="image/png,image/jpeg" hidden onChange={e=>addImage(e.target.files?.[0]??null)}/></label><button className="wbtn ghost" onClick={addText}><Icon name="text" size={12}/> TEXT</button></div>
+   <div className="toolRow">{doc.pages.map((p,i)=><button key={p.id} className={pageIdx===i?'chip on':'chip'} onClick={()=>{setPageIdx(i);setSelId(null);}}>PAGE {i+1}</button>)}<button className="chip" onClick={addPage}>+ PAGE</button></div>{doc.pages.length>1&&<button className="wbtn ghost" onClick={()=>removePage(pageIdx)}>DELETE PAGE</button>}
+   {selected&&<div className="toolField"><label>SELECTED {selected.kind.toUpperCase()}</label>{selected.kind==='text'&&<><textarea value={selected.text} onChange={e=>updateSelected({text:e.target.value})}/><label>SIZE {selected.fontSize}</label><input type="range" min={8} max={72} value={selected.fontSize} onChange={e=>updateSelected({fontSize:+e.target.value})}/><input type="color" value={selected.color} onChange={e=>updateSelected({color:e.target.value})}/></>}<label>WIDTH {Math.round(selected.w*100)}%</label><input type="range" min={10} max={100} value={selected.w*100} onChange={e=>updateSelected({w:+e.target.value/100})}/><button className="wbtn ghost" onClick={removeSelected}>DELETE ELEMENT</button></div>}
+   <div className="toolRow"><label className="toolDrop"><input type="file" accept="application/json" hidden onChange={e=>{const f=e.target.files?.[0];if(f)void importJson(f);e.target.value='';}}/>IMPORT PROJECT</label><button className="wbtn ghost" onClick={exportJson}>EXPORT PROJECT</button></div><span className="toolHint">{status}</span>
+  </div>
+  <div className="toolCol"><div ref={stageRef} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerDown={()=>setSelId(null)} style={{position:'relative',width:'100%',maxWidth:460,aspectRatio:`${aspect}`,background:'#fff',overflow:'hidden'}}>{page?.items.map(item=><div key={item.id} onPointerDown={e=>down(e,item)} style={{position:'absolute',left:`${item.x*100}%`,top:`${item.y*100}%`,width:`${item.w*100}%`,height:`${item.h*100}%`,border:selId===item.id?'2px solid #ff2d78':'1px dashed rgba(0,0,0,.2)',cursor:'move',overflow:'hidden',display:'flex',alignItems:'flex-end'}}>{item.kind==='image'&&item.src&&<img src={item.src} alt="" style={{width:'100%',height:'100%',objectFit:'contain',pointerEvents:'none'}}/>}{item.kind==='text'&&<span style={{color:item.color,fontSize:(item.fontSize??18)*.6,fontFamily:'Helvetica,sans-serif',pointerEvents:'none'}}>{item.text}</span>}</div>)}</div><div className="toolHint">Exact Letter/A4 proportions; export is a real multi-page PDF with embedded images and text.</div></div>
+ </div></ToolShell>;
 }
