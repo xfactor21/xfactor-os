@@ -1,0 +1,39 @@
+name: Design Lab Media + PDF Utilities 2.0 Acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'src/modules/studio/tools/VideoTrimmer.tsx'
+      - 'src/modules/studio/tools/AudioTrimmer.tsx'
+      - 'src/modules/studio/tools/PdfMarkup.tsx'
+      - 'scripts/design-media-pdf-smoke.mjs'
+      - '.github/workflows/design-media-pdf-2-acceptance.yml'
+  workflow_dispatch:
+
+jobs:
+  media-pdf:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - name: Install Chromium
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.62.0
+          npx playwright install --with-deps chromium
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/xfactor-media-pdf-preview.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/xfactor-media-pdf-preview.log
+          exit 1
+      - name: Media + PDF browser acceptance
+        run: node scripts/design-media-pdf-smoke.mjs
