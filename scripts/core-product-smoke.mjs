@@ -44,11 +44,21 @@ await check('clean local-only shell boots', async () => {
   }
 });
 
-await check('Command Deck creates two named Incidents and persists them', async () => {
+await check('Command Deck creates two named Incidents, separates them, and persists them', async () => {
   await openCommand('new project CORE ALPHA');
   await openCommand('new project CORE BETA');
   await page.getByText('CORE ALPHA', { exact: true }).first().waitFor();
   await page.getByText('CORE BETA', { exact: true }).first().waitFor();
+  const positions = await page.evaluate(() => {
+    const raw = localStorage.getItem('xfactor-os-workspace-v2');
+    const workspace = raw ? JSON.parse(raw) : null;
+    const incidents = workspace?.incidents ?? [];
+    const alpha = incidents.find(i => i.name === 'CORE ALPHA');
+    const beta = incidents.find(i => i.name === 'CORE BETA');
+    return alpha && beta ? [workspace.positions?.[alpha.id], workspace.positions?.[beta.id]] : [];
+  });
+  if (positions.length !== 2 || !positions[0] || !positions[1]) throw new Error('missing persisted Incident positions');
+  if (positions[0].x === positions[1].x && positions[0].y === positions[1].y) throw new Error('new Incidents still occupy the exact same Floor coordinates');
   await page.reload({ waitUntil: 'networkidle' });
   await page.getByText('CORE ALPHA', { exact: true }).first().waitFor();
   await page.getByText('CORE BETA', { exact: true }).first().waitFor();
@@ -77,9 +87,11 @@ await check('Hotwire Signal can be edited, retyped, routed, completed, and persi
   await hotwire.fill('core smoke task');
   await page.getByRole('button', { name: 'TASK', exact: true }).click();
   await page.keyboard.press('Control+J');
-  const row = page.locator('.signal-row-full').filter({ hasText: 'core smoke task' });
+  let row = page.locator('.signal-row-full').filter({ hasText: 'core smoke task' });
   await row.waitFor();
   await row.locator('textarea').fill('core smoke edited');
+  row = page.locator('.signal-row-full').filter({ hasText: 'core smoke edited' });
+  await row.waitFor();
   const selects = row.locator('select');
   await selects.nth(0).selectOption('note');
   await selects.nth(1).selectOption({ label: 'CORE ALPHA' });
