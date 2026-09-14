@@ -2,329 +2,37 @@ import { useEffect, useMemo, useState } from 'react';
 import ToolShell from './ToolShell';
 import Icon from '../../../design-system/icons/Icon';
 
-// Module-level ref count + element handle backing the shared Google Fonts
-// <link> — see the effect below for why this needs to be ref-counted
-// rather than a plain create/remove pair.
-let fontLinkRefCount = 0;
-let fontLinkEl: HTMLLinkElement | null = null;
+let fontLinkRefCount=0;let fontLinkEl:HTMLLinkElement|null=null;
+type GenericFamily='serif'|'sans-serif'|'display';type FontPair={heading:string;body:string};
+const PAIRS:FontPair[]=[{heading:'Playfair Display',body:'Source Sans Pro'},{heading:'Montserrat',body:'Merriweather'},{heading:'Poppins',body:'Roboto'},{heading:'Oswald',body:'Lato'},{heading:'Space Grotesk',body:'Inter'},{heading:'Bebas Neue',body:'Nunito Sans'},{heading:'Cormorant Garamond',body:'Work Sans'},{heading:'Archivo Black',body:'Karla'},{heading:'DM Serif Display',body:'DM Sans'},{heading:'Fraunces',body:'Manrope'},{heading:'Abril Fatface',body:'Rubik'},{heading:'Josefin Sans',body:'Nunito'}];
+const GENERIC:Record<string,GenericFamily>={'Playfair Display':'serif','Source Sans Pro':'sans-serif',Montserrat:'sans-serif',Merriweather:'serif',Poppins:'sans-serif',Roboto:'sans-serif',Oswald:'sans-serif',Lato:'sans-serif','Space Grotesk':'sans-serif',Inter:'sans-serif','Bebas Neue':'display','Nunito Sans':'sans-serif','Cormorant Garamond':'serif','Work Sans':'sans-serif','Archivo Black':'sans-serif',Karla:'sans-serif','DM Serif Display':'serif','DM Sans':'sans-serif',Fraunces:'serif',Manrope:'sans-serif','Abril Fatface':'serif',Rubik:'sans-serif','Josefin Sans':'sans-serif',Nunito:'sans-serif'};
+const DEFAULT_H='The quick brown fox',DEFAULT_B='The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs — a practical reading sample for comparing rhythm, texture, and hierarchy.';
+type FontDoc={version:2;selectedIndex:number;headingText:string;bodyText:string;headingSize:number;bodySize:number;bodyLineHeight:number;favorites:number[];compareIndex:number|null};
+const KEY='xfactor-studio-fontpair2-',LEGACY='xos-studio-fontpair-';
+function fallback():FontDoc{return{version:2,selectedIndex:0,headingText:DEFAULT_H,bodyText:DEFAULT_B,headingSize:44,bodySize:16,bodyLineHeight:1.6,favorites:[],compareIndex:null};}
+function load(boardId:string):FontDoc{const f=fallback();try{const raw=localStorage.getItem(KEY+boardId);if(raw)return{...f,...JSON.parse(raw),version:2};const old=localStorage.getItem(LEGACY+boardId);if(old)return{...f,...JSON.parse(old),version:2};}catch{}return f;}
+function generic(name:string){return GENERIC[name]??'sans-serif';}
+function fontsHref(){const set=new Set(PAIRS.flatMap(p=>[p.heading,p.body]));return`https://fonts.googleapis.com/css2?${[...set].map(n=>`family=${n.split(' ').join('+')}:wght@400;700`).join('&')}&display=swap`;}
+function css(pair:FontPair,d:FontDoc){return`/* Heading */\nfont-family: '${pair.heading}', ${generic(pair.heading)};\nfont-size: ${d.headingSize}px;\nfont-weight: 700;\n\n/* Body */\nfont-family: '${pair.body}', ${generic(pair.body)};\nfont-size: ${d.bodySize}px;\nline-height: ${d.bodyLineHeight};`;}
+function dl(blob:Blob,name:string){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2500);}
 
-type GenericFamily = 'serif' | 'sans-serif' | 'display';
-
-type FontPair = {
-  heading: string;
-  body: string;
-  weight?: string;
-};
-
-const FONT_PAIRS: FontPair[] = [
-  { heading: 'Playfair Display', body: 'Source Sans Pro' },
-  { heading: 'Montserrat', body: 'Merriweather' },
-  { heading: 'Poppins', body: 'Roboto' },
-  { heading: 'Oswald', body: 'Lato' },
-  { heading: 'Space Grotesk', body: 'Inter' },
-  { heading: 'Bebas Neue', body: 'Nunito Sans' },
-  { heading: 'Cormorant Garamond', body: 'Work Sans' },
-  { heading: 'Archivo Black', body: 'Karla' },
-  { heading: 'DM Serif Display', body: 'DM Sans' },
-  { heading: 'Fraunces', body: 'Manrope' },
-  { heading: 'Abril Fatface', body: 'Rubik' },
-  { heading: 'Josefin Sans', body: 'Nunito' },
-];
-
-const GENERIC_FAMILY: Record<string, GenericFamily> = {
-  'Playfair Display': 'serif',
-  'Source Sans Pro': 'sans-serif',
-  Montserrat: 'sans-serif',
-  Merriweather: 'serif',
-  Poppins: 'sans-serif',
-  Roboto: 'sans-serif',
-  Oswald: 'sans-serif',
-  Lato: 'sans-serif',
-  'Space Grotesk': 'sans-serif',
-  Inter: 'sans-serif',
-  'Bebas Neue': 'display',
-  'Nunito Sans': 'sans-serif',
-  'Cormorant Garamond': 'serif',
-  'Work Sans': 'sans-serif',
-  'Archivo Black': 'sans-serif',
-  Karla: 'sans-serif',
-  'DM Serif Display': 'serif',
-  'DM Sans': 'sans-serif',
-  Fraunces: 'serif',
-  Manrope: 'sans-serif',
-  'Abril Fatface': 'serif',
-  Rubik: 'sans-serif',
-  'Josefin Sans': 'sans-serif',
-  Nunito: 'sans-serif',
-};
-
-const DEFAULT_HEADING = 'The quick brown fox';
-const DEFAULT_BODY =
-  'The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs — a pangram used to preview every letterform a typeface has to offer, in context, at reading size.';
-
-const MAX_SHUFFLE_RETRIES = 12;
-
-function genericFor(fontName: string): GenericFamily {
-  return GENERIC_FAMILY[fontName] ?? 'sans-serif';
-}
-
-function cssSnippet(pair: FontPair): string {
-  const headingGeneric = genericFor(pair.heading);
-  const bodyGeneric = genericFor(pair.body);
-  return `/* Heading */\nfont-family: '${pair.heading}', ${headingGeneric};\n\n/* Body */\nfont-family: '${pair.body}', ${bodyGeneric};`;
-}
-
-function buildGoogleFontsHref(pairs: FontPair[]): string {
-  const families = new Set<string>();
-  for (const pair of pairs) {
-    families.add(pair.heading);
-    families.add(pair.body);
-  }
-  const params = Array.from(families).map((name) => {
-    const encoded = name.split(' ').join('+');
-    return `family=${encoded}:wght@400;700`;
-  });
-  return `https://fonts.googleapis.com/css2?${params.join('&')}&display=swap`;
-}
-
-type PersistedState = {
-  selectedIndex?: number;
-  headingText?: string;
-  bodyText?: string;
-};
-
-export default function FontPairing({ boardId, onExit }: { boardId: string; onExit: () => void }) {
-  const storageKey = `xos-studio-fontpair-${boardId}`;
-
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [headingText, setHeadingText] = useState(DEFAULT_HEADING);
-  const [bodyText, setBodyText] = useState(DEFAULT_BODY);
-  const [copied, setCopied] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
-  // Load persisted state on mount.
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as PersistedState;
-        if (
-          typeof parsed.selectedIndex === 'number' &&
-          parsed.selectedIndex >= 0 &&
-          parsed.selectedIndex < FONT_PAIRS.length
-        ) {
-          setSelectedIndex(parsed.selectedIndex);
-        }
-        if (typeof parsed.headingText === 'string') setHeadingText(parsed.headingText);
-        if (typeof parsed.bodyText === 'string') setBodyText(parsed.bodyText);
-      }
-    } catch {
-      // ignore malformed/inaccessible storage
-    } finally {
-      setLoaded(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageKey]);
-
-  // Persist state on change (skip until initial load completes to avoid clobbering).
-  useEffect(() => {
-    if (!loaded) return;
-    try {
-      const payload: PersistedState = { selectedIndex, headingText, bodyText };
-      window.localStorage.setItem(storageKey, JSON.stringify(payload));
-    } catch {
-      // ignore quota/access errors
-    }
-  }, [loaded, storageKey, selectedIndex, headingText, bodyText]);
-
-  // Inject the single Google Fonts stylesheet link for all curated pairs,
-  // cleaned up on unmount via a module-level reference count rather than a
-  // plain create/remove pair. A plain pair breaks under React 18
-  // StrictMode's dev-only mount→cleanup→remount double-invoke (and under
-  // Fast Refresh): a bare "does a matching <link> already exist" check
-  // means whichever mount happens to run second sees the first mount's
-  // link, skips creating its own, and therefore never registers a cleanup
-  // for it — so when the *second* instance later unmounts for real, no one
-  // owns the link anymore and it leaks forever. Ref-counting sidesteps that
-  // ownership question entirely: the Nth mount only creates the link if the
-  // count was zero, and the link is only removed once the count drops back
-  // to zero, regardless of how many times or in what order this component
-  // mounts and unmounts.
-  useEffect(() => {
-    fontLinkRefCount += 1;
-    if (fontLinkRefCount === 1) {
-      const href = buildGoogleFontsHref(FONT_PAIRS);
-      fontLinkEl = document.createElement('link');
-      fontLinkEl.rel = 'stylesheet';
-      fontLinkEl.crossOrigin = 'anonymous';
-      fontLinkEl.href = href;
-      document.head.appendChild(fontLinkEl);
-    }
-    return () => {
-      fontLinkRefCount -= 1;
-      if (fontLinkRefCount <= 0) {
-        fontLinkEl?.remove();
-        fontLinkEl = null;
-        fontLinkRefCount = 0;
-      }
-    };
-  }, []);
-
-  const selectedPair = FONT_PAIRS[selectedIndex];
-
-  const snippet = useMemo(() => cssSnippet(selectedPair), [selectedPair]);
-
-  function selectIndex(i: number) {
-    setSelectedIndex(((i % FONT_PAIRS.length) + FONT_PAIRS.length) % FONT_PAIRS.length);
-  }
-
-  function handlePrev() {
-    selectIndex(selectedIndex - 1);
-  }
-
-  function handleNext() {
-    selectIndex(selectedIndex + 1);
-  }
-
-  function handleShuffle() {
-    if (FONT_PAIRS.length <= 1) return;
-    let next = selectedIndex;
-    let tries = 0;
-    while (next === selectedIndex && tries < MAX_SHUFFLE_RETRIES) {
-      next = Math.floor(Math.random() * FONT_PAIRS.length);
-      tries += 1;
-    }
-    setSelectedIndex(next);
-  }
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(snippet);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {
-      // clipboard unavailable — silently ignore
-    }
-  }
-
-  return (
-    <ToolShell title="FONT PAIRING EXPLORER" onExit={onExit}>
-      <div className="toolCol">
-        <div className="toolRow">
-          <button className="chip" onClick={handlePrev}>
-            <Icon name="chevronLeft" size={12} /> PREV
-          </button>
-          <button className="chip" onClick={handleNext}>
-            NEXT <Icon name="chevronRight" size={12} />
-          </button>
-          <button className="chip" onClick={handleShuffle}>
-            <Icon name="shuffle" size={12} /> SHUFFLE
-          </button>
-          <button className="wbtn" onClick={handleCopy}>
-            {copied ? 'COPIED!' : 'COPY CSS'}
-          </button>
-        </div>
-
-        <div className="toolRow" style={{ alignItems: 'stretch', gap: 16 }}>
-          <div className="gpanel" style={{ padding: 16, flex: 2, minWidth: 320 }}>
-            <div className="rsub">LIVE PREVIEW</div>
-            <div
-              style={{
-                fontFamily: selectedPair.heading,
-                fontWeight: 700,
-                fontSize: 40,
-                lineHeight: 1.15,
-                color: 'var(--text)',
-                marginTop: 8,
-                marginBottom: 12,
-                wordBreak: 'break-word',
-              }}
-            >
-              {headingText || DEFAULT_HEADING}
-            </div>
-            <p
-              style={{
-                fontFamily: selectedPair.body,
-                fontWeight: 400,
-                fontSize: 14,
-                lineHeight: 1.6,
-                color: 'var(--text-dim)',
-                marginTop: 0,
-              }}
-            >
-              {bodyText || DEFAULT_BODY}
-            </p>
-
-            <div className="toolField" style={{ marginTop: 12 }}>
-              <label className="toolHint">Heading sample</label>
-              <input
-                type="text"
-                value={headingText}
-                onChange={(e) => setHeadingText(e.target.value)}
-                placeholder={DEFAULT_HEADING}
-              />
-            </div>
-            <div className="toolField" style={{ marginTop: 8 }}>
-              <label className="toolHint">Body sample</label>
-              <textarea
-                value={bodyText}
-                onChange={(e) => setBodyText(e.target.value)}
-                placeholder={DEFAULT_BODY}
-                rows={4}
-              />
-            </div>
-
-            <div className="toolField" style={{ marginTop: 12 }}>
-              <label className="toolHint">CSS</label>
-              <pre
-                style={{
-                  background: 'var(--void)',
-                  border: '1px solid var(--edge)',
-                  borderRadius: 6,
-                  padding: 10,
-                  fontSize: 12,
-                  color: 'var(--cyan)',
-                  whiteSpace: 'pre-wrap',
-                  margin: 0,
-                }}
-              >
-                {snippet}
-              </pre>
-            </div>
-          </div>
-
-          <div className="gpanel" style={{ padding: 12, flex: 1, minWidth: 220, maxHeight: 480, overflowY: 'auto' }}>
-            <div className="rsub">CURATED PAIRS</div>
-            <div className="toolCol" style={{ marginTop: 8, gap: 6 }}>
-              {FONT_PAIRS.map((pair, i) => {
-                const isSelected = i === selectedIndex;
-                return (
-                  <div
-                    key={`${pair.heading}-${pair.body}`}
-                    className="gpanel"
-                    onClick={() => selectIndex(i)}
-                    style={{
-                      padding: '8px 10px',
-                      cursor: 'pointer',
-                      border: isSelected ? '1px solid var(--cyan)' : '1px solid var(--edge)',
-                      color: isSelected ? 'var(--cyan)' : 'var(--text)',
-                    }}
-                  >
-                    <div style={{ fontFamily: pair.heading, fontSize: 15, fontWeight: 700 }}>{pair.heading}</div>
-                    <div className="toolHint" style={{ marginTop: 2 }}>
-                      {pair.heading} / {pair.body}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className="toolHint">
-          Fonts load live from Google Fonts. Click any pair to preview it, or use SHUFFLE / PREV / NEXT to browse.
-        </div>
-      </div>
-    </ToolShell>
-  );
+export default function FontPairing({boardId,onExit}:{boardId:string;onExit:()=>void}){
+ const [doc,setDoc]=useState<FontDoc>(()=>load(boardId));const [copied,setCopied]=useState(false);const pair=PAIRS[doc.selectedIndex],compare=doc.compareIndex===null?null:PAIRS[doc.compareIndex];
+ useEffect(()=>{try{localStorage.setItem(KEY+boardId,JSON.stringify(doc));}catch{}},[boardId,doc]);
+ useEffect(()=>{fontLinkRefCount++;if(fontLinkRefCount===1){fontLinkEl=document.createElement('link');fontLinkEl.rel='stylesheet';fontLinkEl.crossOrigin='anonymous';fontLinkEl.href=fontsHref();document.head.appendChild(fontLinkEl);}return()=>{fontLinkRefCount--;if(fontLinkRefCount<=0){fontLinkEl?.remove();fontLinkEl=null;fontLinkRefCount=0;}};},[]);
+ const snippet=useMemo(()=>css(pair,doc),[pair,doc]);
+ function select(i:number){setDoc(d=>({...d,selectedIndex:(i+PAIRS.length)%PAIRS.length}));}
+ function shuffle(){let n=doc.selectedIndex;while(PAIRS.length>1&&n===doc.selectedIndex)n=Math.floor(Math.random()*PAIRS.length);select(n);}
+ async function copyCss(){try{await navigator.clipboard.writeText(snippet);setCopied(true);setTimeout(()=>setCopied(false),1200);}catch{}}
+ function toggleFavorite(i:number){setDoc(d=>({...d,favorites:d.favorites.includes(i)?d.favorites.filter(x=>x!==i):[...d.favorites,i]}));}
+ function exportSpec(){dl(new Blob([JSON.stringify({version:2,pair,compare,headingText:doc.headingText,bodyText:doc.bodyText,headingSize:doc.headingSize,bodySize:doc.bodySize,bodyLineHeight:doc.bodyLineHeight,css:snippet},null,2)],{type:'application/json'}),'font-pairing-spec.json');}
+ function exportCss(){dl(new Blob([snippet],{type:'text/css'}),'font-pairing.css');}
+ const preview=(p:FontPair,label:string)=><div className="gpanel" style={{padding:16,flex:1,minWidth:300}}><div className="rsub">{label}</div><div style={{fontFamily:p.heading,fontWeight:700,fontSize:doc.headingSize,lineHeight:1.12,color:'var(--text)',margin:'10px 0 12px',wordBreak:'break-word'}}>{doc.headingText||DEFAULT_H}</div><p style={{fontFamily:p.body,fontWeight:400,fontSize:doc.bodySize,lineHeight:doc.bodyLineHeight,color:'var(--text-dim)',margin:0}}>{doc.bodyText||DEFAULT_B}</p><div className="toolHint" style={{marginTop:10}}>{p.heading} / {p.body}</div></div>;
+ return <ToolShell title="FONT PAIRING EXPLORER 2.0" onExit={onExit} actions={<><button className="wbtn ghost" onClick={exportSpec}>SPEC JSON</button><button className="wbtn ghost" onClick={exportCss}>CSS FILE</button><button className="wbtn" onClick={()=>void copyCss()}>{copied?'COPIED!':'COPY CSS'}</button></>}><div className="toolCol" data-testid="font-pairing-2-root">
+  <div className="toolRow" style={{flexWrap:'wrap'}}><button className="chip" onClick={()=>select(doc.selectedIndex-1)}><Icon name="chevronLeft" size={12}/> PREV</button><button className="chip" onClick={()=>select(doc.selectedIndex+1)}>NEXT <Icon name="chevronRight" size={12}/></button><button className="chip" onClick={shuffle}><Icon name="shuffle" size={12}/> SHUFFLE</button><button className={`chip ${doc.favorites.includes(doc.selectedIndex)?'on':''}`} onClick={()=>toggleFavorite(doc.selectedIndex)}>{doc.favorites.includes(doc.selectedIndex)?'★ SAVED':'☆ SAVE'}</button><button className={`chip ${doc.compareIndex!==null?'on':''}`} onClick={()=>setDoc(d=>({...d,compareIndex:d.compareIndex===null?((d.selectedIndex+1)%PAIRS.length):null}))}>{doc.compareIndex===null?'COMPARE':'CLOSE COMPARE'}</button></div>
+  <div className="toolRow" style={{alignItems:'stretch',flexWrap:'wrap'}}>{preview(pair,'PRIMARY PREVIEW')}{compare&&preview(compare,'COMPARISON')}</div>
+  <div className="toolRow" style={{flexWrap:'wrap'}}><label className="toolField" style={{flex:1,minWidth:240}}>HEADING SAMPLE<input aria-label="Font heading sample" value={doc.headingText} onChange={e=>setDoc(d=>({...d,headingText:e.target.value}))}/></label><label className="toolField" style={{flex:2,minWidth:300}}>BODY SAMPLE<textarea aria-label="Font body sample" rows={3} value={doc.bodyText} onChange={e=>setDoc(d=>({...d,bodyText:e.target.value}))}/></label></div>
+  <div className="toolRow" style={{flexWrap:'wrap'}}><label className="toolField">HEADING {doc.headingSize}px<input aria-label="Font heading size" type="range" min="24" max="96" value={doc.headingSize} onChange={e=>setDoc(d=>({...d,headingSize:+e.target.value}))}/></label><label className="toolField">BODY {doc.bodySize}px<input aria-label="Font body size" type="range" min="10" max="32" value={doc.bodySize} onChange={e=>setDoc(d=>({...d,bodySize:+e.target.value}))}/></label><label className="toolField">LINE HEIGHT {doc.bodyLineHeight.toFixed(1)}<input aria-label="Font body line height" type="range" min="1" max="2.2" step="0.1" value={doc.bodyLineHeight} onChange={e=>setDoc(d=>({...d,bodyLineHeight:+e.target.value}))}/></label></div>
+  <div className="toolRow" style={{alignItems:'stretch',gap:16}}><div className="gpanel" style={{padding:12,flex:1,minWidth:280,maxHeight:430,overflowY:'auto'}}><div className="rsub">CURATED PAIRS</div>{PAIRS.map((p,i)=><button key={`${p.heading}-${p.body}`} aria-label={`Font pair ${p.heading} and ${p.body}`} className={`gpanel ${i===doc.selectedIndex?'on':''}`} onClick={()=>select(i)} style={{display:'block',width:'100%',padding:'8px 10px',marginTop:6,textAlign:'left',cursor:'pointer',border:i===doc.selectedIndex?'1px solid var(--cyan)':'1px solid var(--edge)',color:i===doc.selectedIndex?'var(--cyan)':'var(--text)'}}><div style={{fontFamily:p.heading,fontSize:15,fontWeight:700}}>{doc.favorites.includes(i)?'★ ':''}{p.heading}</div><div className="toolHint">{p.heading} / {p.body}</div></button>)}</div><div className="gpanel" style={{padding:12,flex:1,minWidth:280}}><div className="rsub">EXPORT CSS</div><pre style={{background:'var(--void)',border:'1px solid var(--edge)',borderRadius:6,padding:10,fontSize:12,color:'var(--cyan)',whiteSpace:'pre-wrap'}}>{snippet}</pre><div className="toolHint">Fonts load live from Google Fonts in this explorer. Exported CSS records the selected stacks and typography sizing.</div></div></div>
+ </div></ToolShell>;
 }
