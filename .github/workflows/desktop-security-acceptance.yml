@@ -1,0 +1,42 @@
+name: Desktop Security Acceptance
+
+on:
+  pull_request:
+    branches: ['main']
+    paths:
+      - 'src-tauri/tauri.conf.json'
+      - 'widget.html'
+      - 'scripts/release-smoke.mjs'
+      - '.github/workflows/desktop-security-acceptance.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  desktop-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Release smoke
+        run: npm run test:release
+      - name: Production build
+        run: npm run build
+      - name: Verify built Hotwire page and CSP contract
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const html = fs.readFileSync('dist/widget.html', 'utf8');
+          if (!html.includes('<title>xFactor.OS // Hotwire Capture</title>')) throw new Error('Built Hotwire title is not xFactor.OS branded');
+          if (html.includes('xOS // Quick Capture')) throw new Error('Built Hotwire page still contains legacy xOS title');
+          const config = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+          const csp = config?.app?.security?.csp;
+          if (typeof csp !== 'string' || !csp.includes("object-src 'none'") || !csp.includes("worker-src 'self' blob:")) throw new Error('Desktop CSP contract is incomplete');
+          console.log('Desktop security acceptance passed.');
+          NODE
