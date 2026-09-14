@@ -1,392 +1,49 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ToolShell from './ToolShell';
 
-/**
- * MEME GENERATOR — a "New Project" utility tool for the Design Studio room.
- * Upload a background image (or pick a preset fill/gradient), add classic
- * bold/white/black-outline top & bottom captions, drag them into place on
- * the canvas, then export a PNG. The canvas is the single source of truth
- * and is fully redrawn on every relevant state change.
- */
-
 type Pos = { x: number; y: number };
-
-type Preset = {
-  id: string;
-  label: string;
-  swatchStyle: React.CSSProperties;
-  paint: (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
-};
-
+type Ratio = 'square' | 'portrait' | 'landscape';
+type CaptionStyle = { text: string; pos: Pos; size: number };
+type MemeDoc = { version: 2; top: CaptionStyle; bottom: CaptionStyle; presetId: string; ratio: Ratio; fill: string; stroke: string; strokeWidth: number; uppercase: boolean; fileName: string };
+type Preset = { id: string; label: string; swatchStyle: React.CSSProperties; paint: (ctx: CanvasRenderingContext2D, w: number, h: number) => void };
 const PRESETS: Preset[] = [
-  {
-    id: 'void',
-    label: 'VOID',
-    swatchStyle: { background: '#05050a' },
-    paint: (ctx, w, h) => {
-      ctx.fillStyle = '#05050a';
-      ctx.fillRect(0, 0, w, h);
-    },
-  },
-  {
-    id: 'cyan',
-    label: 'CYAN',
-    swatchStyle: { background: 'var(--cyan)' },
-    paint: (ctx, w, h) => {
-      ctx.fillStyle = '#0af0ff';
-      ctx.fillRect(0, 0, w, h);
-    },
-  },
-  {
-    id: 'magenta',
-    label: 'MAGENTA',
-    swatchStyle: { background: 'var(--magenta)' },
-    paint: (ctx, w, h) => {
-      ctx.fillStyle = '#ff2fd6';
-      ctx.fillRect(0, 0, w, h);
-    },
-  },
-  {
-    id: 'nebula',
-    label: 'NEBULA',
-    swatchStyle: {
-      background: 'linear-gradient(135deg, var(--purple), var(--magenta), var(--cyan))',
-    },
-    paint: (ctx, w, h) => {
-      const gradient = ctx.createLinearGradient(0, 0, w, h);
-      gradient.addColorStop(0, '#7b2ff7');
-      gradient.addColorStop(0.5, '#ff2fd6');
-      gradient.addColorStop(1, '#0af0ff');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, w, h);
-    },
-  },
+ { id:'void',label:'VOID',swatchStyle:{background:'#05050a'},paint:(c,w,h)=>{c.fillStyle='#05050a';c.fillRect(0,0,w,h);} },
+ { id:'cyan',label:'CYAN',swatchStyle:{background:'#0af0ff'},paint:(c,w,h)=>{c.fillStyle='#0af0ff';c.fillRect(0,0,w,h);} },
+ { id:'magenta',label:'MAGENTA',swatchStyle:{background:'#ff2fd6'},paint:(c,w,h)=>{c.fillStyle='#ff2fd6';c.fillRect(0,0,w,h);} },
+ { id:'nebula',label:'NEBULA',swatchStyle:{background:'linear-gradient(135deg,#7b2ff7,#ff2fd6,#0af0ff)'},paint:(c,w,h)=>{const g=c.createLinearGradient(0,0,w,h);g.addColorStop(0,'#7b2ff7');g.addColorStop(.5,'#ff2fd6');g.addColorStop(1,'#0af0ff');c.fillStyle=g;c.fillRect(0,0,w,h);} },
 ];
+const SIZES: Record<Ratio,{w:number;h:number}>={square:{w:1080,h:1080},portrait:{w:1080,h:1350},landscape:{w:1200,h:675}};
+const KEY='xfactor-studio-meme2-',LEGACY='xos-studio-meme-';
+function fallback():MemeDoc{return{version:2,top:{text:'TOP TEXT',pos:{x:540,y:100},size:72},bottom:{text:'BOTTOM TEXT',pos:{x:540,y:980},size:72},presetId:'void',ratio:'square',fill:'#ffffff',stroke:'#000000',strokeWidth:7,uppercase:true,fileName:'meme'};}
+function load(boardId:string):MemeDoc{const f=fallback();try{const raw=localStorage.getItem(KEY+boardId);if(raw)return{...f,...JSON.parse(raw),version:2};const old=localStorage.getItem(LEGACY+boardId);if(old){const p=JSON.parse(old);return{...f,top:{...f.top,text:p.topText??f.top.text,pos:p.topPos??f.top.pos,size:p.fontSize??f.top.size},bottom:{...f.bottom,text:p.bottomText??f.bottom.text,pos:p.bottomPos??f.bottom.pos,size:p.fontSize??f.bottom.size},presetId:p.presetId??f.presetId};}}catch{}return f;}
+function wrap(ctx:CanvasRenderingContext2D,text:string,maxWidth:number){const words=text.split(/\s+/).filter(Boolean);if(!words.length)return[''];const lines:string[]=[];let cur=words[0];for(let i=1;i<words.length;i++){const next=`${cur} ${words[i]}`;if(ctx.measureText(next).width>maxWidth){lines.push(cur);cur=words[i];}else cur=next;}lines.push(cur);return lines;}
+function drawCaption(ctx:CanvasRenderingContext2D,c:CaptionStyle,doc:MemeDoc,w:number){if(!c.text.trim())return;const text=doc.uppercase?c.text.toUpperCase():c.text;ctx.font=`900 ${c.size}px Impact, 'Arial Black', sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=doc.strokeWidth;ctx.strokeStyle=doc.stroke;ctx.fillStyle=doc.fill;ctx.lineJoin='round';const lines=wrap(ctx,text,w*.92),lh=c.size*1.08,start=c.pos.y-(lh*lines.length)/2+lh/2;lines.forEach((line,i)=>{if(doc.strokeWidth>0)ctx.strokeText(line,c.pos.x,start+i*lh);ctx.fillText(line,c.pos.x,start+i*lh);});}
+function dl(blob:Blob,name:string){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2500);}
+const safe=(s:string)=>(s.trim()||'meme').replace(/[^a-z0-9._-]+/gi,'-');
 
-const DEFAULT_W = 600;
-const DEFAULT_H = 600;
-
-type PersistedState = {
-  topText: string;
-  bottomText: string;
-  fontSize: number;
-  topPos: Pos;
-  bottomPos: Pos;
-  presetId: string;
-};
-
-function storageKey(boardId: string): string {
-  return `xos-studio-meme-${boardId}`;
-}
-
-function loadPersisted(boardId: string): Partial<PersistedState> {
-  try {
-    const raw = localStorage.getItem(storageKey(boardId));
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object') {
-      return parsed as Partial<PersistedState>;
-    }
-    return {};
-  } catch {
-    return {};
-  }
-}
-
-function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [''];
-  const lines: string[] = [];
-  let current = words[0];
-  for (let i = 1; i < words.length; i++) {
-    const candidate = `${current} ${words[i]}`;
-    if (ctx.measureText(candidate).width > maxWidth) {
-      lines.push(current);
-      current = words[i];
-    } else {
-      current = candidate;
-    }
-  }
-  lines.push(current);
-  return lines;
-}
-
-function drawCaption(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  pos: Pos,
-  fontSize: number,
-  canvasWidth: number
-): void {
-  if (!text.trim()) return;
-  const upper = text.toUpperCase();
-  ctx.font = `bold ${fontSize}px Impact, 'Arial Black', sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.lineWidth = fontSize / 12;
-  ctx.strokeStyle = '#000';
-  ctx.fillStyle = '#fff';
-  ctx.lineJoin = 'round';
-  ctx.miterLimit = 2;
-
-  const maxWidth = canvasWidth * 0.92;
-  const lines = wrapLines(ctx, upper, maxWidth);
-  const lineHeight = fontSize * 1.15;
-  const totalHeight = lineHeight * lines.length;
-  const startY = pos.y - totalHeight / 2 + lineHeight / 2;
-
-  lines.forEach((line, i) => {
-    const y = startY + i * lineHeight;
-    ctx.strokeText(line, pos.x, y);
-    ctx.fillText(line, pos.x, y);
-  });
-}
-
-export default function MemeGenerator({ boardId, onExit }: { boardId: string; onExit: () => void }) {
-  const initialRef = useRef<Partial<PersistedState>>(loadPersisted(boardId));
-  const initial = initialRef.current;
-
-  const [topText, setTopText] = useState(initial.topText ?? 'TOP TEXT');
-  const [bottomText, setBottomText] = useState(initial.bottomText ?? 'BOTTOM TEXT');
-  const [fontSize, setFontSize] = useState(initial.fontSize ?? 40);
-  const [presetId, setPresetId] = useState(initial.presetId ?? PRESETS[0].id);
-  const [topPos, setTopPos] = useState<Pos>(initial.topPos ?? { x: DEFAULT_W / 2, y: 50 });
-  const [bottomPos, setBottomPos] = useState<Pos>(
-    initial.bottomPos ?? { x: DEFAULT_W / 2, y: DEFAULT_H - 50 }
-  );
-  const [canvasSize, setCanvasSize] = useState<{ w: number; h: number }>({
-    w: DEFAULT_W,
-    h: DEFAULT_H,
-  });
-  const [bgImageEl, setBgImageEl] = useState<HTMLImageElement | null>(null);
-
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const objectUrlRef = useRef<string | null>(null);
-  const draggingRef = useRef<'top' | 'bottom' | null>(null);
-  const dragOffsetRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
-
-  const render = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = canvasSize.w;
-    canvas.height = canvasSize.h;
-    ctx.clearRect(0, 0, canvasSize.w, canvasSize.h);
-
-    if (bgImageEl) {
-      ctx.drawImage(bgImageEl, 0, 0, canvasSize.w, canvasSize.h);
-    } else {
-      const preset = PRESETS.find((p) => p.id === presetId) ?? PRESETS[0];
-      preset.paint(ctx, canvasSize.w, canvasSize.h);
-    }
-
-    drawCaption(ctx, topText, topPos, fontSize, canvasSize.w);
-    drawCaption(ctx, bottomText, bottomPos, fontSize, canvasSize.w);
-  }, [bgImageEl, presetId, canvasSize, topText, bottomText, topPos, bottomPos, fontSize]);
-
-  useEffect(() => {
-    render();
-  }, [render]);
-
-  // Persist text/size/positions (not the uploaded image — too large for localStorage).
-  useEffect(() => {
-    try {
-      const data: PersistedState = { topText, bottomText, fontSize, topPos, bottomPos, presetId };
-      localStorage.setItem(storageKey(boardId), JSON.stringify(data));
-    } catch {
-      // ignore quota / access errors
-    }
-  }, [boardId, topText, bottomText, fontSize, topPos, bottomPos, presetId]);
-
-  // Clean up any uploaded-image object URL on unmount.
-  useEffect(() => {
-    return () => {
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
-      }
-    };
-  }, []);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-    }
-    objectUrlRef.current = url;
-    const img = new Image();
-    img.onload = () => {
-      setCanvasSize({ w: img.naturalWidth, h: img.naturalHeight });
-      setBgImageEl(img);
-    };
-    img.src = url;
-    e.target.value = '';
-  };
-
-  const handlePresetClick = (id: string) => {
-    setPresetId(id);
-    setBgImageEl(null);
-    setCanvasSize({ w: DEFAULT_W, h: DEFAULT_H });
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
-    }
-  };
-
-  const getCanvasPoint = (e: React.PointerEvent<HTMLCanvasElement>): Pos => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-    };
-  };
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const point = getCanvasPoint(e);
-    const distTop = Math.abs(point.y - topPos.y);
-    const distBottom = Math.abs(point.y - bottomPos.y);
-    const withinTop = distTop <= 40;
-    const withinBottom = distBottom <= 40;
-
-    let target: 'top' | 'bottom' | null = null;
-    if (withinTop && withinBottom) {
-      target = distTop <= distBottom ? 'top' : 'bottom';
-    } else if (withinTop) {
-      target = 'top';
-    } else if (withinBottom) {
-      target = 'bottom';
-    }
-    if (!target) return;
-
-    draggingRef.current = target;
-    const pos = target === 'top' ? topPos : bottomPos;
-    dragOffsetRef.current = { dx: point.x - pos.x, dy: point.y - pos.y };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const target = draggingRef.current;
-    if (!target) return;
-    const point = getCanvasPoint(e);
-    const next: Pos = {
-      x: point.x - dragOffsetRef.current.dx,
-      y: point.y - dragOffsetRef.current.dy,
-    };
-    if (target === 'top') {
-      setTopPos(next);
-    } else {
-      setBottomPos(next);
-    }
-  };
-
-  const stopDragging = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    draggingRef.current = null;
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-  };
-
-  const handleExport = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'meme.png';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    }, 'image/png');
-  };
-
-  return (
-    <ToolShell title="MEME GENERATOR" onExit={onExit}>
-      <div className="toolRow">
-        <div className="toolCol">
-          <label className="toolDrop">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              style={{ display: 'none' }}
-            />
-            DROP / SELECT IMAGE
-          </label>
-
-          <div className="toolSwatchGrid">
-            {PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                className="toolSwatch"
-                style={{
-                  outline:
-                    !bgImageEl && presetId === preset.id ? '2px solid var(--cyan)' : 'none',
-                }}
-                onClick={() => handlePresetClick(preset.id)}
-              >
-                <span className="sw" style={preset.swatchStyle} />
-                {preset.label}
-              </button>
-            ))}
-          </div>
-
-          <label className="toolField">
-            TOP TEXT
-            <input type="text" value={topText} onChange={(e) => setTopText(e.target.value)} />
-          </label>
-
-          <label className="toolField">
-            BOTTOM TEXT
-            <input
-              type="text"
-              value={bottomText}
-              onChange={(e) => setBottomText(e.target.value)}
-            />
-          </label>
-
-          <label className="toolField">
-            FONT SIZE: {fontSize}px
-            <input
-              type="range"
-              min={18}
-              max={72}
-              value={fontSize}
-              onChange={(e) => setFontSize(Number(e.target.value))}
-            />
-          </label>
-
-          <button type="button" className="wbtn" onClick={handleExport}>
-            EXPORT PNG
-          </button>
-
-          <div className="toolHint">Drag the captions on the canvas to reposition them.</div>
-        </div>
-
-        <div className="toolCol">
-          <div className="toolCanvasWrap">
-            <canvas
-              ref={canvasRef}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={stopDragging}
-              onPointerLeave={stopDragging}
-              style={{ touchAction: 'none', maxWidth: '100%', cursor: 'grab' }}
-            />
-          </div>
-        </div>
-      </div>
-    </ToolShell>
-  );
+export default function MemeGenerator({boardId,onExit}:{boardId:string;onExit:()=>void}){
+ const [doc,setDoc]=useState<MemeDoc>(()=>load(boardId));const [canvasSize,setCanvasSize]=useState(SIZES[doc.ratio]);const [bgImageEl,setBgImageEl]=useState<HTMLImageElement|null>(null);const canvasRef=useRef<HTMLCanvasElement|null>(null),objectUrlRef=useRef<string|null>(null),dragging=useRef<'top'|'bottom'|null>(null),offset=useRef({dx:0,dy:0});
+ useEffect(()=>{try{localStorage.setItem(KEY+boardId,JSON.stringify(doc));}catch{}},[boardId,doc]);
+ useEffect(()=>()=>{if(objectUrlRef.current)URL.revokeObjectURL(objectUrlRef.current);},[]);
+ const render=useCallback(()=>{const cv=canvasRef.current;if(!cv)return;const ctx=cv.getContext('2d');if(!ctx)return;cv.width=canvasSize.w;cv.height=canvasSize.h;ctx.clearRect(0,0,cv.width,cv.height);if(bgImageEl){const scale=Math.max(cv.width/bgImageEl.naturalWidth,cv.height/bgImageEl.naturalHeight),sw=cv.width/scale,sh=cv.height/scale,sx=(bgImageEl.naturalWidth-sw)/2,sy=(bgImageEl.naturalHeight-sh)/2;ctx.drawImage(bgImageEl,sx,sy,sw,sh,0,0,cv.width,cv.height);}else(PRESETS.find(p=>p.id===doc.presetId)??PRESETS[0]).paint(ctx,cv.width,cv.height);drawCaption(ctx,doc.top,doc,cv.width);drawCaption(ctx,doc.bottom,doc,cv.width);},[doc,canvasSize,bgImageEl]);
+ useEffect(()=>render(),[render]);
+ function setRatio(r:Ratio){const prev=canvasSize,next=SIZES[r];setDoc(d=>({...d,ratio:r,top:{...d.top,pos:{x:d.top.pos.x/prev.w*next.w,y:d.top.pos.y/prev.h*next.h}},bottom:{...d.bottom,pos:{x:d.bottom.pos.x/prev.w*next.w,y:d.bottom.pos.y/prev.h*next.h}}}));setCanvasSize(next);}
+ function file(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;const u=URL.createObjectURL(f);if(objectUrlRef.current)URL.revokeObjectURL(objectUrlRef.current);objectUrlRef.current=u;const img=new Image();img.onload=()=>setBgImageEl(img);img.src=u;e.target.value='';}
+ function preset(id:string){setDoc(d=>({...d,presetId:id}));setBgImageEl(null);if(objectUrlRef.current){URL.revokeObjectURL(objectUrlRef.current);objectUrlRef.current=null;}}
+ function point(e:React.PointerEvent<HTMLCanvasElement>){const cv=canvasRef.current;if(!cv)return{x:0,y:0};const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*cv.width/r.width,y:(e.clientY-r.top)*cv.height/r.height};}
+ function down(e:React.PointerEvent<HTMLCanvasElement>){const p=point(e),dt=Math.abs(p.y-doc.top.pos.y),db=Math.abs(p.y-doc.bottom.pos.y);const target=dt<=70||db<=70?(dt<=db?'top':'bottom'):null;if(!target)return;dragging.current=target;const pos=doc[target].pos;offset.current={dx:p.x-pos.x,dy:p.y-pos.y};e.currentTarget.setPointerCapture(e.pointerId);}
+ function move(e:React.PointerEvent<HTMLCanvasElement>){const target=dragging.current;if(!target)return;const p=point(e),pos={x:Math.max(0,Math.min(canvasSize.w,p.x-offset.current.dx)),y:Math.max(0,Math.min(canvasSize.h,p.y-offset.current.dy))};setDoc(d=>({...d,[target]:{...d[target],pos}}));}
+ function up(e:React.PointerEvent<HTMLCanvasElement>){dragging.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);}
+ function exportPng(){canvasRef.current?.toBlob(b=>b&&dl(b,`${safe(doc.fileName)}.png`),'image/png');}
+ function exportJson(){dl(new Blob([JSON.stringify(doc,null,2)],{type:'application/json'}),`${safe(doc.fileName)}-meme.json`);}
+ async function importJson(f:File){try{const next=JSON.parse(await f.text());if(next.version!==2||!next.top||!next.bottom)throw new Error();setDoc({...fallback(),...next});setCanvasSize(SIZES[next.ratio]??SIZES.square);setBgImageEl(null);}catch{window.alert('Invalid Meme Generator JSON');}}
+ return <ToolShell title="MEME GENERATOR 2.0" onExit={onExit} actions={<><button className="wbtn ghost" onClick={exportJson}>PROJECT JSON</button><button className="wbtn" onClick={exportPng}>EXPORT PNG</button></>}><div className="toolRow" data-testid="meme-generator-2-root"><div className="toolCol" style={{minWidth:300}}>
+  <label className="toolDrop">DROP / SELECT IMAGE<input aria-label="Meme background image" type="file" accept="image/*" hidden onChange={file}/></label><label className="toolBtn">IMPORT PROJECT<input aria-label="Meme project JSON" type="file" accept="application/json" hidden onChange={e=>e.target.files?.[0]&&void importJson(e.target.files[0])}/></label>
+  <div className="toolSwatchGrid">{PRESETS.map(p=><button key={p.id} className="toolSwatch" style={{outline:!bgImageEl&&doc.presetId===p.id?'2px solid var(--cyan)':'none'}} onClick={()=>preset(p.id)}><span className="sw" style={p.swatchStyle}/>{p.label}</button>)}</div>
+  <div className="toolRow">{(['square','portrait','landscape'] as Ratio[]).map(r=><button key={r} className={`chip ${doc.ratio===r?'on':''}`} onClick={()=>setRatio(r)}>{r.toUpperCase()}</button>)}</div>
+  <label className="toolField">TOP TEXT<input aria-label="Meme top text" value={doc.top.text} onChange={e=>setDoc(d=>({...d,top:{...d.top,text:e.target.value}}))}/></label><label className="toolField">TOP SIZE {doc.top.size}<input aria-label="Meme top size" type="range" min="24" max="140" value={doc.top.size} onChange={e=>setDoc(d=>({...d,top:{...d.top,size:+e.target.value}}))}/></label>
+  <label className="toolField">BOTTOM TEXT<input aria-label="Meme bottom text" value={doc.bottom.text} onChange={e=>setDoc(d=>({...d,bottom:{...d.bottom,text:e.target.value}}))}/></label><label className="toolField">BOTTOM SIZE {doc.bottom.size}<input aria-label="Meme bottom size" type="range" min="24" max="140" value={doc.bottom.size} onChange={e=>setDoc(d=>({...d,bottom:{...d.bottom,size:+e.target.value}}))}/></label>
+  <div className="toolRow"><label className="toolHint">FILL <input aria-label="Meme text fill" type="color" value={doc.fill} onChange={e=>setDoc(d=>({...d,fill:e.target.value}))}/></label><label className="toolHint">STROKE <input aria-label="Meme text stroke" type="color" value={doc.stroke} onChange={e=>setDoc(d=>({...d,stroke:e.target.value}))}/></label></div><label className="toolField">OUTLINE {doc.strokeWidth}px<input aria-label="Meme outline width" type="range" min="0" max="16" value={doc.strokeWidth} onChange={e=>setDoc(d=>({...d,strokeWidth:+e.target.value}))}/></label>
+  <label className="toolHint"><input aria-label="Meme uppercase" type="checkbox" checked={doc.uppercase} onChange={e=>setDoc(d=>({...d,uppercase:e.target.checked}))}/> FORCE UPPERCASE</label><label className="toolField">OUTPUT NAME<input aria-label="Meme output name" value={doc.fileName} onChange={e=>setDoc(d=>({...d,fileName:e.target.value}))}/></label><div className="toolHint">Drag either caption directly on the canvas. Uploaded backgrounds are center-cropped into the selected output ratio.</div>
+ </div><div className="toolCol"><div className="toolCanvasWrap"><canvas ref={canvasRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} style={{touchAction:'none',maxWidth:'100%',maxHeight:720,cursor:'grab'}}/></div></div></div></ToolShell>;
 }
