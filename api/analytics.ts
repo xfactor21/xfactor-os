@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 const INGEST_URL = 'https://lufvkrnwqbqdaqcgljxt.supabase.co/functions/v1/planetx-analytics-ingest'
 
 export default async function handler(req: any, res: any) {
