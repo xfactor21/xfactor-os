@@ -95,6 +95,24 @@ assert('QR tool has no legacy deployed URL seed', !qr.includes('xos-nexus.surge.
 const widget = fs.readFileSync('src/components/CaptureWidget.tsx', 'utf8');
 assert('desktop capture writes xFactor workspace', widget.includes("from '../xfactor/store'"));
 assert('desktop capture no longer targets legacy nodes sync', !widget.includes('commitOrQueue'));
+const widgetHtml = fs.readFileSync('widget.html', 'utf8');
+assert('desktop capture page uses xFactor.OS identity', widgetHtml.includes('<title>xFactor.OS // Hotwire Capture</title>'));
+assert('desktop capture page has no reachable legacy xOS title', !widgetHtml.includes('xOS //'));
+assert('desktop capture page avoids remote font dependency', !widgetHtml.includes('fonts.googleapis.com'));
+
+const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+const csp = tauri?.app?.security?.csp;
+assert('Tauri desktop CSP is enabled', typeof csp === 'string' && csp.length > 0);
+for (const directive of [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob:",
+  "worker-src 'self' blob:",
+  "connect-src 'self' ipc: http://ipc.localhost https: wss:",
+  "object-src 'none'",
+  "base-uri 'self'",
+]) assert(`Tauri CSP includes ${directive}`, csp.includes(directive));
+assert('Tauri preserves COEP isolation header', tauri?.app?.security?.headers?.['Cross-Origin-Embedder-Policy'] === 'require-corp');
+assert('Tauri preserves COOP isolation header', tauri?.app?.security?.headers?.['Cross-Origin-Opener-Policy'] === 'same-origin');
 
 for (const file of [
   'public/pyodide/pyodide.mjs',
