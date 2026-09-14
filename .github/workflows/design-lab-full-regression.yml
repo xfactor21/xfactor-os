@@ -1,0 +1,93 @@
+name: Design Lab Full 25-Mode Regression
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/design-lab-full-regression.yml'
+  workflow_dispatch:
+
+jobs:
+  design-lab-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Generate media fixture
+        run: |
+          ffmpeg -y -f lavfi -i color=c=black:s=64x64:r=20:d=1.2 -c:v libvpx-vp9 -an /tmp/xfactor-video.webm
+          ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 /tmp/xfactor-video.webm
+
+      - name: Install Chromium
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.62.0
+          npx playwright install --with-deps chromium
+
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/xfactor-design-lab-regression-preview.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/xfactor-design-lab-regression-preview.log
+          exit 1
+
+      - name: All 25 Design Lab routes + app runtime smoke
+        run: node scripts/browser-smoke.mjs
+
+      - name: Wireframe / Prototype 2.0 acceptance
+        run: node scripts/wireframe-smoke.mjs
+
+      - name: Vector / Illustration 2.0 acceptance
+        run: node scripts/vector-smoke.mjs
+
+      - name: Animation 2.0 acceptance
+        run: node scripts/animation-smoke.mjs
+
+      - name: Diagram / Flowchart 2.0 acceptance
+        run: node scripts/diagram-smoke.mjs
+
+      - name: Moodboard 2.0 acceptance
+        run: node scripts/moodboard-smoke.mjs
+
+      - name: Presentation 2.0 acceptance
+        run: node scripts/presentation-smoke.mjs
+
+      - name: Icon Design 2.0 acceptance
+        run: node scripts/icon-design-smoke.mjs
+
+      - name: Image utility bundle acceptance
+        run: node scripts/design-utilities-smoke.mjs
+
+      - name: Brand + pixel utility bundle acceptance
+        run: node scripts/design-brand-pixel-smoke.mjs
+
+      - name: Media + PDF utility bundle acceptance
+        env:
+          XFACTOR_VIDEO_FIXTURE: /tmp/xfactor-video.webm
+        run: node scripts/design-media-pdf-smoke.mjs
+
+      - name: Content utility bundle acceptance
+        run: node scripts/design-content-utilities-smoke.mjs
+
+      - name: Final utility bundle acceptance
+        run: node scripts/design-final-utilities-smoke.mjs
