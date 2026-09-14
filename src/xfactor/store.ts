@@ -98,6 +98,32 @@ function normalizePosition(value: unknown): Position | null {
   return { x:Math.max(0,Math.min(100,finite(value.x,20))), y:Math.max(0,Math.min(100,finite(value.y,20))), rotation:Math.max(-180,Math.min(180,finite(value.rotation,0))) };
 }
 
+const fallbackFloorSlots: Array<Pick<Position,'x'|'y'>> = [
+  {x:5,y:8},{x:58,y:8},{x:5,y:54},{x:58,y:54},{x:31,y:31},{x:72,y:31},{x:18,y:31},
+];
+
+function separateIdenticalPositions(incidents: Incident[], positions: Record<string,Position>): Record<string,Position> {
+  const resolved: Record<string,Position> = {};
+  const occupied = new Set<string>();
+  const key = (position: Pick<Position,'x'|'y'>) => `${position.x.toFixed(3)}:${position.y.toFixed(3)}`;
+  for (const incident of incidents) {
+    const position = positions[incident.id];
+    if (!position) continue;
+    let next = {...position};
+    if (occupied.has(key(next))) {
+      const candidates = fallbackFloorSlots.filter(slot => !occupied.has(key(slot)));
+      const existing = Object.values(resolved);
+      const best = candidates
+        .map(slot => ({slot, distance:Math.min(...existing.map(other => Math.hypot(slot.x-other.x,slot.y-other.y)))}))
+        .sort((a,b) => b.distance-a.distance)[0]?.slot;
+      if (best) next = {...next,x:best.x,y:best.y};
+    }
+    occupied.add(key(next));
+    resolved[incident.id]=next;
+  }
+  return resolved;
+}
+
 function normalizeLayout(value: unknown): SavedLayout | null {
   if (!isRecord(value) || typeof value.id !== 'string' || !value.id) return null;
   const positions: Record<string,Position> = {};
@@ -118,6 +144,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
   const activity = (Array.isArray(value.activity) ? value.activity : []).map(normalizeActivity).filter((v): v is ActivityEvent => Boolean(v)).map(a=>({...a,incidentId:a.incidentId && incidentIds.has(a.incidentId) ? a.incidentId : undefined}));
   const positions: Record<string,Position> = {};
   if (isRecord(value.positions)) for (const [id,pos] of Object.entries(value.positions)) if (incidentIds.has(id)) { const clean=normalizePosition(pos); if(clean) positions[id]=clean; }
+  const separatedPositions = separateIdenticalPositions(cleanIncidents,positions);
   const savedLayouts = (Array.isArray(value.savedLayouts) ? value.savedLayouts : []).map(normalizeLayout).filter((v): v is SavedLayout => Boolean(v));
   return {
     schemaVersion:2,
@@ -126,7 +153,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
     signals,
     assets,
     activity:activity.slice(0,5000),
-    positions,
+    positions:separatedPositions,
     savedLayouts:savedLayouts.slice(0,50),
     selectedIncidentId:typeof value.selectedIncidentId === 'string' && incidentIds.has(value.selectedIncidentId) ? value.selectedIncidentId : undefined,
   };
