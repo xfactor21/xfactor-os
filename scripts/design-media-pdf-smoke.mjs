@@ -52,6 +52,14 @@ async function open(name, testId) {
   await page.locator('.dpBoardCard').filter({ hasText: name }).click();
   await page.getByTestId(testId).waitFor();
 }
+async function setRange(label, value) {
+  await page.getByLabel(label).evaluate((el, next) => {
+    const input = el;
+    input.value = String(next);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}
 
 await check('Video Trimmer 2.0 loads timed WebM metadata and persists exact in/out controls', async () => {
   await open('VIDEO2 TEST', 'video-trimmer-2-root');
@@ -75,8 +83,8 @@ await check('Audio Trimmer 2.0 decodes WAV, persists exact trim/fades, and expor
   await page.getByLabel('Audio trim start').fill('0.10');
   await page.getByLabel('Audio trim end').fill('0.80');
   await page.getByLabel('Audio export name').fill('tone-cut');
-  await page.getByLabel('Audio fade in').fill('0.10');
-  await page.getByLabel('Audio fade out').fill('0.12');
+  await setRange('Audio fade in', 0.10);
+  await setRange('Audio fade out', 0.12);
   await page.waitForTimeout(220);
   const prefs = await page.evaluate(() => JSON.parse(localStorage.getItem('xfactor-studio-audiotrim2-audio2-test') || '{}'));
   if (prefs.exportName !== 'tone-cut' || Math.abs(prefs.start - 0.1) > 0.02 || Math.abs(prefs.end - 0.8) > 0.02 || Math.abs(prefs.fadeIn - 0.1) > 0.02 || Math.abs(prefs.fadeOut - 0.12) > 0.02) throw new Error('audio trim/fade prefs did not persist');
