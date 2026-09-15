@@ -11,7 +11,7 @@ import TerminalRoom from '../modules/terminal';
 import type { Asset, Incident, IncidentPriority, IncidentStatus, Signal, SignalType, WorkspaceState } from './domain';
 import {
   event, exportWorkspace, importWorkspace, loadWorkspace, newAsset, newIncident, newLayout, newPile,
-  newSignal, normalizeWorkspace, saveWorkspace, WORKSPACE_STORAGE_KEY
+  newSignal, normalizeWorkspace, saveWorkspace, workspaceClock, WORKSPACE_STORAGE_KEY
 } from './store';
 import { deleteAssetBlob, getAssetBlob, kindFromFile, putAssetBlob } from './assetStore';
 import { parseCommand } from './commandGrammar';
@@ -78,8 +78,8 @@ export default function ChaosDeck() {
     void adapter.pull().then(remote => {
       setCloudError(false);
       if (remote) setWs(local => {
-        const localClock = Math.max(0,...local.incidents.map(i=>i.updatedAt),...local.activity.map(a=>a.createdAt));
-        const remoteClock = Math.max(0,...remote.incidents.map(i=>i.updatedAt),...remote.activity.map(a=>a.createdAt));
+        const localClock = workspaceClock(local);
+        const remoteClock = workspaceClock(remote);
         return remoteClock > localClock ? remote : local;
       });
     }).catch(err => { setCloudError(true); console.warn('xFactor.OS cloud pull unavailable',err); }).finally(()=>{ syncReady.current=true; });
@@ -141,7 +141,7 @@ export default function ChaosDeck() {
   const chosen = useMemo(() => ws.incidents.find(s => s.id === selected) ?? ws.incidents.find(i=>!i.archived), [ws.incidents, selected]);
   const visibleIncidents=useMemo(()=>ws.incidents.filter(i=>!i.archived),[ws.incidents]);
 
-  function patch(recipe:(draft:WorkspaceState)=>WorkspaceState) { setWs(prev => normalizeWorkspace(recipe(prev)) ?? prev); }
+  function patch(recipe:(draft:WorkspaceState)=>WorkspaceState) { setWs(prev => normalizeWorkspace({...recipe(prev),updatedAt:Date.now()}) ?? prev); }
   function record(label:string,type='system',incidentId?:string){patch(p=>({...p,activity:[event(type,label,incidentId),...p.activity]}));}
   function selectIncident(id:string, additive=false) {
     setSelectedIds(prev => additive ? (prev.includes(id) ? prev.filter(x=>x!==id) : [id,...prev]) : [id]);
