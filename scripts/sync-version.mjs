@@ -52,10 +52,10 @@ if (!cargoVersionRe.test(cargoToml)) {
 }
 writeFileSync(cargoTomlPath, cargoToml.replace(cargoVersionRe, `$1"${version}"`));
 
-// Cargo.lock: keep the root xfactor-os package entry aligned as well. This was
-// historically stale even while Cargo.toml/Tauri had moved forward.
+// Cargo.lock: keep the root xfactor-os package entry aligned as well. Accept
+// both LF and CRLF because GitHub's Windows checkout can normalize line endings.
 const cargoLock = readFileSync(cargoLockPath, 'utf8');
-const cargoLockVersionRe = /(\[\[package\]\]\nname = "xfactor-os"\nversion = )"[^"]*"/;
+const cargoLockVersionRe = /(\[\[package\]\]\r?\nname = "xfactor-os"\r?\nversion = )"[^"]*"/;
 if (!cargoLockVersionRe.test(cargoLock)) {
   console.error('sync-version: could not find xfactor-os package in Cargo.lock');
   process.exit(1);
