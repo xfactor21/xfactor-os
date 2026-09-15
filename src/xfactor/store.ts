@@ -21,6 +21,7 @@ const assetSource = (value: unknown): AssetSource => value === 'file' || value =
 export function freshWorkspace(): WorkspaceState {
   return {
     schemaVersion:2,
+    updatedAt:now(),
     incidents:[],
     piles:[],
     signals:[],
@@ -131,6 +132,22 @@ function normalizeLayout(value: unknown): SavedLayout | null {
   return { id:value.id, name:text(value.name,'SAVED LAYOUT').slice(0,240), positions, createdAt:finite(value.createdAt,now()) };
 }
 
+/** Return the newest meaningful timestamp represented by the workspace.
+ * The explicit workspace clock covers mutations such as pile collapse or floor movement
+ * that do not naturally update an entity timestamp. Legacy schema-v2 payloads still
+ * get a useful clock from their timestamp-bearing entities. */
+export function workspaceClock(state: WorkspaceState): number {
+  return Math.max(
+    0, state.updatedAt || 0,
+    ...state.incidents.flatMap(item => [item.createdAt, item.updatedAt]),
+    ...state.piles.map(item => item.createdAt),
+    ...state.signals.flatMap(item => [item.createdAt, item.updatedAt]),
+    ...state.assets.flatMap(item => [item.createdAt, item.updatedAt]),
+    ...state.activity.map(item => item.createdAt),
+    ...state.savedLayouts.map(item => item.createdAt),
+  );
+}
+
 /** Treat localStorage and cloud payloads as untrusted input. */
 export function normalizeWorkspace(value: unknown): WorkspaceState | null {
   if (!isRecord(value) || value.schemaVersion !== 2) return null;
@@ -146,8 +163,18 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
   if (isRecord(value.positions)) for (const [id,pos] of Object.entries(value.positions)) if (incidentIds.has(id)) { const clean=normalizePosition(pos); if(clean) positions[id]=clean; }
   const separatedPositions = separateIdenticalPositions(cleanIncidents,positions);
   const savedLayouts = (Array.isArray(value.savedLayouts) ? value.savedLayouts : []).map(normalizeLayout).filter((v): v is SavedLayout => Boolean(v));
+  const updatedAt = Math.max(
+    0, finite(value.updatedAt, 0),
+    ...cleanIncidents.flatMap(item => [item.createdAt, item.updatedAt]),
+    ...piles.map(item => item.createdAt),
+    ...signals.flatMap(item => [item.createdAt, item.updatedAt]),
+    ...assets.flatMap(item => [item.createdAt, item.updatedAt]),
+    ...activity.map(item => item.createdAt),
+    ...savedLayouts.map(item => item.createdAt),
+  );
   return {
     schemaVersion:2,
+    updatedAt,
     incidents:cleanIncidents,
     piles,
     signals,

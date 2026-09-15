@@ -79,6 +79,8 @@ export interface SavedLayout {
 
 export interface WorkspaceState {
   schemaVersion: 2;
+  /** Monotonic-enough wall-clock timestamp for whole-workspace conflict resolution. */
+  updatedAt: number;
   incidents: Incident[];
   piles: Pile[];
   signals: Signal[];
