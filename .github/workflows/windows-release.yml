@@ -23,8 +23,7 @@ jobs:
           workspaces: src-tauri
       - name: Read release version
         id: version
-        shell: bash
-        run: echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+        run: echo "version=$((Get-Content package.json | ConvertFrom-Json).version)" >> $env:GITHUB_OUTPUT
       - name: Synchronize release metadata
         run: node scripts/sync-version.mjs
       - name: Install dependencies
