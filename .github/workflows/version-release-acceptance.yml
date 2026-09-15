@@ -1,0 +1,67 @@
+name: Version Release Acceptance
+
+on:
+  pull_request:
+    branches: ['main']
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'index.html'
+      - 'scripts/sync-version.mjs'
+      - 'src-tauri/tauri.conf.json'
+      - 'src-tauri/Cargo.toml'
+      - 'src-tauri/Cargo.lock'
+      - '.github/workflows/windows-release.yml'
+      - '.github/workflows/version-release-acceptance.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  version-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify synchronized version metadata
+        run: |
+          node scripts/sync-version.mjs
+          git diff --exit-code -- package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+          const cargo = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+          const cargoLock = fs.readFileSync('src-tauri/Cargo.lock', 'utf8');
+          const version = pkg.version;
+          if (version !== '0.5.0') throw new Error(`expected release 0.5.0, got ${version}`);
+          if (lock.version !== version || lock.packages?.['']?.version !== version) throw new Error('package-lock version drift');
+          if (tauri.version !== version) throw new Error('Tauri version drift');
+          if (!new RegExp(`^version = "${version.replaceAll('.', '\\.') }"$`, 'm').test(cargo)) throw new Error('Cargo.toml version drift');
+          const root = cargoLock.match(/\[\[package\]\]\nname = "xfactor-os"\nversion = "([^"]+)"/);
+          if (root?.[1] !== version) throw new Error(`Cargo.lock version drift: ${root?.[1] ?? 'missing'}`);
+          console.log(`All release metadata synchronized at ${version}.`);
+          NODE
+      - name: Install dependencies
+        run: npm ci
+      - name: Release checks
+        run: npm run test:release
+      - name: Build production app
+        run: npm run build
+      - name: Verify visible build identity
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const version = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
+          const html = fs.readFileSync('dist/index.html', 'utf8');
+          if (html.includes('__XFACTOR_VERSION__')) throw new Error('unresolved version token in production HTML');
+          if (!html.includes(`xFactor.OS // v${version}`)) throw new Error('visible build badge missing release version');
+          if (!html.includes(`xFactor.OS v${version}`)) throw new Error('document title missing release version');
+          console.log(`Production UI visibly identifies xFactor.OS v${version}.`);
+          NODE
