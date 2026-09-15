@@ -50,9 +50,70 @@ replaceExact(
   `  function patch(recipe:(draft:WorkspaceState)=>WorkspaceState) { setWs(prev => normalizeWorkspace({...recipe(prev),updatedAt:Date.now()}) ?? prev); }`,
 );
 
-fs.writeFileSync('scripts/cloud-sync-clock-smoke.mjs', `import fs from 'node:fs';\n\nfunction assert(label, condition) {\n  if (!condition) throw new Error(\\`FAIL: \\${label}\\`);\n  console.log(\\`PASS: \\${label}\\`);\n}\n\nconst domain = fs.readFileSync('src/xfactor/domain.ts', 'utf8');\nconst store = fs.readFileSync('src/xfactor/store.ts', 'utf8');\nconst deck = fs.readFileSync('src/xfactor/ChaosDeck.tsx', 'utf8');\nconst sync = fs.readFileSync('src/xfactor/syncAdapter.ts', 'utf8');\n\nassert('workspace state has an explicit updatedAt clock', /interface WorkspaceState[\\s\\S]*updatedAt: number;/.test(domain));\nassert('fresh workspaces initialize the clock', store.includes('updatedAt:now()'));\nassert('normalization accepts legacy schema-v2 payloads and derives a clock', store.includes('finite(value.updatedAt, 0)') && store.includes('...signals.flatMap(item => [item.createdAt, item.updatedAt])') && store.includes('...assets.flatMap(item => [item.createdAt, item.updatedAt])'));\nassert('workspaceClock includes explicit whole-workspace timestamp', store.includes('export function workspaceClock(state: WorkspaceState)') && store.includes('state.updatedAt || 0'));\nassert('cloud hydration uses the complete workspace clock', deck.includes('const localClock = workspaceClock(local);') && deck.includes('const remoteClock = workspaceClock(remote);'));\nassert('central mutations stamp workspace updatedAt', deck.includes('normalizeWorkspace({...recipe(prev),updatedAt:Date.now()})'));\nassert('legacy partial incident/activity clock is gone', !deck.includes('local.incidents.map(i=>i.updatedAt)') && !deck.includes('remote.incidents.map(i=>i.updatedAt)'));\nassert('cloud writes remain normalized owner-scoped upserts', sync.includes(".upsert({ owner_id:this.ownerId") && sync.includes(".eq('owner_id',this.ownerId)"));\nconsole.log('Cloud sync freshness contract passed.');\n`);
+const smoke = [
+  "import fs from 'node:fs';",
+  '',
+  'function assert(label, condition) {',
+  "  if (!condition) throw new Error('FAIL: ' + label);",
+  "  console.log('PASS: ' + label);",
+  '}',
+  '',
+  "const domain = fs.readFileSync('src/xfactor/domain.ts', 'utf8');",
+  "const store = fs.readFileSync('src/xfactor/store.ts', 'utf8');",
+  "const deck = fs.readFileSync('src/xfactor/ChaosDeck.tsx', 'utf8');",
+  "const sync = fs.readFileSync('src/xfactor/syncAdapter.ts', 'utf8');",
+  '',
+  "assert('workspace state has an explicit updatedAt clock', /interface WorkspaceState[\\s\\S]*updatedAt: number;/.test(domain));",
+  "assert('fresh workspaces initialize the clock', store.includes('updatedAt:now()'));",
+  "assert('normalization derives a legacy-compatible clock', store.includes('finite(value.updatedAt, 0)') && store.includes('...signals.flatMap(item => [item.createdAt, item.updatedAt])') && store.includes('...assets.flatMap(item => [item.createdAt, item.updatedAt])'));",
+  "assert('workspaceClock includes the whole-workspace timestamp', store.includes('export function workspaceClock(state: WorkspaceState)') && store.includes('state.updatedAt || 0'));",
+  "assert('cloud hydration uses complete workspace clocks', deck.includes('const localClock = workspaceClock(local);') && deck.includes('const remoteClock = workspaceClock(remote);'));",
+  "assert('central mutations stamp workspace updatedAt', deck.includes('normalizeWorkspace({...recipe(prev),updatedAt:Date.now()})'));",
+  "assert('legacy partial freshness comparison is gone', !deck.includes('local.incidents.map(i=>i.updatedAt)') && !deck.includes('remote.incidents.map(i=>i.updatedAt)'));",
+  "assert('cloud writes remain owner-scoped', sync.includes('.upsert({ owner_id:this.ownerId') && sync.includes(\".eq('owner_id',this.ownerId)\"));",
+  "console.log('Cloud sync freshness contract passed.');",
+  '',
+].join('\n');
+fs.writeFileSync('scripts/cloud-sync-clock-smoke.mjs', smoke);
 
-fs.writeFileSync('.github/workflows/cloud-sync-freshness-acceptance.yml', `name: Cloud Sync Freshness Acceptance\n\non:\n  pull_request:\n    branches: ['main']\n    paths:\n      - 'src/xfactor/domain.ts'\n      - 'src/xfactor/store.ts'\n      - 'src/xfactor/ChaosDeck.tsx'\n      - 'src/xfactor/syncAdapter.ts'\n      - 'scripts/cloud-sync-clock-smoke.mjs'\n      - '.github/workflows/cloud-sync-freshness-acceptance.yml'\n  workflow_dispatch: {}\n\npermissions:\n  contents: read\n\njobs:\n  cloud-sync-freshness:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v6\n      - uses: actions/setup-node@v6\n        with:\n          node-version: 22\n          cache: npm\n      - name: Install dependencies\n        run: npm ci\n      - name: Verify cloud freshness contract\n        run: node scripts/cloud-sync-clock-smoke.mjs\n      - name: Release smoke\n        run: npm run test:release\n      - name: Production build\n        run: npm run build\n`);
+const workflow = [
+  'name: Cloud Sync Freshness Acceptance',
+  '',
+  'on:',
+  '  pull_request:',
+  "    branches: ['main']",
+  '    paths:',
+  "      - 'src/xfactor/domain.ts'",
+  "      - 'src/xfactor/store.ts'",
+  "      - 'src/xfactor/ChaosDeck.tsx'",
+  "      - 'src/xfactor/syncAdapter.ts'",
+  "      - 'scripts/cloud-sync-clock-smoke.mjs'",
+  "      - '.github/workflows/cloud-sync-freshness-acceptance.yml'",
+  '  workflow_dispatch: {}',
+  '',
+  'permissions:',
+  '  contents: read',
+  '',
+  'jobs:',
+  '  cloud-sync-freshness:',
+  '    runs-on: ubuntu-latest',
+  '    steps:',
+  '      - uses: actions/checkout@v6',
+  '      - uses: actions/setup-node@v6',
+  '        with:',
+  '          node-version: 22',
+  '          cache: npm',
+  '      - name: Install dependencies',
+  '        run: npm ci',
+  '      - name: Verify cloud freshness contract',
+  '        run: node scripts/cloud-sync-clock-smoke.mjs',
+  '      - name: Release smoke',
+  '        run: npm run test:release',
+  '      - name: Production build',
+  '        run: npm run build',
+  '',
+].join('\n');
+fs.writeFileSync('.github/workflows/cloud-sync-freshness-acceptance.yml', workflow);
 
 fs.rmSync('scripts/apply-cloud-sync-freshness-fix.mjs');
 fs.rmSync('.github/workflows/cloud-sync-freshness-codemod.yml');
