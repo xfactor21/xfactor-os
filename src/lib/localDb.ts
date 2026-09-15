@@ -16,10 +16,9 @@
  * data loss."
  */
 import Database from '@tauri-apps/plugin-sql';
+import { isTauri } from './platform';
 
-export function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-}
+export { isTauri } from './platform';
 
 export interface PendingCapture {
   id: number;
