@@ -1,0 +1,27 @@
+name: Tauri Permissions Acceptance
+
+on:
+  pull_request:
+    branches: ['main']
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  tauri-permissions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Least-privilege contract
+        run: node scripts/tauri-permissions-smoke.mjs
+      - name: Release checks
+        run: npm run test:release
+      - name: Production build
+        run: npm run build

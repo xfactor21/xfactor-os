@@ -5,8 +5,12 @@ on:
     branches: ['main']
     paths:
       - 'src-tauri/tauri.conf.json'
+      - 'src-tauri/capabilities/**'
       - 'widget.html'
+      - 'src/lib/fileIO.ts'
+      - 'src/lib/platform.ts'
       - 'scripts/release-smoke.mjs'
+      - 'scripts/tauri-permissions-smoke.mjs'
       - '.github/workflows/desktop-security-acceptance.yml'
   workflow_dispatch: {}
 
