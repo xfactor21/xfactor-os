@@ -1,0 +1,26 @@
+name: Live Cloud Sync Acceptance
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  live-cloud-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run live two-session acceptance
+        env:
+          XFACTOR_LIVE_SYNC_SUPABASE_URL: ${{ secrets.XFACTOR_LIVE_SYNC_SUPABASE_URL }}
+          XFACTOR_LIVE_SYNC_ANON_KEY: ${{ secrets.XFACTOR_LIVE_SYNC_ANON_KEY }}
+          XFACTOR_LIVE_SYNC_EMAIL: ${{ secrets.XFACTOR_LIVE_SYNC_EMAIL }}
+          XFACTOR_LIVE_SYNC_PASSWORD: ${{ secrets.XFACTOR_LIVE_SYNC_PASSWORD }}
+        run: npm run test:cloud-live
