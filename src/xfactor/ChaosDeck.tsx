@@ -61,6 +61,7 @@ export default function ChaosDeck() {
   const fileRef=useRef<HTMLInputElement>(null);
   const syncReady = useRef(false);
   const syncTimer = useRef<number | null>(null);
+  const syncGeneration = useRef(0);
   const authUser = useAuthStore(s => s.user);
   const initAuth = useAuthStore(s => s.init);
 
@@ -72,25 +73,41 @@ export default function ChaosDeck() {
   }, [ws.selectedIncidentId]);
   useEffect(() => { void initAuth(); }, [initAuth]);
   useEffect(() => {
+    const generation = ++syncGeneration.current;
     syncReady.current = false;
+    if (syncTimer.current) { window.clearTimeout(syncTimer.current); syncTimer.current = null; }
     if (!authUser) return;
     const adapter = new SupabaseWorkspaceSyncAdapter(authUser.id);
     void adapter.pull().then(remote => {
+      if (syncGeneration.current !== generation) return;
       setCloudError(false);
       if (remote) setWs(local => {
         const localClock = workspaceClock(local);
         const remoteClock = workspaceClock(remote);
         return remoteClock > localClock ? remote : local;
       });
-    }).catch(err => { setCloudError(true); console.warn('xFactor.OS cloud pull unavailable',err); }).finally(()=>{ syncReady.current=true; });
+    }).catch(err => {
+      if (syncGeneration.current !== generation) return;
+      setCloudError(true);
+      console.warn('xFactor.OS cloud pull unavailable',err);
+    }).finally(()=>{ if (syncGeneration.current === generation) syncReady.current=true; });
   }, [authUser?.id]);
   useEffect(() => {
     if (!authUser || !syncReady.current) return;
+    const generation = syncGeneration.current;
+    const ownerId = authUser.id;
     if (syncTimer.current) window.clearTimeout(syncTimer.current);
     syncTimer.current = window.setTimeout(() => {
-      void new SupabaseWorkspaceSyncAdapter(authUser.id).push(ws).then(()=>setCloudError(false)).catch(err => { setCloudError(true); console.warn('xFactor.OS cloud push unavailable',err); });
+      if (syncGeneration.current !== generation) return;
+      void new SupabaseWorkspaceSyncAdapter(ownerId).push(ws).then(()=>{
+        if (syncGeneration.current === generation) setCloudError(false);
+      }).catch(err => {
+        if (syncGeneration.current !== generation) return;
+        setCloudError(true);
+        console.warn('xFactor.OS cloud push unavailable',err);
+      });
     }, 900);
-    return () => { if (syncTimer.current) window.clearTimeout(syncTimer.current); };
+    return () => { if (syncTimer.current) { window.clearTimeout(syncTimer.current); syncTimer.current = null; } };
   }, [ws, authUser]);
   useEffect(() => {
     const refresh = () => setWs(loadWorkspace());
