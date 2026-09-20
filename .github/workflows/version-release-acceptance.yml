@@ -13,6 +13,10 @@ on:
       - 'src-tauri/Cargo.toml'
       - 'src-tauri/Cargo.lock'
       - '.github/workflows/windows-release.yml'
+      - 'README.md'
+      - 'README-XFACTOR.md'
+      - 'RELEASE-AUDIT.md'
+      - 'BUILD-MATRIX.md'
       - '.github/workflows/version-release-acceptance.yml'
   workflow_dispatch: {}
 
@@ -39,6 +43,7 @@ jobs:
           const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
           const cargo = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
           const cargoLock = fs.readFileSync('src-tauri/Cargo.lock', 'utf8');
+          const activeDocs = ['README.md', 'README-XFACTOR.md', 'RELEASE-AUDIT.md', 'BUILD-MATRIX.md'].map(path => [path, fs.readFileSync(path, 'utf8')]);
           const version = pkg.version;
           if (version !== '0.5.0') throw new Error(`expected release 0.5.0, got ${version}`);
           if (lock.version !== version || lock.packages?.['']?.version !== version) throw new Error('package-lock version drift');
@@ -46,7 +51,11 @@ jobs:
           if (!new RegExp(`^version = "${version.replaceAll('.', '\\.') }"$`, 'm').test(cargo)) throw new Error('Cargo.toml version drift');
           const root = cargoLock.match(/\[\[package\]\]\nname = "xfactor-os"\nversion = "([^"]+)"/);
           if (root?.[1] !== version) throw new Error(`Cargo.lock version drift: ${root?.[1] ?? 'missing'}`);
-          console.log(`All release metadata synchronized at ${version}.`);
+          for (const [path, text] of activeDocs) {
+            if (!text.includes(version)) throw new Error(`${path} does not identify current release ${version}`);
+            if (/\b(?:Version:\s*\*\*|Release Audit — |What |## )0\.[0-4]\./.test(text)) throw new Error(`${path} still presents a pre-0.5 release as current`);
+          }
+          console.log(`All release metadata and active docs synchronized at ${version}.`);
           NODE
       - name: Install dependencies
         run: npm ci
