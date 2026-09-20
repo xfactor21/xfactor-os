@@ -1,0 +1,27 @@
+name: Cloud Account Isolation Acceptance
+
+on:
+  pull_request:
+    branches: ['main']
+    paths:
+      - 'src/xfactor/ChaosDeck.tsx'
+      - 'scripts/cloud-account-isolation-smoke.mjs'
+      - '.github/workflows/cloud-account-isolation-acceptance.yml'
+  workflow_dispatch: {}
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm ci
+      - name: Cloud account isolation contract
+        run: node scripts/cloud-account-isolation-smoke.mjs
+      - name: Release checks
+        run: npm run test:release
+      - name: Production build
+        run: npm run build
