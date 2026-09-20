@@ -1,92 +1,75 @@
-# xFactor.OS Release Audit — 0.3.0
+# xFactor.OS Release Audit — 0.5.0
 
 ## Current verdict
 
-**ENGINEERING RELEASE CANDIDATE VERIFIED.**
+**ENGINEERING RELEASE CANDIDATE VERIFIED / PUBLIC DISTRIBUTION STILL GATED.**
 
-The defined 0.3.0 source scope now passes clean dependency installation, security audit, static/release checks, TypeScript/Vite production build, real Chromium runtime acceptance, and Tauri packaging on Windows, macOS, and Linux.
+The current 0.5.0 line passes clean dependency installation, release/security checks, TypeScript/Vite production build, real Chromium product/runtime acceptance, consolidated Design Lab regression, cloud-sync freshness/account-isolation contracts, Tauri least-privilege checks, and Windows Tauri packaging.
 
-This does **not** mean signed public-store distribution is complete. Code signing/notarization, installer smoke on physical target machines, and live Supabase/RLS acceptance remain separate deployment gates where those capabilities are advertised.
+Production Vercel is currently deployed from the latest verified `main` line. This does **not** mean signed public Windows distribution is complete.
 
-## Completion work performed
+## Verified product scope
 
-### Core operating system
-- Expanded Incident records with description, next move, priority, relations, archive state, and safer normalization.
-- Blackbox is a real workbench rather than a static summary card.
-- Task open/done counts derive from routed Signal tasks.
-- Added bidirectional Incident relationships with dangling-relation cleanup.
-- Piles support collapse/explode/delete and individual membership removal.
-- Saved layout snapshots can be saved, restored, and removed.
+### Core operating environment
+- Persistent spatial Floor with deterministic Stack It, presentation-only Riot Mode, Saved Damage layouts, multi-Incident selection, and reload persistence.
+- Editable Incidents with Blackbox workbench, priorities, heat/status, next move, relations, archive/delete, and task-derived counts.
+- Piles with overlapping membership, rename, collapse/explode, membership removal, and deletion without deleting contained Incidents.
+- Signal/Hotwire supports sparks/tasks/notes/links, editing, type conversion, routing, pinning, completion, deletion, and search.
+- Tape activity ledger plus normalized workspace backup/restore.
+- Black Vault supports URL references and real IndexedDB-backed local binary files with preview/download/favorite/archive/restore/delete.
+- Command Deck and global entity search use deterministic local grammar rather than advertised AI routing.
 
-### Signal / Hotwire
-- Signal records can be edited, retyped, routed/unrouted, pinned, completed, searched, or deleted.
-- Command grammar supports typed task/note/link capture and search.
+### Design Lab
+- The current Design Lab milestone contains **25/25 production modes**.
+- A consolidated 25-mode regression plus the accumulated focused acceptance suites have passed on the milestone line.
+- Several major editors have deeper dedicated acceptance beyond route existence.
+- No claim is made that every tool has feature parity with specialist professional desktop applications.
 
-### Black Vault
-- Real local file ingestion through a file picker.
-- File blobs persist in IndexedDB rather than localStorage JSON.
-- Image/audio/video preview, download, favorite, archive/restore, and delete are implemented.
-- URL/reference assets remain supported.
-- Design Lab board metadata appears as `studio://` Vault assets and follows create/rename/delete events.
+### Terminal/runtime
+Real Chromium acceptance boots the supported Terminal runtime surfaces:
+- Python
+- Ruby
+- PHP
+- Go
+- Node.js / WebContainers
 
-### Tape / backup
-- Dedicated append-only Tape view.
-- Normalized JSON workspace backup and restore from UI and Command Deck.
+Production preview also verifies the required cross-origin isolation behavior.
 
-### Account / sync
-- Optional account sheet with email/password, signup, magic link, sign-out, and explicit local-only state when cloud is not configured.
-- Cloud sync remains local-first and nonfatal.
-- Binary Vault blobs intentionally remain device-local.
+### Cloud/account boundary
+- Dedicated xFactor.OS Supabase project exists and is healthy.
+- `xfactor_workspaces` exists with owner-scoped RLS.
+- Whole-workspace freshness logic prevents newer non-Incident mutations from being overwritten by older cloud state.
+- Auth-generation isolation prevents stale pull/push results from a previous user session from hydrating or changing a newer session.
+- A repeatable two-client live sync harness is merged.
+- **Credential-backed first-user / two-session A↔B acceptance is still not claimed**, because no dedicated test Auth user has been supplied yet.
+- Vault binary blobs intentionally remain device-local; workspace metadata is the cloud-sync boundary.
 
-## Verified release evidence
+### Analytics / production
+- xFactor.OS production analytics ingestion has been verified end-to-end with clearly marked synthetic audit probes.
+- Shared product summaries exclude rows explicitly marked synthetic/audit so CI evidence does not inflate user metrics.
+- Production Vercel deployment is expected to track the current `main` SHA and must be checked after substantive release merges.
 
-### Clean web build and security
-GitHub Actions clean runner verification on Node 22 completed successfully:
-- `npm ci`: pass.
-- `npm audit --omit=dev --audit-level=high`: **0 vulnerabilities**.
-- `npm audit --audit-level=high`: **0 vulnerabilities**.
-- `npm run test:release`: **64/64 pass**.
-- `npm run lint`: **0 errors** (16 non-blocking warnings in inherited/current modules).
-- `npm run build`: TypeScript project build + Vite production build **pass**.
+### Desktop / Windows
+- Tauri CSP is explicit and compatible with required WASM/blob-worker behavior.
+- Reachable desktop identity uses xFactor.OS branding.
+- Active Tauri capabilities are least-privilege split; the capture window does not inherit broad main-window privileges.
+- Current Windows CI builds versioned EXE/MSI installers successfully.
 
-### Real Chromium acceptance
-The production Vite preview was launched in CI and exercised with Playwright/Chromium. Verified:
-- main shell loads;
-- production preview reports `crossOriginIsolated === true`;
-- first-run workspace is empty;
-- Incident creation survives reload;
-- Hotwire task capture works;
-- Command Deck navigation to Vault works;
-- a real Black Vault file is persisted to IndexedDB and survives reload;
-- Tape opens;
-- Terminal opens;
-- Python runtime boots;
-- Ruby runtime boots;
-- PHP runtime boots;
-- Go runtime boots;
-- Node.js/WebContainers runtime boots;
-- Design Lab opens.
-
-### Design Lab truth boundary
-- **25/25 declared Design Lab modes have concrete production routes.**
-- The Design Lab shell opens in the real browser acceptance run.
-- A full edit/import/export click-through for every one of the 25 tools has **not** been individually automated; this remains a deeper QA pass rather than a source-completeness blocker.
-
-### Desktop/Tauri
-An isolated GitHub Actions matrix successfully executed `npm ci`, production dependency audit, Rust/Tauri compilation, packaging, and artifact upload on:
-- **Windows** — pass;
-- **macOS** — pass;
-- **Linux** — pass.
-
-Final 0.3.0 package artifacts were produced for all three platforms. They remain unsigned engineering artifacts until signing/notarization and physical install smoke are completed.
+## Current required gates for release-affecting changes
+- focused acceptance for the changed subsystem;
+- Core Product Acceptance when core behavior is touched;
+- Verify Release Candidate;
+- Version Release Acceptance;
+- Tauri Permissions / Desktop Security where applicable;
+- Windows packaging for release-affecting changes.
 
 ## Remaining deployment gates
 
-1. Code-sign Windows installer and notarize/sign macOS distribution before broad public distribution.
-2. Install the generated packages on physical target machines and run tray/file-picker/restart smoke tests.
-3. If cloud sync is publicly enabled, run live Supabase sign-up/sign-in, RLS isolation, pull/push, reconnect, and two-session conflict acceptance.
-4. If claiming exhaustive Design Lab QA, individually exercise edit/import/export paths for all 25 tools.
+1. **Live Supabase user acceptance:** create one dedicated Auth test user and run the merged two-client A→B / B→A sync harness.
+2. **Windows install acceptance:** install the generated EXE/MSI on a real Windows environment and verify launch, restart/persistence, native file dialog, tray/Hotwire behavior, upgrade, and uninstall.
+3. **Code signing / SmartScreen:** sign the Windows release before broad public distribution.
+4. **macOS/public multi-platform distribution:** current release work is Windows-focused; signed/notarized macOS distribution is not claimed for 0.5.0.
 
 ## Release-manager conclusion
 
-**0.3.0 is READY as a verified engineering release candidate.** The remaining items are distribution/platform acceptance and optional cloud/deep-tool QA gates, not hidden missing core source features.
+**0.5.0 is a verified engineering release candidate.** The remaining blockers are explicit deployment/owner-backed gates rather than hidden missing core implementation. Public Windows distribution should remain gated until real installer acceptance and signing are complete; cloud sync should remain described as unverified until the credential-backed two-session test passes.
