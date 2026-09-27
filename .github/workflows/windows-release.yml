@@ -32,7 +32,7 @@ jobs:
         run: npm run test:release
       - name: Build Windows desktop app
         run: npm run tauri build
-      - name: Verify MSI install, launch, and uninstall
+      - name: Verify MSI + NSIS install, launch, and uninstall
         shell: pwsh
         run: ./scripts/windows-installer-smoke.ps1
       - name: Upload Windows installers
