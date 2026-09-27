@@ -194,7 +194,7 @@ function LiquidBoard({
     magnet={44}
     quality={compact ? 0.7 : 1}
     maxSurfaces={compact ? 8 : 16}
-    pointerDrop={!compact}
+    pointerDrop={false}
     ambientDrops={false}
   >
     {signals.map((signal, index) => {
@@ -255,7 +255,14 @@ function MatterBoard({
       map.set(material, current);
     });
     return map;
-  }, [signals, plasma.matterMap]);
+  }, [
+    signals,
+    plasma.matterMap.spark,
+    plasma.matterMap.task,
+    plasma.matterMap.note,
+    plasma.matterMap.link,
+    plasma.matterMap.doneTask,
+  ]);
 
   return <>
     {[...grouped.entries()].map(([material, materialSignals]) => {
