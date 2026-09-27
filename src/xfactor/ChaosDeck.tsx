@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import Studio from '../modules/studio';
 import { loadBoards } from '../modules/studio/boards';
-import TerminalRoom from '../modules/terminal';
+import DeveloperWorkbench from './DeveloperWorkbench';
 import type { Asset, Incident, IncidentPriority, IncidentStatus, Signal, SignalType, WorkspaceState } from './domain';
 import {
   event, exportWorkspace, importWorkspace, loadWorkspace, newAsset, newIncident, newLayout, newPile,
@@ -267,7 +267,7 @@ export default function ChaosDeck() {
     if(label==='Piles') setView('piles');
     if(label==='Tape') setView('tape');
     if(label==='Floor') setView('deck');
-    if(label==='Terminal') setView('terminal');
+    if(label==='Terminal'||label==='Workbench') setView('terminal');
     if(label==='Create pile') createPileFromSelection();
     if(label==='Backup workspace') exportBackup();
     if(label==='Restore workspace') importRef.current?.click();
@@ -285,7 +285,7 @@ export default function ChaosDeck() {
   }
   const commands = [
     {label:'New incident',hint:'CREATE',icon:Plus},{label:'Riot Mode',hint:'LAYOUT',icon:Shuffle},{label:'Stack It',hint:'LAYOUT',icon:Layers3},
-    {label:'Create pile',hint:'ORGANIZE',icon:FolderPlus},{label:'Signal',hint:'OPEN',icon:Radio},{label:'Piles',hint:'OPEN',icon:Boxes},{label:'Vault',hint:'OPEN',icon:Archive},{label:'Tape',hint:'OPEN',icon:History},{label:'Terminal',hint:'OPEN',icon:TerminalSquare},{label:'Design Lab',hint:'OPEN',icon:Hammer},
+    {label:'Create pile',hint:'ORGANIZE',icon:FolderPlus},{label:'Signal',hint:'OPEN',icon:Radio},{label:'Piles',hint:'OPEN',icon:Boxes},{label:'Vault',hint:'OPEN',icon:Archive},{label:'Tape',hint:'OPEN',icon:History},{label:'Workbench',hint:'BUILD',icon:TerminalSquare},{label:'Design Lab',hint:'OPEN',icon:Hammer},
     {label:'Backup workspace',hint:'EXPORT',icon:Download},{label:'Restore workspace',hint:'IMPORT',icon:Upload},
   ].filter(c=>c.label.toLowerCase().includes(paletteQuery.toLowerCase()));
 
@@ -312,7 +312,7 @@ export default function ChaosDeck() {
       <button className="rail-x" onClick={()=>setStudio(true)}><Hammer/><small>LAB</small></button>
       <button className={`rail-x ${view==='vault'?'active':''}`} onClick={()=>setView('vault')}><Archive/><small>VAULT</small></button>
       <button className={`rail-x ${view==='tape'?'active':''}`} onClick={()=>setView('tape')}><History/><small>TAPE</small></button>
-      <div className="rail-grow"/><button className={`rail-x ${view==='terminal'?'active':''}`} onClick={()=>setView('terminal')}><TerminalSquare/><small>TERM</small></button><div className="rail-mark">X<br/><i>21</i></div>
+      <div className="rail-grow"/><button className={`rail-x ${view==='terminal'?'active':''}`} onClick={()=>setView('terminal')}><TerminalSquare/><small>WORK</small></button><div className="rail-mark">X<br/><i>21</i></div>
     </aside>
 
     <main className="xf-main">
@@ -344,7 +344,7 @@ export default function ChaosDeck() {
 
       {view==='tape' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">TAPE //</span><h1>THE MESS HAS A MEMORY.</h1><p>Append-only operational history. Nothing here controls the data; it tells you what happened to it.</p></div><div className="xf-floor-actions"><button onClick={exportBackup}><Download size={14}/> BACKUP WORKSPACE</button><button onClick={()=>importRef.current?.click()}><Upload size={14}/> RESTORE BACKUP</button></div></div><div className="tape-ledger">{ws.activity.length===0?<Empty label="NO TAPE YET" detail="Your actions will start leaving a trail here."/>:ws.activity.map(a=><article key={a.id}><span>{relative(a.createdAt)} AGO</span><b>{a.type.toUpperCase()}</b><p>{a.label}</p><small>{a.incidentId?ws.incidents.find(i=>i.id===a.incidentId)?.name??'FORMER INCIDENT':'SYSTEM'}</small></article>)}</div></section>}
 
-      {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">TERM //</span><h1>POWER TOOLS, NO TRAINING WHEELS.</h1><p>The inherited runtime stack is mounted directly here: Node, Python, Ruby, PHP, and Go where the browser/platform supports them.</p></div></div><div className="xf-terminal-runtime"><TerminalRoom active /></div></section>}
+      {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">WORKBENCH //</span><h1>BUILD THE INCIDENT.</h1><p>Code, run, preview and debug without dropping the project context. The active Incident owns this Workbench; the shared runtime keeps the project and terminal in the same environment.</p></div></div><DeveloperWorkbench active projectId={chosen?.id} projectName={chosen?.name}/></section>}
     </main>
 
     <div className="xf-hotwire"><Zap size={15}/><b>HOTWIRE</b><input value={capture} onChange={e=>setCapture(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCapture('spark')}} placeholder={chosen?`THROW A THOUGHT INTO ${chosen.name}...`:'THROW A THOUGHT INTO THE SYSTEM...'}/><button onClick={()=>addCapture('task')}>TASK</button><button onClick={()=>addCapture('note')}>NOTE</button><button onClick={()=>addCapture('link')}><Link2 size={11}/></button><button onClick={()=>addCapture('spark')}>BURN IT IN</button></div>
