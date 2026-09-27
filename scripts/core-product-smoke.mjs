@@ -149,11 +149,12 @@ await check('Black Vault binary file survives reload', async () => {
   await page.getByText('core-audit-vault.txt').waitFor();
 });
 
-await check('Tape and Terminal remain reachable after restore/reload cycle', async () => {
+await check('Tape and Incident Workbench remain reachable after restore/reload cycle', async () => {
   await openCommand('open tape');
   await page.getByText('THE MESS HAS A MEMORY.').waitFor();
   await openCommand('open terminal');
-  await page.getByText('POWER TOOLS, NO TRAINING WHEELS.').waitFor();
+  await page.getByText('BUILD THE INCIDENT.').waitFor();
+  await page.locator('.dev-workbench').waitFor();
 });
 
 await browser.close();
