@@ -1,3 +1,5 @@
+mod git;
+
 use tauri::Manager;
 
 #[cfg(desktop)]
@@ -32,6 +34,14 @@ pub fn run() {
     .plugin(tauri_plugin_sql::Builder::default().build())
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
+    .plugin(tauri_plugin_persisted_scope::init())
+    .invoke_handler(tauri::generate_handler![
+      git::git_status,
+      git::git_diff,
+      git::git_stage,
+      git::git_unstage,
+      git::git_commit,
+    ])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

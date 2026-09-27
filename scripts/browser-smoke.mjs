@@ -100,6 +100,40 @@ await check('Tape view opens', async () => {
   await page.getByText('THE MESS HAS A MEMORY.').waitFor();
 });
 
+await check('Signal Plasma mode is reversible and data-safe', async () => {
+  await page.keyboard.press('Control+K');
+  const input = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
+  await input.fill('open signal');
+  await input.press('Enter');
+  await page.getByText("DON'T ORGANIZE IT YET.").waitFor();
+  const original = page.locator('.signal-row textarea').first();
+  const originalText = await original.inputValue();
+  await page.getByRole('button', { name: /PLASMA/i }).click();
+  await page.locator('.xf-root.xf-plasma-mode').waitFor();
+  const plasmaEditor = page.locator('.xf-plasma-note textarea').first();
+  await plasmaEditor.waitFor();
+  await plasmaEditor.fill(originalText + ' // PLASMA SAFE');
+  await page.getByRole('button', { name: 'NORMAL' }).click();
+  await page.getByText("DON'T ORGANIZE IT YET.").waitFor();
+  const returnedText = await page.locator('.signal-row textarea').first().inputValue();
+  if (!returnedText.includes('PLASMA SAFE')) throw new Error('Signal edit did not survive Plasma -> Normal transition');
+});
+
+await check('Signal Matter mode uses canonical Signal data', async () => {
+  await page.keyboard.press('Control+K');
+  const input = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
+  await input.fill('open signal');
+  await input.press('Enter');
+  await page.getByRole('button', { name: /MATTER/i }).click();
+  await page.locator('.xf-root.xf-matter-mode').waitFor();
+  await page.getByText('THOUGHTS HAVE WEIGHT NOW.').waitFor();
+  const editor = page.locator('.xf-matter-note textarea').first();
+  await editor.waitFor();
+  const value = await editor.inputValue();
+  if (!value.includes('PLASMA SAFE')) throw new Error('Matter did not receive the canonical Signal edit');
+  await page.getByRole('button', { name: 'NORMAL' }).click();
+});
+
 await check('Incident Developer Workbench opens', async () => {
   await page.keyboard.press('Control+K');
   const input = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
