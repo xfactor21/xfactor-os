@@ -42,7 +42,7 @@ function Resolve-AppExecutable($Entry) {
 }
 
 function Invoke-AppLaunchSmoke([System.IO.FileInfo]$Exe, [string]$InstallerLabel) {
-  Write-Host "Launching installed app from $InstallerLabel: $($Exe.FullName)"
+  Write-Host "Launching installed app from ${InstallerLabel}: $($Exe.FullName)"
   $app = Start-Process $Exe.FullName -PassThru
   Start-Sleep -Seconds 10
   if ($app.HasExited) {
