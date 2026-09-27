@@ -9,7 +9,9 @@ import Studio from '../modules/studio';
 import { loadBoards } from '../modules/studio/boards';
 import DeveloperWorkbench from './DeveloperWorkbench';
 import PlasmaSignalWorkspace from './PlasmaSignalWorkspace';
+import GlobalSpatialToggle from './GlobalSpatialToggle';
 import { usePlasmaMode } from './plasmaMode';
+import './spatialGlobal.css';
 import type { Asset, Incident, IncidentPriority, IncidentStatus, Signal, SignalType, WorkspaceState } from './domain';
 import {
   event, exportWorkspace, importWorkspace, loadWorkspace, newAsset, newIncident, newLayout, newPile,
@@ -159,7 +161,8 @@ export default function ChaosDeck() {
   const selected = selectedIds[0];
   const chosen = useMemo(() => ws.incidents.find(s => s.id === selected) ?? ws.incidents.find(i=>!i.archived), [ws.incidents, selected]);
   const visibleIncidents=useMemo(()=>ws.incidents.filter(i=>!i.archived),[ws.incidents]);
-  const plasma = usePlasmaMode(chosen?.id);
+  // Spatial display mode is an OS-level presentation state. Incident layouts remain scoped separately.
+  const plasma = usePlasmaMode('global');
 
   function patch(recipe:(draft:WorkspaceState)=>WorkspaceState) { setWs(prev => normalizeWorkspace({...recipe(prev),updatedAt:Date.now()}) ?? prev); }
   function record(label:string,type='system',incidentId?:string){patch(p=>({...p,activity:[event(type,label,incidentId),...p.activity]}));}
@@ -303,7 +306,8 @@ export default function ChaosDeck() {
     <input ref={fileRef} type="file" multiple hidden onChange={e=>void ingestFiles(e.target.files)}/>
     <header className="xf-topbar">
       <div className="xf-brand"><img src="/xfactor-mask.jpeg"/><div><b>xFACTOR.OS</b><span>// CONTROLLED CHAOS SYSTEM</span></div></div>
-      <div className="xf-top-status"><span><Radio size={12}/> SIGNAL {signalStrength}%</span><span><Activity size={12}/> {ws.activity.length} EVENTS</span><span className="hot"><Flame size={12}/> {visibleIncidents.filter(i=>i.heat>80).length} HOT</span>{plasma.mode==='plasma'&&<span className="plasma-status"><Sparkles size={12}/> PLASMA</span>}{plasma.mode==='matter'&&<span className="matter-status">◆ MATTER</span>}</div>
+      <div className="xf-top-status"><span><Radio size={12}/> SIGNAL {signalStrength}%</span><span><Activity size={12}/> {ws.activity.length} EVENTS</span><span className="hot"><Flame size={12}/> {visibleIncidents.filter(i=>i.heat>80).length} HOT</span></div>
+      <GlobalSpatialToggle plasma={plasma}/>
       <button className="xf-account-btn" onClick={()=>setAccount(true)}>{authUser?authUser.email?.split('@')[0]:'LOCAL'}<span>{authUser?'SYNCED':supabaseConfigured?'SIGN IN':'OFFLINE'}</span></button>
       <button className="xf-command" onClick={()=>setPalette(true)}><Command size={14}/> COMMAND <kbd>CTRL K</kbd></button>
     </header>
@@ -315,7 +319,7 @@ export default function ChaosDeck() {
       <button className="rail-x" onClick={()=>setStudio(true)}><Hammer/><small>LAB</small></button>
       <button className={`rail-x ${view==='vault'?'active':''}`} onClick={()=>setView('vault')}><Archive/><small>VAULT</small></button>
       <button className={`rail-x ${view==='tape'?'active':''}`} onClick={()=>setView('tape')}><History/><small>TAPE</small></button>
-      <div className="rail-grow"/><button className={`rail-x ${view==='terminal'?'active':''}`} onClick={()=>setView('terminal')}><TerminalSquare/><small>WORK</small></button><div className="rail-mark">X<br/><i>21</i></div>
+      <div className="rail-grow"/><button className={`rail-x ${view==='terminal'?'active':''}`} onClick={()=>setView('terminal')}><TerminalSquare/><small>BUILD</small></button><div className="rail-mark">X<br/><i>21</i></div>
     </aside>
 
     <main className="xf-main">
