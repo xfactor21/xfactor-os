@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import ts from '/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js';
+import ts from 'typescript';
 
 function assert(name, condition) {
   if (!condition) throw new Error(`FAIL: ${name}`);
