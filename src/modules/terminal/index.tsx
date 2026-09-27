@@ -365,7 +365,8 @@ export default function TerminalRoom({ active, compact = false }: { active: bool
           setTimeout(() => reject(new Error('Timed out reaching the WebContainers boot service — check your network connection.')), 20000),
         ),
       ]);
-      const shell = await wc.spawn('jsh', { terminal: { cols: term.cols, rows: term.rows } });
+      await wc.fs.mkdir('/workspace', { recursive: true });
+      const shell = await wc.spawn('jsh', { cwd: '/workspace', terminal: { cols: term.cols, rows: term.rows } });
       void shell.output.pipeTo(new WritableStream({ write(data) { term.write(data); } }));
       const input = shell.input.getWriter();
       const dataDisposable = term.onData((data) => void input.write(data));
