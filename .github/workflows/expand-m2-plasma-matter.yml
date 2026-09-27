@@ -31,7 +31,7 @@ jobs:
           cat .handoff/matter.b64.* | base64 -d > /tmp/matter.zip
           unzip -q /tmp/matter.zip -d /tmp/xfactor-m2
 
-          git apply /tmp/xfactor-m2/tauri-m2.patch
+          patch -p1 < /tmp/xfactor-m2/tauri-m2.patch
           git apply /tmp/xfactor-m2/PLASMA_INTEGRATION.patch
 
           cp /tmp/xfactor-m2/src/xfactor/DeveloperWorkbench.tsx src/xfactor/DeveloperWorkbench.tsx
