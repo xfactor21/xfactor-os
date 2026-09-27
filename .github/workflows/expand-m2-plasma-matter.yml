@@ -122,7 +122,7 @@ jobs:
                 plasma={plasma}
               />}
 
-      """
+          """
               text = text[:signal_start] + replacement + text[signal_end:]
 
           chaos.write_text(text)
