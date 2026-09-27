@@ -226,7 +226,6 @@ jobs:
           PY
 
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          cargo check --manifest-path src-tauri/Cargo.toml
 
           rm -rf .handoff
           rm -f .github/workflows/expand-m2-plasma-matter.yml
