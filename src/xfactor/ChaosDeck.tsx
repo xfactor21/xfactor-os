@@ -344,7 +344,17 @@ export default function ChaosDeck() {
 
       {view==='tape' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">TAPE //</span><h1>THE MESS HAS A MEMORY.</h1><p>Append-only operational history. Nothing here controls the data; it tells you what happened to it.</p></div><div className="xf-floor-actions"><button onClick={exportBackup}><Download size={14}/> BACKUP WORKSPACE</button><button onClick={()=>importRef.current?.click()}><Upload size={14}/> RESTORE BACKUP</button></div></div><div className="tape-ledger">{ws.activity.length===0?<Empty label="NO TAPE YET" detail="Your actions will start leaving a trail here."/>:ws.activity.map(a=><article key={a.id}><span>{relative(a.createdAt)} AGO</span><b>{a.type.toUpperCase()}</b><p>{a.label}</p><small>{a.incidentId?ws.incidents.find(i=>i.id===a.incidentId)?.name??'FORMER INCIDENT':'SYSTEM'}</small></article>)}</div></section>}
 
-      {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">WORKBENCH //</span><h1>BUILD THE INCIDENT.</h1><p>Code, run, preview and debug without dropping the project context. The active Incident owns this Workbench; the shared runtime keeps the project and terminal in the same environment.</p></div></div><DeveloperWorkbench active projectId={chosen?.id} projectName={chosen?.name}/></section>}
+      {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">WORKBENCH //</span><h1>BUILD THE INCIDENT.</h1><p>Code, run, preview and debug without dropping the project context. The active Incident owns this Workbench; the shared runtime keeps the project and terminal in the same environment.</p></div></div><DeveloperWorkbench
+  active
+  projectId={chosen?.id}
+  projectName={chosen?.name}
+  projectStatus={chosen?.status}
+  projectPriority={chosen?.priority}
+  nextMove={chosen?.nextMove}
+  openSignals={chosen ? ws.signals.filter(signal => signal.incidentId === chosen.id && !signal.done).length : 0}
+  taskCount={chosen ? ws.signals.filter(signal => signal.incidentId === chosen.id && signal.type === 'task' && !signal.done).length : 0}
+  assetCount={chosen ? ws.assets.filter(asset => asset.incidentId === chosen.id && !asset.archived).length : 0}
+/></section>}
     </main>
 
     <div className="xf-hotwire"><Zap size={15}/><b>HOTWIRE</b><input value={capture} onChange={e=>setCapture(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCapture('spark')}} placeholder={chosen?`THROW A THOUGHT INTO ${chosen.name}...`:'THROW A THOUGHT INTO THE SYSTEM...'}/><button onClick={()=>addCapture('task')}>TASK</button><button onClick={()=>addCapture('note')}>NOTE</button><button onClick={()=>addCapture('link')}><Link2 size={11}/></button><button onClick={()=>addCapture('spark')}>BURN IT IN</button></div>
