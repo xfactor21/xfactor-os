@@ -41,7 +41,7 @@ jobs:
           if 'tauri-plugin-persisted-scope' not in text:
               if anchor not in text:
                   raise SystemExit('Cargo fs plugin anchor not found')
-              text = text.replace(anchor, anchor + '\\ntauri-plugin-persisted-scope = "2.3.7"', 1)
+              text = text.replace(anchor, anchor + chr(10) + 'tauri-plugin-persisted-scope = "2.3.7"', 1)
           cargo.write_text(text)
 
           lib = Path('src-tauri/src/lib.rs')
@@ -51,7 +51,7 @@ jobs:
           if addition not in text:
               if anchor not in text:
                   raise SystemExit('Tauri fs init anchor not found')
-              text = text.replace(anchor, anchor + '\\n' + addition, 1)
+              text = text.replace(anchor, anchor + chr(10) + addition, 1)
           lib.write_text(text)
 
           caps_path = Path('src-tauri/capabilities/default.json')
@@ -69,7 +69,7 @@ jobs:
               if permission not in permissions:
                   permissions.insert(insert_at, permission)
           caps['permissions'] = permissions
-          caps_path.write_text(json.dumps(caps, indent=2) + '\\n')
+          caps_path.write_text(json.dumps(caps, indent=2) + chr(10))
           PY
 
           python <<'PY'
