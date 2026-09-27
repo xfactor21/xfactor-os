@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { EditorView as EditorViewType } from '@codemirror/view';
 import Icon from './icons/Icon';
 
-export type EditorLanguage = 'python' | 'html';
+export type EditorLanguage = 'python' | 'html' | 'javascript' | 'typescript' | 'css' | 'plain';
 
 interface CodeEditorProps {
   /** Initial document text. Treated as UNCONTROLLED after mount — CodeMirror
@@ -44,11 +44,13 @@ export default function CodeEditor({ value, resetKey, onChange, language, readOn
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const [{ EditorView, basicSetup }, { EditorState }, { python }, { html }] = await Promise.all([
+      const [{ EditorView, basicSetup }, { EditorState }, { python }, { html }, { javascript }, { css }] = await Promise.all([
         import('codemirror'),
         import('@codemirror/state'),
         import('@codemirror/lang-python'),
         import('@codemirror/lang-html'),
+        import('@codemirror/lang-javascript'),
+        import('@codemirror/lang-css'),
       ]);
       if (cancelled || !containerRef.current) return;
       const xosDarkTheme = EditorView.theme(
@@ -71,7 +73,13 @@ export default function CodeEditor({ value, resetKey, onChange, language, readOn
         },
         { dark: true },
       );
-      const langExt = language === 'python' ? python() : html();
+      const langExt =
+        language === 'python' ? python()
+          : language === 'html' ? html()
+            : language === 'javascript' ? javascript({ jsx: true })
+              : language === 'typescript' ? javascript({ jsx: true, typescript: true })
+                : language === 'css' ? css()
+                  : [];
       const state = EditorState.create({
         doc: value,
         extensions: [
