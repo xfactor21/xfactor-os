@@ -100,12 +100,32 @@ await check('Tape view opens', async () => {
   await page.getByText('THE MESS HAS A MEMORY.').waitFor();
 });
 
-await check('Terminal surface opens', async () => {
+await check('Incident Developer Workbench opens', async () => {
   await page.keyboard.press('Control+K');
   const input = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
   await input.fill('open terminal');
   await input.press('Enter');
-  await page.getByText('POWER TOOLS, NO TRAINING WHEELS.').waitFor();
+  await page.getByText('BUILD THE INCIDENT.').waitFor();
+  await page.locator('.dev-workbench').waitFor();
+});
+
+await check('Workbench edits a project file and updates preview', async () => {
+  await page.locator('.dev-file').filter({ hasText: 'main.js' }).locator('button').first().click();
+  const editor = page.locator('.dev-code-editor .cm-content');
+  await editor.waitFor();
+  await editor.click();
+  await page.keyboard.press('Control+A');
+  await page.keyboard.insertText("document.querySelector('#app').innerHTML = '<h1>WORKBENCH SMOKE</h1>';");
+  const preview = page.locator('.dev-preview-pane iframe').contentFrame();
+  await preview.getByText('WORKBENCH SMOKE').waitFor({ timeout: 5000 });
+  const persisted = await page.evaluate(() => {
+    const workspace = JSON.parse(localStorage.getItem('xfactor-os-workspace-v2') || '{}');
+    const id = workspace.selectedIncidentId;
+    if (!id) return false;
+    const files = JSON.parse(localStorage.getItem('xfactor-workbench-v1:' + id) || '[]');
+    return files.some(file => file.path === 'src/main.js' && file.content.includes('WORKBENCH SMOKE'));
+  });
+  if (!persisted) throw new Error('Incident-bound Workbench file did not persist');
 });
 
 for (const runtime of ['PYTHON', 'RUBY', 'PHP', 'GO', 'NODE.JS']) {
