@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import { Check, Pin, RotateCcw, Search, Sparkles, Trash2 } from 'lucide-react';
 import { Plasma, PlasmaProvider, type Offset } from '@cruxgarden/plasma-ui';
 import type { Incident, Signal, SignalType } from './domain';
 import type { MatterMaterial, MatterSlot, PlasmaController, PlasmaLook, PlasmaPolicy } from './plasmaMode';
+import { beginMomentum, joinedAny, momentumTarget, sampleMomentum, type PointerMomentum } from './spatialPhysics';
 import './plasmaMode.css';
 
 interface PlasmaSignalWorkspaceProps {
@@ -171,29 +172,42 @@ function LiquidBoard({
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
 }) {
+  const momentum = useRef(new Map<string, PointerMomentum>());
+  const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
+  const rememberPointer = (id: string, event: ReactPointerEvent) => {
+    const previous = momentum.current.get(id);
+    momentum.current.set(id, previous ? sampleMomentum(previous, event.clientX, event.clientY) : beginMomentum(event.clientX, event.clientY));
+  };
+  const settle = (id: string, next: Offset) => {
+    const rect = stage.current?.getBoundingClientRect();
+    const target = momentumTarget(next, momentum.current.get(id), rect, { width: 258, height: 170 });
+    momentum.current.delete(id);
+    onLayout(id, target);
+  };
+
   return <PlasmaProvider
     mood={plasma.look === 'afterglow' ? 'tidal' : plasma.look === 'pink-riot' ? 'ember' : 'aurora'}
     theme="dark"
     tint={plasma.look === 'afterglow' ? '#8b5cf6' : '#ff2aa3'}
-    opacity={0.09}
-    frost={plasma.frost}
-    blend={plasma.blend}
-    viscosity={0.38}
-    stretch={1.2}
-    refraction={1.08}
-    dispersion={1.1}
+    opacity={0.21}
+    frost={Math.max(0.08, plasma.frost * 0.58)}
+    blend={Math.max(plasma.blend, compact ? 30 : 46)}
+    viscosity={0.16}
+    stretch={1.9}
+    refraction={1.32}
+    dispersion={1.42}
     rimColor="iridescent"
-    rimWidth={1.25}
-    highlight={1.2}
-    shimmer={1.1}
-    shimmerSpeed={1.15}
-    glow={1.2}
-    wash={0.7}
-    grain={0.7}
+    rimWidth={1.9}
+    highlight={1.65}
+    shimmer={1.55}
+    shimmerSpeed={1.3}
+    glow={1.75}
+    wash={0.35}
+    grain={0.26}
     grid={24}
-    magnet={44}
-    quality={compact ? 0.7 : 1}
-    maxSurfaces={compact ? 8 : 16}
+    magnet={58}
+    quality={compact ? 0.68 : 1}
+    maxSurfaces={compact ? 7 : 16}
     pointerDrop={false}
     ambientDrops={false}
   >
@@ -202,17 +216,21 @@ function LiquidBoard({
       const offset = layout[signal.id] ?? fallback;
       return <Plasma
         key={signal.id}
-        className={`xf-plasma-note type-${signal.type} ${signal.done ? 'done' : ''}`}
+        className={`xf-plasma-note type-${signal.type} ${signal.done ? 'done' : ''} ${joinedIds.has(signal.id) ? 'is-fused' : ''}`}
         draggable
         snap
+        fuse
         bounds={stage}
         group={layoutScope}
         offset={offset}
-        onDragEnd={next => onLayout(signal.id, next)}
+        onPointerDownCapture={event => momentum.current.set(signal.id, beginMomentum(event.clientX, event.clientY))}
+        onPointerMoveCapture={event => rememberPointer(signal.id, event)}
+        onDragEnd={next => settle(signal.id, next)}
+        onJoinChange={joined => setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; })}
         tint={typeTint[plasma.look][signal.type]}
-        opacity={signal.done ? 0.05 : 0.14}
-        frost={signal.type === 'note' ? Math.min(0.8, plasma.frost + 0.12) : plasma.frost}
-        elevation={signal.pinned ? 0.72 : 0.38}
+        opacity={signal.done ? 0.13 : 0.28}
+        frost={signal.type === 'note' ? Math.min(0.58, plasma.frost * 0.5 + 0.08) : Math.max(0.05, plasma.frost * 0.4)}
+        elevation={signal.pinned ? 0.78 : 0.48}
         radius={signal.type === 'spark' ? 32 : 24}
         padding={16}
         style={{ width: 258, height: 170, position: 'absolute', left: 0, top: 0 }}
@@ -246,6 +264,19 @@ function MatterBoard({
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
 }) {
+  const momentum = useRef(new Map<string, PointerMomentum>());
+  const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
+  const rememberPointer = (id: string, event: ReactPointerEvent) => {
+    const previous = momentum.current.get(id);
+    momentum.current.set(id, previous ? sampleMomentum(previous, event.clientX, event.clientY) : beginMomentum(event.clientX, event.clientY));
+  };
+  const settle = (id: string, next: Offset) => {
+    const rect = stage.current?.getBoundingClientRect();
+    const target = momentumTarget(next, momentum.current.get(id), rect, { width: 258, height: 170 }, 190);
+    momentum.current.delete(id);
+    onLayout(id, target);
+  };
+
   const grouped = useMemo(() => {
     const map = new Map<MatterMaterial, Signal[]>();
     signals.forEach(signal => {
@@ -306,13 +337,17 @@ function MatterBoard({
           const offset = layout[signal.id] ?? { x: 18, y: 18 };
           return <Plasma
             key={signal.id}
-            className={`xf-plasma-note xf-matter-note material-${material} type-${signal.type} ${signal.done ? 'done' : ''}`}
+            className={`xf-plasma-note xf-matter-note material-${material} type-${signal.type} ${signal.done ? 'done' : ''} ${joinedIds.has(signal.id) ? 'is-fused' : ''}`}
             draggable
             snap
+            fuse
             bounds={stage}
             group={`${layoutScope}:${material}`}
             offset={offset}
-            onDragEnd={next => onLayout(signal.id, next)}
+            onPointerDownCapture={event => momentum.current.set(signal.id, beginMomentum(event.clientX, event.clientY))}
+            onPointerMoveCapture={event => rememberPointer(signal.id, event)}
+            onDragEnd={next => settle(signal.id, next)}
+            onJoinChange={joined => setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; })}
             tint={typeTint[plasma.look][signal.type]}
             opacity={signal.done ? 0.06 : material === 'metal' || material === 'stone' || material === 'wood' ? 0.2 : 0.13}
             frost={material === 'crystal' ? Math.min(0.85, plasma.frost + 0.15) : material === 'plasma' ? plasma.frost : 0}
@@ -351,7 +386,8 @@ export default function PlasmaSignalWorkspace({
   }), [signals, query, plasma.active, scope, selectedIncidentId]);
 
   const visibleSignals = useMemo(() => filtered.slice(0, compact ? 5 : plasma.mode === 'matter' ? 10 : 14), [filtered, compact, plasma.mode]);
-  const layoutScope = scope === 'all' ? 'all-signals' : plasma.scopeId;
+  // Global mode; spatial arrangements still belong to the Incident being viewed.
+  const layoutScope = scope === 'all' ? 'all-signals' : selectedIncidentId ?? 'unrouted';
   const spatialMode = plasma.mode === 'matter' ? 'matter' : 'plasma';
 
   useEffect(() => {
@@ -383,18 +419,13 @@ export default function PlasmaSignalWorkspace({
   }
 
   const status = plasma.active
-    ? `${plasma.mode === 'matter' ? 'MATTER' : 'PLASMA'} // ${plasma.policy === 'remember' ? 'REMEMBERED FOR INCIDENT' : plasma.policy === '30m' ? '30 MIN WINDOW' : 'THIS SESSION'}`
+    ? `${plasma.mode === 'matter' ? 'MATTER' : 'PLASMA'} // ${plasma.policy === 'remember' ? 'UNTIL OFF' : plasma.policy === '30m' ? '30 MIN WINDOW' : 'THIS SESSION'}`
     : 'STANDARD MODE';
 
   return <section className="xf-page plasma-signal-workspace">
     <div className="xf-section-head plasma-section-head">
       <div><span className="kicker">SIGNAL //</span><h1>{plasma.mode === 'matter' ? 'THOUGHTS HAVE WEIGHT NOW.' : plasma.mode === 'plasma' ? 'LET THE THOUGHTS TOUCH.' : "DON'T ORGANIZE IT YET."}</h1><p>{plasma.mode === 'matter' ? 'Tasks cut like metal. Notes refract like crystal. Sparks drift like cloud. Same data, but the material tells you what kind of thing you are touching.' : plasma.mode === 'plasma' ? 'Same notes. Same tasks. Different physics. Drag related thoughts together and let surface tension become temporary organization.' : 'Capture first. Route, convert, pin, and finish it when the thought survives contact with reality.'}</p></div>
-      <div className="plasma-mode-switch" role="group" aria-label="Signal display mode">
-        <button className={plasma.mode === 'normal' ? 'active' : ''} onClick={() => plasma.setMode('normal')}>NORMAL</button>
-        <button className={plasma.mode === 'plasma' ? 'active plasma' : 'plasma'} onClick={() => plasma.setMode('plasma')}><Sparkles size={12}/> PLASMA</button>
-        <button className={plasma.mode === 'matter' ? 'active matter' : 'matter'} onClick={() => plasma.setMode('matter')}>◆ MATTER</button>
-        <small>{status}</small>
-      </div>
+      <div className="plasma-page-state" aria-label="Spatial mode status"><small>GLOBAL DISPLAY //</small><b>{status}</b><span>Use the NORMAL / PLASMA / MATTER control in the top bar from any room.</span></div>
     </div>
 
     <div className="signal-toolbar plasma-toolbar">
@@ -404,7 +435,7 @@ export default function PlasmaSignalWorkspace({
 
     {plasma.mode === 'normal' ? <NormalSignalList signals={filtered} incidents={incidents} onUpdate={onUpdate} onDelete={onDelete}/> : <>
       <div className={`plasma-controls ${plasma.mode === 'matter' ? 'matter-controls' : ''}`}>
-        <div className="plasma-control-group"><span>KEEP IT ON //</span>{(['session', '30m', 'remember'] as PlasmaPolicy[]).map(policy => <button key={policy} className={plasma.policy === policy ? 'active' : ''} onClick={() => plasma.setPolicy(policy)}>{policy === 'session' ? 'THIS SESSION' : policy === '30m' ? '30 MIN' : 'REMEMBER INCIDENT'}</button>)}</div>
+        <div className="plasma-control-group"><span>KEEP IT ON //</span>{(['session', '30m', 'remember'] as PlasmaPolicy[]).map(policy => <button key={policy} className={plasma.policy === policy ? 'active' : ''} onClick={() => plasma.setPolicy(policy)}>{policy === 'session' ? 'THIS SESSION' : policy === '30m' ? '30 MIN' : 'UNTIL OFF'}</button>)}</div>
         <div className="plasma-control-group"><span>LOOK //</span>{(['neon-x', 'pink-riot', 'afterglow'] as PlasmaLook[]).map(look => <button key={look} className={plasma.look === look ? 'active' : ''} onClick={() => plasma.setLook(look)}>{look === 'neon-x' ? 'NEON X' : look === 'pink-riot' ? 'PINK RIOT' : 'AFTERGLOW'}</button>)}</div>
         {plasma.mode === 'plasma' ? <>
           <label><span>FROST {Math.round(plasma.frost * 100)}%</span><input type="range" min="0" max="0.75" step="0.05" value={plasma.frost} onChange={event => plasma.setFrost(Number(event.target.value))}/></label>

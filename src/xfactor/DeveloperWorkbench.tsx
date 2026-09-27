@@ -691,6 +691,8 @@ export default function DeveloperWorkbench({
         </div>
       </div>
 
+      <div className="dev-m2-beacon"><strong>WORKBENCH M2 //</strong><span>REAL FOLDER</span><span>FILE TREE</span><span>SEARCH</span><span>PROBLEMS</span><span>GIT</span><span>LIVE PREVIEW</span><span>TERMINAL</span>{isTauri() && mode === 'sandbox' && <button disabled={!projectId} title={!projectId ? 'Select or create an Incident first.' : 'Bind a real project folder to this Incident.'} onClick={() => void bindFolder()}><FolderOpen size={12}/> {projectId ? 'OPEN REAL PROJECT' : 'SELECT INCIDENT FIRST'}</button>}</div>
+
       {mode === 'local' && binding && <div className="dev-workbench-secondary">
         <div className="dev-project-search"><Search size={13}/><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void runProjectSearch(); }} placeholder="SEARCH THIS PROJECT..."/><button disabled={searchBusy || !searchQuery.trim()} onClick={() => void runProjectSearch()}>{searchBusy ? 'SEARCHING' : 'SEARCH'}</button></div>
         {searchMeta && <small>{searchMeta}</small>}

@@ -1,0 +1,31 @@
+/* Global spatial mode: intentionally obvious. NORMAL remains the existing xFactor.OS visual system. */
+.xf-global-spatial{display:flex;align-items:center;gap:6px;min-width:max-content;position:relative;z-index:90}
+.xf-global-spatial-modes{display:flex;border:1px solid #332a35;background:#0b090e;padding:2px;box-shadow:inset 0 0 18px #0008}
+.xf-global-spatial-modes button{border:0;background:transparent;color:#77707c;padding:7px 8px;font-size:8px;font-weight:900;letter-spacing:.09em;display:flex;align-items:center;gap:4px;cursor:pointer}
+.xf-global-spatial-modes button.active.normal{background:#252027;color:#fff}
+.xf-global-spatial-modes button.plasma{color:#ff63be}.xf-global-spatial-modes button.active.plasma{color:#fff;background:#ff2aa326;box-shadow:inset 0 0 0 1px #ff2aa360,0 0 18px #ff2aa33d}
+.xf-global-spatial-modes button.matter{color:#cdb4ff}.xf-global-spatial-modes button.active.matter{color:#fff;background:#9b5cff25;box-shadow:inset 0 0 0 1px #9b5cff66,0 0 18px #9b5cff35}
+.xf-global-spatial-options{display:flex;gap:4px}.xf-global-spatial-options select{border:1px solid #332a38;background:#0b090f;color:#a99fae;padding:6px 7px;font-size:7px;font-weight:800;letter-spacing:.07em}
+
+/* PLASMA should read as a different operating state from across the room. */
+.xf-root.xf-plasma-mode{--spatial-edge:#ff2aa3;--spatial-alt:#20d9ff;background:radial-gradient(circle at 28% 0%,#ff2aa314,transparent 35%),radial-gradient(circle at 92% 18%,#20d9ff10,transparent 30%),#020205}
+.xf-root.xf-plasma-mode .xf-main{filter:saturate(1.08)}
+.xf-root.xf-plasma-mode :is(.xf-shard,.xf-blackbox,.xf-feed,.pile-card,.asset-card,.tape-ledger article,.xf-account-panel,.dev-workbench){border-color:#ff4ab64f!important;background:linear-gradient(145deg,rgba(255,42,163,.085),rgba(10,7,15,.40) 42%,rgba(32,217,255,.055))!important;box-shadow:inset 0 0 26px #ff2aa30a,0 0 24px #ff2aa311!important;backdrop-filter:blur(15px) saturate(1.2)}
+.xf-root.xf-plasma-mode :is(.xf-shard,.pile-card,.asset-card){border-radius:24px 11px 27px 15px!important}
+.xf-root.xf-plasma-mode :is(.xf-shard,.pile-card,.asset-card,.tape-ledger article){transition:box-shadow .25s ease,border-radius .35s ease,filter .25s ease,transform .25s ease}
+.xf-root.xf-plasma-mode :is(.xf-shard,.pile-card,.asset-card,.tape-ledger article):hover{box-shadow:inset 0 0 30px #20d9ff0e,0 0 34px #ff2aa329!important;filter:saturate(1.22) brightness(1.05)}
+.xf-root.xf-plasma-mode .xf-hotwire{background:linear-gradient(90deg,#08070be8,#140912e8,#08070be8)!important}
+
+/* MATTER assigns a legible physical character to each room instead of one generic neon skin. */
+.xf-root.xf-matter-mode{--spatial-edge:#9b5cff;--spatial-alt:#20d9ff;background:radial-gradient(circle at 10% 0%,#9b5cff10,transparent 32%),radial-gradient(circle at 90% 10%,#20d9ff0c,transparent 26%),#020204}
+.xf-root.xf-matter-mode .xf-shard{border-radius:4px!important;border-color:#c4b8ca3d!important;background:linear-gradient(128deg,#19161cde,#08080ade 54%,#28232bdd)!important;box-shadow:inset 0 1px #ffffff17,inset 0 -22px 30px #0005,0 0 18px #9b5cff10!important}
+.xf-root.xf-matter-mode .pile-card{border-radius:9px!important;background:radial-gradient(circle at 20% 10%,#ffffff08,transparent 20%),linear-gradient(145deg,#161317f0,#080709f4)!important;border-color:#96879538!important;box-shadow:inset 0 0 34px #0007,0 8px 28px #0007!important}
+.xf-root.xf-matter-mode .asset-card{border-radius:11px!important;background:linear-gradient(145deg,#bcecff10,#071016c7 45%,#7fdcff08)!important;border-color:#9cddff38!important;box-shadow:inset 0 0 30px #75d9ff0b,0 0 22px #20d9ff0d!important;backdrop-filter:blur(18px)}
+.xf-root.xf-matter-mode .tape-ledger article{background:linear-gradient(95deg,#24120ddd,#100908ed 45%,#2b1710d9)!important;border-color:#dc8d5830!important;box-shadow:inset 14px 0 28px #5d2a1913!important}
+.xf-root.xf-matter-mode :is(.xf-blackbox,.dev-workbench){border-color:#9b5cff3a!important;background:linear-gradient(150deg,#140d1bd8,#060609ed 52%,#07131ad8)!important;box-shadow:inset 0 0 26px #9b5cff09,0 0 24px #20d9ff09!important}
+
+/* Workbench M2 should not hide its reason for existing. */
+.dev-m2-beacon{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:8px 10px;border:1px solid #34303a;background:#09080c;margin:0 0 8px}
+.dev-m2-beacon>strong{font-size:9px;letter-spacing:.12em;color:#fff}.dev-m2-beacon>span{font-size:7px;letter-spacing:.08em;color:#857e89;border:1px solid #29252d;padding:4px 6px}.dev-m2-beacon>button{margin-left:auto;border:1px solid #ff2aa34a;background:#ff2aa315;color:#fff;padding:6px 8px;font-size:8px;font-weight:900;letter-spacing:.08em}
+
+@media(max-width:900px){.xf-global-spatial-options{display:none}.xf-global-spatial-modes button{padding:6px 5px;font-size:7px}.xf-global-spatial-modes svg{display:none}}
