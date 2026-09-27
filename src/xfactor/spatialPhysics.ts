@@ -48,6 +48,6 @@ export function momentumTarget(
   return { x, y };
 }
 
-export function joinedAny(joined: { top: boolean; right: boolean; bottom: boolean; left: boolean }): boolean {
-  return joined.top || joined.right || joined.bottom || joined.left;
+export function joinedAny(joined: boolean): boolean {
+  return joined;
 }
