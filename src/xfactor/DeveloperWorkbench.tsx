@@ -134,10 +134,22 @@ export default function DeveloperWorkbench({
   active,
   projectId,
   projectName,
+  projectStatus,
+  projectPriority,
+  nextMove,
+  openSignals = 0,
+  taskCount = 0,
+  assetCount = 0,
 }: {
   active: boolean;
   projectId?: string;
   projectName?: string;
+  projectStatus?: string;
+  projectPriority?: string;
+  nextMove?: string;
+  openSignals?: number;
+  taskCount?: number;
+  assetCount?: number;
 }) {
   const key = storageKey(projectId);
   const [files, setFiles] = useState<WorkbenchFile[]>(() => loadFiles(key));
@@ -313,9 +325,17 @@ export default function DeveloperWorkbench({
   return (
     <section className={`dev-workbench ${active ? 'active' : ''}`}>
       <div className="dev-workbench-head">
-        <div>
+        <div className="dev-project-context">
           <span>ACTIVE INCIDENT //</span>
           <b>{projectName || 'SCRATCH PROJECT'}</b>
+          <div className="dev-project-meta">
+            {projectStatus && <i>{projectStatus}</i>}
+            {projectPriority && <i>{projectPriority}</i>}
+            <i>{taskCount} TASKS</i>
+            <i>{openSignals} OPEN SIGNALS</i>
+            <i>{assetCount} ASSETS</i>
+          </div>
+          {nextMove && <p><strong>NEXT //</strong> {nextMove}</p>}
         </div>
         <div className="dev-workbench-actions">
           <span className={`dev-status ${devStatus}`}>{devStatus === 'running' ? '● LIVE' : devStatus.toUpperCase()}</span>
