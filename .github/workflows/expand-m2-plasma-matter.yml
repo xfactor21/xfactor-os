@@ -31,7 +31,47 @@ jobs:
           cat .handoff/matter.b64.* | base64 -d > /tmp/matter.zip
           unzip -q /tmp/matter.zip -d /tmp/xfactor-m2
 
-          patch -p1 < /tmp/xfactor-m2/tauri-m2.patch
+          python <<'PY'
+          from pathlib import Path
+          import json
+
+          cargo = Path('src-tauri/Cargo.toml')
+          text = cargo.read_text()
+          anchor = 'tauri-plugin-fs = "2"'
+          if 'tauri-plugin-persisted-scope' not in text:
+              if anchor not in text:
+                  raise SystemExit('Cargo fs plugin anchor not found')
+              text = text.replace(anchor, anchor + '\\ntauri-plugin-persisted-scope = "2.3.7"', 1)
+          cargo.write_text(text)
+
+          lib = Path('src-tauri/src/lib.rs')
+          text = lib.read_text()
+          anchor = '    .plugin(tauri_plugin_fs::init())'
+          addition = '    .plugin(tauri_plugin_persisted_scope::init())'
+          if addition not in text:
+              if anchor not in text:
+                  raise SystemExit('Tauri fs init anchor not found')
+              text = text.replace(anchor, anchor + '\\n' + addition, 1)
+          lib.write_text(text)
+
+          caps_path = Path('src-tauri/capabilities/default.json')
+          caps = json.loads(caps_path.read_text())
+          wanted = [
+              'fs:allow-read-dir',
+              'fs:allow-stat',
+              'fs:allow-mkdir',
+              'fs:allow-remove',
+              'fs:allow-rename',
+          ]
+          permissions = caps.get('permissions', [])
+          insert_at = permissions.index('fs:allow-read-text-file') if 'fs:allow-read-text-file' in permissions else len(permissions)
+          for permission in reversed(wanted):
+              if permission not in permissions:
+                  permissions.insert(insert_at, permission)
+          caps['permissions'] = permissions
+          caps_path.write_text(json.dumps(caps, indent=2) + '\\n')
+          PY
+
           git apply /tmp/xfactor-m2/PLASMA_INTEGRATION.patch
 
           cp /tmp/xfactor-m2/src/xfactor/DeveloperWorkbench.tsx src/xfactor/DeveloperWorkbench.tsx
