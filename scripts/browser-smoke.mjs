@@ -43,6 +43,17 @@ await check('incident creation and persistence', async () => {
   await page.getByText('BROWSER SMOKE INCIDENT').first().waitFor();
 });
 
+await check('global Normal Plasma Matter control works from Floor', async () => {
+  const control = page.getByLabel('Global spatial display mode');
+  await control.waitFor();
+  await page.getByRole('button', { name: 'PLASMA', exact: true }).click();
+  await page.locator('.xf-root.xf-plasma-mode').waitFor();
+  await page.getByRole('button', { name: 'MATTER', exact: true }).click();
+  await page.locator('.xf-root.xf-matter-mode').waitFor();
+  await page.getByRole('button', { name: 'NORMAL', exact: true }).click();
+  await page.locator('.xf-root.xf-plasma-mode, .xf-root.xf-matter-mode').waitFor({ state: 'detached' });
+});
+
 await check('Hotwire signal capture works', async () => {
   const hotwire = page.locator('.xf-hotwire input');
   await hotwire.fill('browser smoke thought');
