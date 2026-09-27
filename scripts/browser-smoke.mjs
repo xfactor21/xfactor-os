@@ -128,6 +128,13 @@ await check('Workbench edits a project file and updates preview', async () => {
   if (!persisted) throw new Error('Incident-bound Workbench file did not persist');
 });
 
+await check('Workbench launches the project through WebContainer + Vite', async () => {
+  await page.getByRole('button', { name: /RUN DEV/i }).click();
+  await page.locator('.dev-status.running').waitFor({ timeout: 90000 });
+  const livePreview = page.locator('.dev-preview-pane iframe').contentFrame();
+  await livePreview.getByText('WORKBENCH SMOKE').waitFor({ timeout: 15000 });
+});
+
 for (const runtime of ['PYTHON', 'RUBY', 'PHP', 'GO', 'NODE.JS']) {
   await check(`Terminal ${runtime} runtime boots`, async () => {
     const chip = page.locator('#r-terminal .chip').filter({ hasText: runtime }).first();
