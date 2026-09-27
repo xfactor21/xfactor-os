@@ -149,7 +149,7 @@ export default function DeveloperWorkbench({
   const [devError, setDevError] = useState<string>();
   const [logs, setLogs] = useState<string[]>([]);
   const wcRef = useRef<Awaited<ReturnType<typeof getWebContainer>> | null>(null);
-  const mountedKeyRef = useRef<string>();
+  const mountedKeyRef = useRef<string | undefined>(undefined);
   const devProcessRef = useRef<{ kill(): void } | null>(null);
   const serverOffRef = useRef<(() => void) | null>(null);
 
@@ -232,7 +232,7 @@ export default function DeveloperWorkbench({
   function closeTab(path: string) {
     setTabs((current) => {
       const next = current.filter((tab) => tab !== path);
-      if (activePath === path) setActivePath(next.at(-1) ?? files[0]?.path ?? '');
+      if (activePath === path) setActivePath(next[next.length - 1] ?? files[0]?.path ?? '');
       return next;
     });
   }
