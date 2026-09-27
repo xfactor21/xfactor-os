@@ -22,7 +22,7 @@ const STARTER_FILES: WorkbenchFile[] = [
   },
   {
     path: 'index.html',
-    content: \`<!doctype html>
+    content: `<!doctype html>
 <html>
   <head>
     <meta charset="UTF-8" />
@@ -35,13 +35,13 @@ const STARTER_FILES: WorkbenchFile[] = [
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
-\`,
+`,
   },
   {
     path: 'src/main.js',
-    content: \`const app = document.querySelector('#app');
+    content: `const app = document.querySelector('#app');
 
-app.innerHTML = \\\`
+app.innerHTML = \`
   <section class="hero">
     <small>xFactor.OS // WORKBENCH</small>
     <h1>Build something impossible to ignore.</h1>
@@ -49,18 +49,18 @@ app.innerHTML = \\\`
     <button id="hit">MAKE NOISE</button>
     <strong id="count">0</strong>
   </section>
-\\\`;
+\`;
 
 let count = 0;
 document.querySelector('#hit').addEventListener('click', () => {
   count += 1;
   document.querySelector('#count').textContent = String(count);
 });
-\`,
+`,
   },
   {
     path: 'src/style.css',
-    content: \`:root {
+    content: `:root {
   font-family: Inter, system-ui, sans-serif;
   color: #f8f7fb;
   background: #09090c;
@@ -78,7 +78,7 @@ h1 { font-size: clamp(42px, 8vw, 82px); line-height: .9; margin: 14px 0; letter-
 p { color: #aaa8b3; max-width: 560px; line-height: 1.6; }
 button { border: 0; padding: 12px 16px; font-weight: 900; background: linear-gradient(90deg,#ff2aa3,#8b5cf6,#20d9ff); color:#08080b; }
 strong { margin-left: 14px; color: #20d9ff; }
-\`,
+`,
   },
 ];
 
@@ -87,7 +87,7 @@ function cloneStarter(): WorkbenchFile[] {
 }
 
 function storageKey(projectId?: string) {
-  return \`xfactor-workbench-v1:\${projectId || 'scratch'}\`;
+  return `xfactor-workbench-v1:${projectId || 'scratch'}`;
 }
 
 function loadFiles(key: string): WorkbenchFile[] {
@@ -118,8 +118,8 @@ function staticPreview(files: WorkbenchFile[]): string {
     .replace(/<link[^>]+href=["'][^"']*src\/style\.css["'][^>]*>/i, '')
     .replace(/<script[^>]+src=["'][^"']*src\/main\.js["'][^>]*><\/script>/i, '');
   const safeJs = js.replace(/<\/script/gi, '<\\/script');
-  html = html.includes('</head>') ? html.replace('</head>', \`<style>\${css}</style></head>\`) : \`<style>\${css}</style>\${html}\`;
-  html = html.includes('</body>') ? html.replace('</body>', \`<script type="module">\${safeJs}</script></body>\`) : \`\${html}<script type="module">\${safeJs}</script>\`;
+  html = html.includes('</head>') ? html.replace('</head>', `<style>${css}</style></head>`) : `<style>${css}</style>${html}`;
+  html = html.includes('</body>') ? html.replace('</body>', `<script type="module">${safeJs}</script></body>`) : `${html}<script type="module">${safeJs}</script>`;
   return html;
 }
 
@@ -218,7 +218,7 @@ export default function DeveloperWorkbench({
   }
 
   async function deleteFile(path: string) {
-    if (!window.confirm(\`Delete \${path} from this Workbench project?\`)) return;
+    if (!window.confirm(`Delete ${path} from this Workbench project?`)) return;
     const next = files.filter((file) => file.path !== path);
     setFiles(next.length ? next : cloneStarter());
     setTabs((current) => current.filter((tab) => tab !== path));
@@ -280,7 +280,7 @@ export default function DeveloperWorkbench({
         write(chunk) { setLogs((current) => [...current.slice(-80), chunk]); },
       }));
       const installCode = await install.exit;
-      if (installCode !== 0) throw new Error(\`npm install exited with code \${installCode}\`);
+      if (installCode !== 0) throw new Error(`npm install exited with code ${installCode}`);
 
       devProcessRef.current?.kill();
       serverOffRef.current?.();
@@ -298,7 +298,7 @@ export default function DeveloperWorkbench({
       void process.exit.then((code) => {
         if (code !== 0) {
           setDevStatus('error');
-          setDevError(\`Dev server exited with code \${code}\`);
+          setDevError(`Dev server exited with code ${code}`);
         }
       });
     } catch (error) {
@@ -311,14 +311,14 @@ export default function DeveloperWorkbench({
   const nestedByFolder = (folder: string) => files.filter((file) => file.path.startsWith(folder + '/'));
 
   return (
-    <section className={\`dev-workbench \${active ? 'active' : ''}\`}>
+    <section className={`dev-workbench ${active ? 'active' : ''}`}>
       <div className="dev-workbench-head">
         <div>
           <span>ACTIVE INCIDENT //</span>
           <b>{projectName || 'SCRATCH PROJECT'}</b>
         </div>
         <div className="dev-workbench-actions">
-          <span className={\`dev-status \${devStatus}\`}>{devStatus === 'running' ? '● LIVE' : devStatus.toUpperCase()}</span>
+          <span className={`dev-status ${devStatus}`}>{devStatus === 'running' ? '● LIVE' : devStatus.toUpperCase()}</span>
           <button onClick={createFile}><Plus size={13}/> FILE</button>
           <button onClick={resetStarter}><RefreshCw size={13}/> RESET</button>
           <button className="run" onClick={() => void runDev()} disabled={devStatus === 'booting' || devStatus === 'installing' || devStatus === 'starting'}>
@@ -388,7 +388,7 @@ function FileRow({
   open: () => void;
   remove: () => void;
 }) {
-  return <div className={\`dev-file \${active ? 'active' : ''}\`}>
+  return <div className={`dev-file ${active ? 'active' : ''}`}>
     <button onClick={open}><FileCode2 size={12}/><span>{label || file.path}</span></button>
     <button className="trash" title="Delete file" onClick={remove}><Trash2 size={11}/></button>
   </div>;
