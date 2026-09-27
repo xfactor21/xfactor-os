@@ -11,7 +11,7 @@
     "tauri": "tauri",
     "sync-version": "node scripts/sync-version.mjs",
     "version": "node scripts/sync-version.mjs && git add src-tauri/tauri.conf.json src-tauri/Cargo.toml",
-    "test:release": "node scripts/release-smoke.mjs && node scripts/tauri-permissions-smoke.mjs",
+    "test:release": "node scripts/release-smoke.mjs && node scripts/tauri-permissions-smoke.mjs && node scripts/m2-pure-tests.mjs && node scripts/plasma-pure-tests.mjs",
     "test:cloud-live": "node scripts/cloud-sync-live-acceptance.mjs"
   },
   "dependencies": {
@@ -51,7 +51,8 @@
     "react-dom": "^19.2.7",
     "tailwindcss": "^4.3.2",
     "three": "^0.185.1",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.14",
+    "@cruxgarden/plasma-ui": "0.7.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.4",
