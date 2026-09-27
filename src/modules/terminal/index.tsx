@@ -9,6 +9,7 @@ import { openTextFile, writeTextFileAt, saveTextFileAs, type OpenedFile } from '
 import Icon from '../../design-system/icons/Icon';
 import AmbientField from '../../design-system/background/AmbientField';
 import CodeEditor from '../../design-system/CodeEditor';
+import { getWebContainer, webContainerSupported } from '../../lib/webcontainerRuntime';
 
 type Runtime = 'node' | 'python' | 'ruby' | 'php' | 'go';
 
@@ -58,17 +59,8 @@ type Runtime = 'node' | 'python' | 'ruby' | 'php' | 'go';
  */
 
 // ---------------------------------------------------------------------------
-// Node.js (WebContainers) — unchanged from the original single-language pass.
+// Node.js (WebContainers) — shared with the Incident Developer Workbench.
 // ---------------------------------------------------------------------------
-
-let webcontainerBoot: Promise<import('@webcontainer/api').WebContainer> | null = null;
-async function bootWebContainer() {
-  if (!webcontainerBoot) {
-    const { WebContainer } = await import('@webcontainer/api');
-    webcontainerBoot = WebContainer.boot({ coep: 'require-corp' });
-  }
-  return webcontainerBoot;
-}
 
 // ---------------------------------------------------------------------------
 // Python (Pyodide) — self-hosted at public/pyodide/.
@@ -234,17 +226,13 @@ async function bootGo() {
   return goBoot;
 }
 
-function crossOriginIsolated(): boolean {
-  return typeof window !== 'undefined' && 'crossOriginIsolated' in window && window.crossOriginIsolated === true;
-}
-
 // A REPL runtime is anything driven by our own line-buffered prompt rather
 // than a real interactive shell (only Node/WebContainers gets the latter).
 interface ReplEvaluator {
   evaluate(code: string): Promise<{ stdout: string; stderr: string }>;
 }
 
-export default function TerminalRoom({ active }: { active: boolean }) {
+export default function TerminalRoom({ active, compact = false }: { active: boolean; compact?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -362,7 +350,7 @@ export default function TerminalRoom({ active }: { active: boolean }) {
     const term = termRef.current;
     if (!term) return;
     clearActiveListeners();
-    if (!crossOriginIsolated()) {
+    if (!webContainerSupported()) {
       setStatus('unsupported');
       term.writeln('\r\n\x1b[31mWebContainers needs cross-origin isolation (COOP/COEP), which this context isn\'t providing.\x1b[0m');
       term.writeln('This is expected on the plain web preview build — try the packaged desktop app, which sets these headers (see tauri.conf.json).');
@@ -372,7 +360,7 @@ export default function TerminalRoom({ active }: { active: boolean }) {
     term.writeln('\r\nBooting a real Node.js runtime (WebContainers, WASM, entirely client-side)…');
     try {
       const wc = await Promise.race([
-        bootWebContainer(),
+        getWebContainer(),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Timed out reaching the WebContainers boot service — check your network connection.')), 20000),
         ),
@@ -605,7 +593,7 @@ export default function TerminalRoom({ active }: { active: boolean }) {
   }
 
   return (
-    <section className={`room ambient ${active ? 'on' : ''}`} id="r-terminal">
+    <section className={`room ambient ${compact ? 'terminalCompact' : ''} ${active ? 'on' : ''}`} id="r-terminal">
       <AmbientField mood="cyan" density={14} active={active} parallax />
       <div className="roomInner">
         <h2 className="rh">
