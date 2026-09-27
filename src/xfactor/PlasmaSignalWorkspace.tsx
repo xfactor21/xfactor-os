@@ -209,7 +209,7 @@ function LiquidBoard({
     quality={compact ? 0.68 : 1}
     maxSurfaces={compact ? 7 : 16}
     pointerDrop={false}
-    ambientDrops={!compact}
+    ambientDrops={false}
   >
     {signals.map((signal, index) => {
       const fallback = homeLayout(signals)[signal.id] ?? { x: 18 + (index % 3) * 282, y: 18 + Math.floor(index / 3) * 192 };
