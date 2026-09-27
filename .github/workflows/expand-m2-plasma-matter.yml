@@ -91,15 +91,15 @@ jobs:
                   raise SystemExit('Plasma import anchor not found')
               text = text.replace(import_anchor, import_anchor + '\n' + import_addition, 1)
 
-          selected_anchor = "  const visibleIncidents=useMemo(()=>ws.incidents.filter(i=>!i.archived),[ws.incidents]);"
           hook_line = "  const plasma = usePlasmaMode(chosen?.id);"
           if hook_line not in text:
-              if selected_anchor not in text:
+              anchor = "  const visibleIncidents=useMemo(()=>ws.incidents.filter(i=>!i.archived),[ws.incidents]);"
+              if anchor not in text:
                   raise SystemExit('Plasma hook anchor not found')
-              text = text.replace(selected_anchor, selected_anchor + '\n' + hook_line, 1)
+              text = text.replace(anchor, anchor + '\n' + hook_line, 1)
 
           root_old = '  return <div className="xf-root">'
-          root_new = "  return <div className={\`xf-root \${plasma.active ? \`xf-plasma-mode plasma-\${plasma.look}\` : ''}\`}>"
+          root_new = "  return <div className={`xf-root ${plasma.active ? `xf-plasma-mode plasma-${plasma.look}` : ''}`}>"
           if root_old in text:
               text = text.replace(root_old, root_new, 1)
 
@@ -108,8 +108,10 @@ jobs:
           if status_old in text:
               text = text.replace(status_old, status_new, 1)
 
-          old_signal = """      {view==='signal' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">SIGNAL //</span><h1>DON'T ORGANIZE IT YET.</h1><p>Capture first. Route, convert, pin, and finish it when the thought survives contact with reality.</p></div></div><div className="signal-toolbar"><Search size={14}/><input value={signalQuery} placeholder="FILTER THE LEAK..." onChange={e=>setSignalQuery(e.target.value)}/><span>{ws.signals.length} TOTAL</span></div><div className="signal-full">{ws.signals.filter(s=>!signalQuery||\`\${s.text} \${s.type}\`.toLowerCase().includes(signalQuery.toLowerCase())).map(s=><article className={\`signal-row signal-row-full \${s.done?'done':''}\`} key={s.id}><button onClick={()=>updateSignal(s.id,{done:!s.done})}>{s.done?<Check size={14}/>:<span className={\`sig-dot \${s.type}\`}/>}</button><div className="signal-body"><small>{s.type.toUpperCase()} · {relative(s.createdAt)} AGO</small><textarea value={s.text} onChange={e=>updateSignal(s.id,{text:e.target.value})}/><div className="signal-routing"><select value={s.type} onChange={e=>updateSignal(s.id,{type:e.target.value as SignalType})}><option value="spark">SPARK</option><option value="task">TASK</option><option value="note">NOTE</option><option value="link">LINK</option></select><select value={s.incidentId??''} onChange={e=>updateSignal(s.id,{incidentId:e.target.value||undefined})}><option value="">UNROUTED</option>{visibleIncidents.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></div></div><button className={s.pinned?'active-icon':''} onClick={()=>updateSignal(s.id,{pinned:!s.pinned})}><Pin size={13}/></button><button onClick={()=>patch(p=>({...p,signals:p.signals.filter(x=>x.id!==s.id),activity:[event('signal','Removed signal',s.incidentId),...p.activity]}))}><Trash2 size={13}/></button></article>)}{ws.signals.length===0&&<Empty label="NO SIGNAL YET" detail="Use Hotwire below. Capture anything before your brain talks you out of it."/>}</div></section>}"""
-          new_signal = """      {view==='signal' && <PlasmaSignalWorkspace
+          if '<PlasmaSignalWorkspace' not in text:
+              signal_start = text.index("{view==='signal' &&")
+              signal_end = text.index("{view==='vault' &&", signal_start)
+              replacement = """{view==='signal' && <PlasmaSignalWorkspace
                 signals={ws.signals}
                 incidents={visibleIncidents}
                 selectedIncidentId={chosen?.id}
@@ -118,11 +120,10 @@ jobs:
                 onUpdate={updateSignal}
                 onDelete={signal=>patch(p=>({...p,signals:p.signals.filter(x=>x.id!==signal.id),activity:[event('signal','Removed signal',signal.incidentId),...p.activity]}))}
                 plasma={plasma}
-              />}"""
-          if old_signal in text:
-              text = text.replace(old_signal, new_signal, 1)
-          elif '<PlasmaSignalWorkspace' not in text:
-              raise SystemExit('Signal view replacement anchor not found')
+              />}
+
+      """
+              text = text[:signal_start] + replacement + text[signal_end:]
 
           chaos.write_text(text)
 
