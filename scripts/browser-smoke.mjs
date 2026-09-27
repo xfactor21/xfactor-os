@@ -48,7 +48,7 @@ await check('global Normal Plasma Matter control works from Floor', async () => 
   await control.waitFor();
   await page.getByRole('button', { name: 'PLASMA', exact: true }).click();
   await page.locator('.xf-root.xf-plasma-mode').waitFor();
-  await page.getByRole('button', { name: 'MATTER', exact: true }).click();
+  await page.getByRole('button', { name: /MATTER/i }).click();
   await page.locator('.xf-root.xf-matter-mode').waitFor();
   await page.getByRole('button', { name: 'NORMAL', exact: true }).click();
   await page.locator('.xf-root.xf-plasma-mode, .xf-root.xf-matter-mode').waitFor({ state: 'detached' });
