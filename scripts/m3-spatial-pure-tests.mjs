@@ -32,6 +32,6 @@ assert('Matter global CSS gives rooms distinct material treatments', css.include
 assert('controller is OS-global', chaos.includes("usePlasmaMode('global')") && chaos.includes('<GlobalSpatialToggle plasma={plasma}/>'));
 assert('Signal uses inertial throw', signal.includes('momentumTarget') && signal.includes('onPointerMoveCapture'));
 assert('Signal fusion is explicit', signal.includes('onJoinChange') && signal.includes('is-fused') && signal.includes('fuse'));
-assert('Workbench M2 is surfaced', workbench.includes('WORKBENCH M2 //') && workbench.includes('OPEN REAL PROJECT'));
+assert('Workbench build capabilities are surfaced', workbench.includes('OPEN REAL PROJECT') && (workbench.includes('WORKBENCH M2 //') || workbench.includes('BUILD // PROJECT COCKPIT')));
 
 console.log('\nM3 corrective spatial source checks passed.');

@@ -232,7 +232,8 @@ export default function DeveloperWorkbench({
   const [devStatus, setDevStatus] = useState<DevStatus>('idle');
   const [devError, setDevError] = useState<string>();
   const [logs, setLogs] = useState<string[]>([]);
-  const [runScripts, setRunScripts] = useState<string>();
+  const [runScripts, setRunScripts] = useState<string[]>([]);
+  const [selectedScript, setSelectedScript] = useState<string>();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set(['src']));
   const [searchQuery, setSearchQuery] = useState('');
   const [searchHits, setSearchHits] = useState<ProjectSearchHit[]>([]);
