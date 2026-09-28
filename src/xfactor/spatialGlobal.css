@@ -29,3 +29,50 @@
 .dev-m2-beacon>strong{font-size:9px;letter-spacing:.12em;color:#fff}.dev-m2-beacon>span{font-size:7px;letter-spacing:.08em;color:#857e89;border:1px solid #29252d;padding:4px 6px}.dev-m2-beacon>button{margin-left:auto;border:1px solid #ff2aa34a;background:#ff2aa315;color:#fff;padding:6px 8px;font-size:8px;font-weight:900;letter-spacing:.08em}
 
 @media(max-width:900px){.xf-global-spatial-options{display:none}.xf-global-spatial-modes button{padding:6px 5px;font-size:7px}.xf-global-spatial-modes svg{display:none}}
+
+/* M5 TRUE SPATIAL RENDERER — WebGL bodies, not CSS outlines. */
+.xf-root.xf-plasma-mode .xf-true-spatial,
+.xf-root.xf-matter-mode .xf-true-spatial{
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+}
+.xf-true-spatial{z-index:22!important}
+.xf-true-spatial:not(.xf-shard){position:relative}
+.xf-true-spatial.selected{z-index:24!important}
+.xf-root.xf-plasma-mode .tape,
+.xf-root.xf-matter-mode .tape{z-index:23}
+.xf-root.xf-plasma-mode .xf-shard:after,
+.xf-root.xf-matter-mode .xf-shard:after{opacity:.18}
+.xf-root.xf-plasma-mode .xf-shard,
+.xf-root.xf-matter-mode .xf-shard{backdrop-filter:none!important}
+.xf-root.xf-plasma-mode :is(.xf-blackbox,.xf-feed,.pile-card,.asset-card,.tape-ledger article),
+.xf-root.xf-matter-mode :is(.xf-blackbox,.xf-feed,.pile-card,.asset-card,.tape-ledger article){
+  backdrop-filter:none!important;
+}
+.xf-root.xf-plasma-mode .dev-spatial-shell,
+.xf-root.xf-matter-mode .dev-spatial-shell{
+  min-height:640px;
+  padding:8px;
+}
+.xf-root.xf-plasma-mode .dev-spatial-shell>.dev-workbench,
+.xf-root.xf-matter-mode .dev-spatial-shell>.dev-workbench{
+  background:rgba(5,5,9,.38)!important;
+  border-color:rgba(255,255,255,.035)!important;
+  box-shadow:none!important;
+}
+.xf-root.xf-plasma-mode .xf-floor,
+.xf-root.xf-matter-mode .xf-floor{
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px),
+    linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+    radial-gradient(circle at 70% 30%,rgba(255,0,127,.055),transparent 30%),
+    rgba(3,3,6,.22)!important;
+}
+.xf-root.xf-plasma-mode .xf-true-spatial:hover{
+  filter:saturate(1.18) brightness(1.06);
+}
+.xf-root.xf-matter-mode .xf-true-spatial:hover{
+  filter:brightness(1.06);
+}
+
