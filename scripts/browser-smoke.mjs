@@ -152,6 +152,12 @@ await check('Incident Developer Workbench opens', async () => {
   await input.press('Enter');
   await page.getByText('BUILD THE INCIDENT.').waitFor();
   await page.locator('.dev-workbench').waitFor();
+  await page.getByText('BUILD // PROJECT COCKPIT').waitFor();
+  await page.getByText('NO DISK PROJECT ATTACHED').waitFor();
+  await page.getByRole('button', { name: 'TERMINAL', exact: true }).waitFor();
+  await page.getByRole('button', { name: /PROBLEMS/ }).waitFor();
+  await page.getByRole('button', { name: 'SOURCE CONTROL', exact: true }).waitFor();
+  await page.getByRole('button', { name: /PROJECT SEARCH/ }).waitFor();
 });
 
 await check('Workbench edits a project file and updates preview', async () => {
@@ -174,7 +180,7 @@ await check('Workbench edits a project file and updates preview', async () => {
 });
 
 await check('Workbench launches the project through WebContainer + Vite', async () => {
-  await page.getByRole('button', { name: /RUN DEV/i }).click();
+  await page.getByRole('button', { name: /RUN PROJECT/i }).click();
   await page.locator('.dev-status.running').waitFor({ timeout: 90000 });
   const livePreview = page.locator('.dev-preview-pane iframe').contentFrame();
   await livePreview.getByText('WORKBENCH SMOKE').waitFor({ timeout: 15000 });
