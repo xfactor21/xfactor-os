@@ -189,27 +189,33 @@ function LiquidBoard({
     mood={plasma.look === 'afterglow' ? 'tidal' : plasma.look === 'pink-riot' ? 'ember' : 'aurora'}
     theme="dark"
     tint={plasma.look === 'afterglow' ? '#8b5cf6' : '#ff2aa3'}
-    opacity={0.21}
-    frost={Math.max(0.08, plasma.frost * 0.58)}
-    blend={Math.max(plasma.blend, compact ? 30 : 46)}
-    viscosity={0.16}
-    stretch={1.9}
-    refraction={1.32}
-    dispersion={1.42}
+    opacity={0.68}
+    frost={Math.max(0.03, plasma.frost * 0.22)}
+    blend={Math.max(plasma.blend, compact ? 40 : 68)}
+    viscosity={0.1}
+    stretch={3.15}
+    flow={0.78}
+    tension={0.24}
+    refraction={1.72}
+    dispersion={1.56}
     rimColor="iridescent"
-    rimWidth={1.9}
-    highlight={1.65}
-    shimmer={1.55}
-    shimmerSpeed={1.3}
-    glow={1.75}
-    wash={0.35}
-    grain={0.26}
+    rimWidth={2.15}
+    highlight={1.8}
+    edgeLine={1.25}
+    shimmer={1.75}
+    shimmerSpeed={1.4}
+    glow={1.9}
+    wash={0.88}
+    grain={0.12}
     grid={24}
-    magnet={58}
-    quality={compact ? 0.68 : 1}
+    magnet={72}
+    quality={compact ? 0.74 : 1.08}
     maxSurfaces={compact ? 7 : 16}
     pointerDrop={false}
+    pointerPull
     ambientDrops={false}
+    ground="clear"
+    zIndex={18}
   >
     {signals.map((signal, index) => {
       const fallback = homeLayout(signals)[signal.id] ?? { x: 18 + (index % 3) * 282, y: 18 + Math.floor(index / 3) * 192 };
@@ -228,10 +234,10 @@ function LiquidBoard({
         onDragEnd={next => settle(signal.id, next)}
         onJoinChange={joined => setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; })}
         tint={typeTint[plasma.look][signal.type]}
-        opacity={signal.done ? 0.13 : 0.28}
-        frost={signal.type === 'note' ? Math.min(0.58, plasma.frost * 0.5 + 0.08) : Math.max(0.05, plasma.frost * 0.4)}
-        elevation={signal.pinned ? 0.78 : 0.48}
-        radius={signal.type === 'spark' ? 32 : 24}
+        opacity={signal.done ? 0.38 : 0.64}
+        frost={signal.type === 'note' ? Math.min(0.24, plasma.frost * 0.2 + 0.03) : Math.max(0.02, plasma.frost * 0.14)}
+        elevation={signal.pinned ? 0.82 : 0.56}
+        radius={signal.type === 'spark' ? 34 : 27}
         padding={16}
         style={{ width: 258, height: 170, position: 'absolute', left: 0, top: 0 }}
       >
@@ -304,8 +310,8 @@ function MatterBoard({
         theme="dark"
         material={material}
         tint={plasma.look === 'afterglow' ? '#8b5cf6' : '#ff2aa3'}
-        opacity={0.1}
-        frost={material === 'plasma' || material === 'crystal' ? plasma.frost : 0}
+        opacity={material === 'crystal' ? 0.52 : material === 'cloud' ? 0.5 : 0.82}
+        frost={material === 'plasma' || material === 'crystal' ? Math.min(0.26, plasma.frost * 0.3) : 0}
         blend={physics.blend}
         viscosity={physics.viscosity}
         stretch={physics.stretch}
@@ -322,16 +328,19 @@ function MatterBoard({
         rimColor="iridescent"
         rimWidth={material === 'metal' || material === 'stone' ? 0.7 : 1.1}
         highlight={material === 'metal' || material === 'crystal' ? 1.25 : 0.9}
-        shimmer={material === 'plasma' || material === 'crystal' ? 0.9 : 0.25}
-        glow={material === 'cloud' ? 0.6 : 0.85}
-        wash={0.45}
-        grain={material === 'stone' || material === 'wood' ? 0.85 : 0.25}
+        shimmer={material === 'plasma' || material === 'crystal' ? 1.2 : 0.4}
+        glow={material === 'cloud' ? 1.0 : 1.18}
+        wash={0.72}
+        grain={material === 'stone' || material === 'wood' ? 0.62 : 0.16}
         grid={24}
-        magnet={40}
-        quality={compact ? 0.48 : 0.78}
+        magnet={48}
+        quality={compact ? 0.56 : 0.9}
         maxSurfaces={Math.max(1, Math.min(materialSignals.length, compact ? 5 : 10))}
         pointerDrop={false}
+        pointerPull
         ambientDrops={false}
+        ground="clear"
+        zIndex={18}
       >
         {materialSignals.map(signal => {
           const offset = layout[signal.id] ?? { x: 18, y: 18 };
@@ -349,8 +358,8 @@ function MatterBoard({
             onDragEnd={next => settle(signal.id, next)}
             onJoinChange={joined => setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; })}
             tint={typeTint[plasma.look][signal.type]}
-            opacity={signal.done ? 0.06 : material === 'metal' || material === 'stone' || material === 'wood' ? 0.2 : 0.13}
-            frost={material === 'crystal' ? Math.min(0.85, plasma.frost + 0.15) : material === 'plasma' ? plasma.frost : 0}
+            opacity={signal.done ? 0.38 : material === 'metal' ? 0.86 : material === 'stone' ? 0.9 : material === 'wood' ? 0.82 : material === 'crystal' ? 0.52 : material === 'cloud' ? 0.48 : 0.64}
+            frost={material === 'crystal' ? Math.min(0.28, plasma.frost * 0.32 + 0.03) : material === 'plasma' ? Math.min(0.18, plasma.frost * 0.22) : 0}
             elevation={signal.pinned ? 0.74 : material === 'cloud' ? 0.12 : 0.42}
             radius={physics.radius}
             padding={16}
