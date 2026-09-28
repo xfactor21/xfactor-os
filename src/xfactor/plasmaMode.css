@@ -11,3 +11,39 @@
 .xf-plasma-note.is-fused .xf-plasma-note-head:after{content:'FUSED';margin-left:auto;color:#ff8bd2;font-size:7px;letter-spacing:.15em;text-shadow:0 0 12px #ff2aa388}
 .xf-matter-note.is-fused .xf-plasma-note-head:after{content:'BONDED';color:#d8c7ff}
 
+/* M5 liquid-body correction: content floats above the WebGL material instead of replacing it. */
+.xf-plasma-note{
+  z-index:22!important;
+}
+.xf-root.xf-plasma-mode .xf-plasma-note-inner{
+  background:linear-gradient(145deg,rgba(4,3,9,.075),rgba(5,3,9,.018))!important;
+  border-color:rgba(255,255,255,.035)!important;
+  box-shadow:inset 0 0 18px rgba(255,255,255,.008)!important;
+}
+.xf-root.xf-plasma-mode .xf-plasma-note-route select,
+.xf-root.xf-plasma-mode .xf-plasma-note-foot button{
+  background:rgba(4,4,9,.26)!important;
+  border-color:rgba(255,255,255,.055)!important;
+}
+.xf-root.xf-matter-mode .xf-plasma-note-inner{
+  background:rgba(4,4,8,.10)!important;
+  border-color:rgba(255,255,255,.055)!important;
+  box-shadow:none!important;
+}
+.xf-plasma-stage{
+  background:
+    radial-gradient(circle at 17% 10%,rgba(255,42,163,.10),transparent 35%),
+    radial-gradient(circle at 81% 13%,rgba(32,217,255,.07),transparent 29%),
+    rgba(3,3,7,.22)!important;
+}
+.xf-matter-stage{
+  background:
+    radial-gradient(circle at 16% 8%,rgba(255,42,163,.08),transparent 34%),
+    radial-gradient(circle at 78% 12%,rgba(32,217,255,.06),transparent 30%),
+    radial-gradient(circle at 48% 90%,rgba(155,92,255,.07),transparent 35%),
+    rgba(3,3,7,.18)!important;
+}
+.xf-plasma-note.is-fused .xf-plasma-note-inner{
+  background:rgba(5,4,10,.035)!important;
+}
+
