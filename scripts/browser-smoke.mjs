@@ -43,13 +43,31 @@ await check('incident creation and persistence', async () => {
   await page.getByText('BROWSER SMOKE INCIDENT').first().waitFor();
 });
 
-await check('global Normal Plasma Matter control works from Floor', async () => {
+await check('global Normal Plasma Matter control renders true spatial surfaces from Floor', async () => {
   const control = page.getByLabel('Global spatial display mode');
   await control.waitFor();
   await page.getByRole('button', { name: 'PLASMA', exact: true }).click();
   await page.locator('.xf-root.xf-plasma-mode').waitFor();
+  const floorSurface = page.locator('.xf-root.xf-plasma-mode .xf-shard.xf-true-spatial.plasma-panel').first();
+  await floorSurface.waitFor();
+  const plasmaCanvas = page.locator('.xf-root.xf-plasma-mode canvas').first();
+  await plasmaCanvas.waitFor();
+  const plasmaVisual = await page.evaluate(() => {
+    const canvas = document.querySelector('.xf-root.xf-plasma-mode canvas');
+    const surface = document.querySelector('.xf-root.xf-plasma-mode .xf-shard.xf-true-spatial');
+    if (!(canvas instanceof HTMLCanvasElement) || !(surface instanceof HTMLElement)) return null;
+    const cs = getComputedStyle(surface);
+    const canvasStyle = getComputedStyle(canvas);
+    return { z: canvasStyle.zIndex, display: canvasStyle.display, background: cs.backgroundColor, backgroundImage: cs.backgroundImage };
+  });
+  if (!plasmaVisual) throw new Error('true Plasma renderer did not mount');
+  if (plasmaVisual.z !== '18' || plasmaVisual.display === 'none') throw new Error('Plasma canvas is not visibly layered above room backgrounds');
+  if (plasmaVisual.backgroundImage !== 'none') throw new Error('legacy CSS card fill is still covering the WebGL surface');
+
   await page.getByRole('button', { name: /MATTER/i }).click();
   await page.locator('.xf-root.xf-matter-mode').waitFor();
+  await page.locator('.xf-root.xf-matter-mode .xf-shard.xf-true-spatial.plasma-panel').first().waitFor();
+
   await page.getByRole('button', { name: 'NORMAL', exact: true }).click();
   await page.locator('.xf-root.xf-plasma-mode, .xf-root.xf-matter-mode').waitFor({ state: 'detached' });
 });
@@ -58,6 +76,8 @@ await check('Hotwire signal capture works', async () => {
   const hotwire = page.locator('.xf-hotwire input');
   await hotwire.fill('browser smoke thought');
   await page.getByRole('button', { name: 'TASK', exact: true }).click();
+  await hotwire.fill('browser smoke liquid pair');
+  await page.getByRole('button', { name: 'NOTE', exact: true }).click();
   await page.keyboard.press('Control+J');
   await page.getByText('browser smoke thought').waitFor();
 });
@@ -123,6 +143,11 @@ await check('Signal Plasma mode is reversible and data-safe', async () => {
   await page.locator('.xf-root.xf-plasma-mode').waitFor();
   const plasmaEditor = page.locator('.xf-plasma-note textarea').first();
   await plasmaEditor.waitFor();
+  const signalCanvas = page.locator('.xf-root.xf-plasma-mode canvas').first();
+  await signalCanvas.waitFor();
+  const signalCanvasZ = await signalCanvas.evaluate((node) => getComputedStyle(node).zIndex);
+  if (signalCanvasZ !== '18') throw new Error('Signal Plasma canvas is still behind the board');
+  await page.locator('.xf-plasma-note.is-fused').first().waitFor({ timeout: 8000 });
   await plasmaEditor.fill(originalText + ' // PLASMA SAFE');
   await page.getByRole('button', { name: 'NORMAL' }).click();
   await page.getByText("DON'T ORGANIZE IT YET.").waitFor();
