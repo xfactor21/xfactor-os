@@ -154,10 +154,11 @@ await check('Incident Developer Workbench opens', async () => {
   await page.locator('.dev-workbench').waitFor();
   await page.getByText('BUILD // PROJECT COCKPIT').waitFor();
   await page.getByText('NO DISK PROJECT ATTACHED').waitFor();
-  await page.getByRole('button', { name: 'TERMINAL', exact: true }).waitFor();
-  await page.getByRole('button', { name: /PROBLEMS/ }).waitFor();
-  await page.getByRole('button', { name: 'SOURCE CONTROL', exact: true }).waitFor();
-  await page.getByRole('button', { name: /PROJECT SEARCH/ }).waitFor();
+  const workbenchDock = page.locator('.dev-dock-tabs');
+  await workbenchDock.getByRole('button', { name: 'TERMINAL', exact: true }).waitFor();
+  await workbenchDock.getByRole('button', { name: /PROBLEMS/ }).waitFor();
+  await workbenchDock.getByRole('button', { name: 'SOURCE CONTROL', exact: true }).waitFor();
+  await workbenchDock.getByRole('button', { name: /PROJECT SEARCH/ }).waitFor();
 });
 
 await check('Workbench edits a project file and updates preview', async () => {
