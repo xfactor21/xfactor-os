@@ -14,6 +14,8 @@ const ROOM_MATERIAL: Record<Exclude<SpatialRoom, 'signal'>, MaterialName> = {
   terminal: 'metal',
 };
 
+const PlasmaSurface = Plasma as any;
+
 const SpatialContext = createContext<{ mode: SpatialMode; room: SpatialRoom }>({ mode: 'normal', room: 'deck' });
 
 function tintFor(plasma: PlasmaController) {
@@ -106,8 +108,8 @@ export function SpatialSurface({
     return createElement(as, { ...rest, className }, children);
   }
 
-  return <Plasma
-    as={as as never}
+  return <PlasmaSurface
+    as={as}
     className={classes}
     fuse={fuse ?? true}
     group={group}
@@ -119,5 +121,5 @@ export function SpatialSurface({
     {...rest}
   >
     {children}
-  </Plasma>;
+  </PlasmaSurface>;
 }
