@@ -303,6 +303,8 @@ export default function ChaosDeck() {
         const index=p.spatialGroups.filter(group=>group.entityKind===kind).length+1;
         groupName=`AUTO BUNDLE ${String(index).padStart(2,'0')}`;
         const created=newSpatialGroup(kind,[a,b],groupName,index%2?'#ff2aa3':'#20d9ff');
+        const bundleMaterials=['crystal','metal','cloud','wood','stone','plasma'] as const;
+        created.material=bundleMaterials[(index-1)%bundleMaterials.length];
         groupId=created.id;spatialGroups=[created,...p.spatialGroups];
       }
       let piles=p.piles,incidents=p.incidents;
