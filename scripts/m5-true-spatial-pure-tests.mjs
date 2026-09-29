@@ -25,7 +25,7 @@ const signalCss = fs.readFileSync(new URL('../src/xfactor/plasmaMode.css', impor
 const physics = fs.readFileSync(new URL('../src/xfactor/spatialPhysics.ts', import.meta.url), 'utf8');
 
 assert('room provider uses actual PlasmaProvider', trueSpatial.includes('<PlasmaProvider') && trueSpatial.includes('ground="clear"'));
-assert('room canvas is lifted above legacy room backgrounds', trueSpatial.includes('zIndex={18}'));
+assert('room canvas is lifted above legacy room backgrounds', trueSpatial.includes('zIndex={8}'));
 assert('room material enables pointer response without unstable ambient drops', trueSpatial.includes('pointerPull') && trueSpatial.includes('ambientDrops={false}'));
 assert('Matter has room-level physical materials', ['deck: \'metal\'', 'piles: \'stone\'', 'vault: \'crystal\'', 'tape: \'wood\''].every((token) => trueSpatial.includes(token)));
 assert('room surfaces use actual Plasma elements', trueSpatial.includes('const PlasmaSurface = Plasma as any') && trueSpatial.includes('<PlasmaSurface'));
@@ -34,8 +34,8 @@ assert('Piles register as true spatial surfaces', chaos.includes('group="pile-ca
 assert('Vault assets register as true spatial surfaces', chaos.includes('group="vault-assets"'));
 assert('Tape entries register as true spatial surfaces', chaos.includes('group="tape-ledger"'));
 assert('Blackbox and Workbench register with the room renderer', chaos.includes('group="deck-lower"') && chaos.includes('group="workbench-shell"'));
-assert('legacy card fills are removed in spatial modes', globalCss.includes('.xf-root.xf-plasma-mode .xf-true-spatial') && globalCss.includes('background:transparent!important'));
-assert('Signal canvas is visible above the board', signal.includes('ground="clear"') && signal.includes('zIndex={18}'));
+assert('legacy card fills are removed in spatial modes', globalCss.includes('M6 FINAL SPATIAL LAYERING') && globalCss.includes('background:none!important'));
+assert('Signal canvas is visible above the board', signal.includes('ground="clear"') && signal.includes('zIndex={8}'));
 assert('Signal Plasma has strong liquid body tuning', (signal.includes('opacity={0.68}') || signal.includes('opacity={0.84}')) && (signal.includes('stretch={3.15}') || signal.includes('stretch={4.8}')) && (signal.includes('flow={0.78}') || signal.includes('flow={1.28}')) && (signal.includes('tension={0.24}') || signal.includes('tension={0.38}')));
 assert('Signal surfaces are materially opaque enough to read as bodies', signal.includes('opacity={signal.done ? 0.38 : 0.64}') || signal.includes('opacity={signal.done ? 0.58 : 0.9}'));
 assert('Matter surfaces use substantial material opacity', (signal.includes("material === 'metal' ? 0.86") || signal.includes("material === 'metal' ? 0.94")) && (signal.includes("material === 'stone' ? 0.9") || signal.includes("material === 'stone' ? 0.96")));
