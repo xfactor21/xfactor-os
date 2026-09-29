@@ -1,4 +1,5 @@
 mod git;
+mod browser;
 
 use tauri::Manager;
 
@@ -41,6 +42,10 @@ pub fn run() {
       git::git_stage,
       git::git_unstage,
       git::git_commit,
+      browser::browser_open,
+      browser::browser_inspect,
+      browser::browser_audit_component,
+      browser::browser_capture_site,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
