@@ -19,6 +19,11 @@ const check = async (label, fn) => {
 
 page.on('pageerror', error => failures.push(`pageerror: ${error.message}`));
 
+async function waitSpatialSwitch() {
+  const curtain = page.locator('.xf-spatial-curtain');
+  if (await curtain.count()) await curtain.waitFor({ state: 'detached', timeout: 20000 });
+}
+
 await check('main shell loads', async () => {
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.getByText('xFACTOR.OS').first().waitFor();
@@ -48,6 +53,7 @@ await check('global Normal Plasma Matter control renders true spatial surfaces f
   await control.waitFor();
   await page.getByRole('button', { name: 'PLASMA', exact: true }).click();
   await page.locator('.xf-root.xf-plasma-mode').waitFor();
+  await waitSpatialSwitch();
   const floorSurface = page.locator('.xf-root.xf-plasma-mode .xf-shard.xf-true-spatial.plasma-panel').first();
   await floorSurface.waitFor();
   const plasmaCanvas = page.locator('.xf-root.xf-plasma-mode canvas').first();
@@ -61,15 +67,17 @@ await check('global Normal Plasma Matter control renders true spatial surfaces f
     return { z: canvasStyle.zIndex, display: canvasStyle.display, background: cs.backgroundColor, backgroundImage: cs.backgroundImage };
   });
   if (!plasmaVisual) throw new Error('true Plasma renderer did not mount');
-  if (plasmaVisual.z !== '18' || plasmaVisual.display === 'none') throw new Error('Plasma canvas is not visibly layered above room backgrounds');
+  if (plasmaVisual.z !== '8' || plasmaVisual.display === 'none') throw new Error('Plasma canvas is not visibly layered above room backgrounds');
   if (plasmaVisual.backgroundImage !== 'none') throw new Error('legacy CSS card fill is still covering the WebGL surface');
 
   await page.getByRole('button', { name: /MATTER/i }).click();
   await page.locator('.xf-root.xf-matter-mode').waitFor();
+  await waitSpatialSwitch();
   await page.locator('.xf-root.xf-matter-mode .xf-shard.xf-true-spatial.plasma-panel').first().waitFor();
 
   await page.getByRole('button', { name: 'NORMAL', exact: true }).click();
   await page.locator('.xf-root.xf-plasma-mode, .xf-root.xf-matter-mode').waitFor({ state: 'detached' });
+  await waitSpatialSwitch();
 });
 
 await check('Hotwire signal capture works', async () => {
@@ -141,15 +149,32 @@ await check('Signal Plasma mode is reversible and data-safe', async () => {
   const originalText = await original.inputValue();
   await page.getByRole('button', { name: /PLASMA/i }).click();
   await page.locator('.xf-root.xf-plasma-mode').waitFor();
+  await waitSpatialSwitch();
   const plasmaEditor = page.locator('.xf-plasma-note textarea').first();
   await plasmaEditor.waitFor();
   const signalCanvas = page.locator('.xf-root.xf-plasma-mode canvas').first();
   await signalCanvas.waitFor();
   const signalCanvasZ = await signalCanvas.evaluate((node) => getComputedStyle(node).zIndex);
-  if (signalCanvasZ !== '18') throw new Error('Signal Plasma canvas is still behind the board');
-  await page.locator('.xf-plasma-note.is-fused').first().waitFor({ timeout: 8000 });
+  if (signalCanvasZ !== '8') throw new Error('Signal Plasma canvas is still behind the board');
+
+  const signalNotes = page.locator('.xf-plasma-note');
+  if (await signalNotes.count() < 2) throw new Error('Need two Signal surfaces for physical fusion acceptance');
+  const firstBox = await signalNotes.nth(0).boundingBox();
+  const secondBox = await signalNotes.nth(1).boundingBox();
+  if (!firstBox || !secondBox) throw new Error('Signal surface geometry unavailable');
+  await page.mouse.move(secondBox.x + 18, secondBox.y + 18);
+  await page.mouse.down();
+  await page.mouse.move(firstBox.x + firstBox.width - 8, firstBox.y + 18, { steps: 14 });
+  await page.mouse.up();
+  await page.locator('.xf-plasma-note.is-fused').first().waitFor({ timeout: 12000 });
+  await page.waitForFunction(() => {
+    const workspace = JSON.parse(localStorage.getItem('xfactor-os-workspace-v2') || '{}');
+    return Array.isArray(workspace.spatialGroups) && workspace.spatialGroups.some(group => group.entityKind === 'signal' && group.memberIds?.length >= 2);
+  }, null, { timeout: 12000 });
+
   await plasmaEditor.fill(originalText + ' // PLASMA SAFE');
   await page.getByRole('button', { name: 'NORMAL' }).click();
+  await waitSpatialSwitch();
   await page.getByText("DON'T ORGANIZE IT YET.").waitFor();
   const returnedText = await page.locator('.signal-row textarea').first().inputValue();
   if (!returnedText.includes('PLASMA SAFE')) throw new Error('Signal edit did not survive Plasma -> Normal transition');
@@ -162,12 +187,14 @@ await check('Signal Matter mode uses canonical Signal data', async () => {
   await input.press('Enter');
   await page.getByRole('button', { name: /MATTER/i }).click();
   await page.locator('.xf-root.xf-matter-mode').waitFor();
+  await waitSpatialSwitch();
   await page.getByText('THOUGHTS HAVE WEIGHT NOW.').waitFor();
   const editor = page.locator('.xf-matter-note textarea').first();
   await editor.waitFor();
   const value = await editor.inputValue();
   if (!value.includes('PLASMA SAFE')) throw new Error('Matter did not receive the canonical Signal edit');
   await page.getByRole('button', { name: 'NORMAL' }).click();
+  await waitSpatialSwitch();
 });
 
 await check('Incident Developer Workbench opens', async () => {
