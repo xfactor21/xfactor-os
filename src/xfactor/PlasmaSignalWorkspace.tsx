@@ -337,6 +337,7 @@ function MatterBoard({
     return map;
   }, [
     signals,
+    groups,
     plasma.matterMap.spark,
     plasma.matterMap.task,
     plasma.matterMap.note,
