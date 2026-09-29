@@ -23,6 +23,8 @@ const signal = fs.readFileSync(new URL('../src/xfactor/PlasmaSignalWorkspace.tsx
 const globalCss = fs.readFileSync(new URL('../src/xfactor/spatialGlobal.css', import.meta.url), 'utf8');
 const signalCss = fs.readFileSync(new URL('../src/xfactor/plasmaMode.css', import.meta.url), 'utf8');
 const physics = fs.readFileSync(new URL('../src/xfactor/spatialPhysics.ts', import.meta.url), 'utf8');
+const organizer = fs.readFileSync(new URL('../src/xfactor/SpatialOrganizer.tsx', import.meta.url), 'utf8');
+const workbench = fs.readFileSync(new URL('../src/xfactor/DeveloperWorkbench.tsx', import.meta.url), 'utf8');
 
 assert('room provider uses actual PlasmaProvider', trueSpatial.includes('<PlasmaProvider') && trueSpatial.includes('ground="clear"'));
 assert('room canvas is lifted above legacy room backgrounds', trueSpatial.includes('zIndex={18}'));
@@ -30,10 +32,10 @@ assert('room material enables pointer response without unstable ambient drops', 
 assert('Matter has room-level physical materials', ['deck: \'metal\'', 'piles: \'stone\'', 'vault: \'crystal\'', 'tape: \'wood\''].every((token) => trueSpatial.includes(token)));
 assert('room surfaces use actual Plasma elements', trueSpatial.includes('const PlasmaSurface = Plasma as any') && trueSpatial.includes('<PlasmaSurface'));
 assert('Floor incidents register as true spatial surfaces', chaos.includes('group="floor-incidents"') && chaos.includes('xf-shard'));
-assert('Piles register as true spatial surfaces', chaos.includes('group="pile-cards"'));
+assert('Piles register through the reusable true spatial organizer', chaos.includes('roomKey="m6:piles"') && organizer.includes('<SpatialSurface'));
 assert('Vault assets register as true spatial surfaces', chaos.includes('group="vault-assets"'));
-assert('Tape entries register as true spatial surfaces', chaos.includes('group="tape-ledger"'));
-assert('Blackbox and Workbench register with the room renderer', chaos.includes('group="deck-lower"') && chaos.includes('group="workbench-shell"'));
+assert('Tape entries register through the reusable true spatial organizer', chaos.includes('roomKey="m6:tape"') && organizer.includes('<SpatialSurface'));
+assert('Blackbox and Workbench register with the room renderer', chaos.includes('group="deck-lower"') && workbench.includes('group="workbench-panels"'));
 assert('legacy card fills are removed in spatial modes', globalCss.includes('.xf-root.xf-plasma-mode .xf-true-spatial') && globalCss.includes('background:transparent!important'));
 assert('Signal canvas is visible above the board', signal.includes('ground="clear"') && signal.includes('zIndex={18}'));
 assert('Signal Plasma has strong liquid body tuning', signal.includes('opacity={0.68}') && signal.includes('stretch={3.15}') && signal.includes('flow={0.78}') && signal.includes('tension={0.24}'));
