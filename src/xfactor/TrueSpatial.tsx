@@ -2,11 +2,11 @@ import { createContext, createElement, useContext, useState, type ElementType, t
 import { Plasma, PlasmaProvider, type Offset } from '@cruxgarden/plasma-ui';
 import type { PlasmaController, SpatialMode } from './plasmaMode';
 
-export type SpatialRoom = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'terminal';
+export type SpatialRoom = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'terminal' | 'files' | 'browser' | 'settings';
 
 type MaterialName = 'plasma' | 'crystal' | 'metal' | 'wood' | 'stone' | 'cloud';
 
-const ROOM_MATERIAL: Record<Exclude<SpatialRoom, 'signal'>, MaterialName> = {
+const ROOM_MATERIAL: Record<'deck'|'piles'|'vault'|'tape'|'terminal', MaterialName> = {
   deck: 'metal',
   piles: 'stone',
   vault: 'crystal',
@@ -14,7 +14,7 @@ const ROOM_MATERIAL: Record<Exclude<SpatialRoom, 'signal'>, MaterialName> = {
   terminal: 'metal',
 };
 
-const ROOM_BLEND: Record<Exclude<SpatialRoom, 'signal'>, number> = {
+const ROOM_BLEND: Record<'deck'|'piles'|'vault'|'tape'|'terminal', number> = {
   deck: 20,
   piles: 11,
   vault: 14,
@@ -66,13 +66,14 @@ export function SpatialRoomProvider({
 }) {
   const value = { mode: plasma.mode, room };
 
-  if (plasma.mode === 'normal' || room === 'signal') {
+  if (plasma.mode === 'normal' || room === 'signal' || room === 'files' || room === 'browser' || room === 'settings') {
     return <SpatialContext.Provider value={value}>{children}</SpatialContext.Provider>;
   }
 
-  const material: MaterialName = plasma.mode === 'matter' ? ROOM_MATERIAL[room] : 'plasma';
+  const spatialRoom = room as 'deck'|'piles'|'vault'|'tape'|'terminal';
+  const material: MaterialName = plasma.mode === 'matter' ? ROOM_MATERIAL[spatialRoom] : 'plasma';
   const matter = plasma.mode === 'matter';
-  const blend = matter ? Math.max(5, ROOM_BLEND[room]-3) : ROOM_BLEND[room];
+  const blend = matter ? Math.max(5, ROOM_BLEND[spatialRoom]-3) : ROOM_BLEND[spatialRoom];
 
   return <SpatialContext.Provider value={value}>
     <PlasmaProvider
@@ -80,19 +81,20 @@ export function SpatialRoomProvider({
       theme="dark"
       material={material}
       tint={tintFor(plasma)}
-      opacity={matter ? 0.72 : 0.7}
+      background={matter ? '#05070a' : '#07020a'}
+      opacity={matter ? 0.84 : 0.86}
       frost={matter ? (material === 'crystal' ? 0.2 : 0.03) : 0.035}
       blend={blend}
       viscosity={matter ? 0.42 : 0.1}
-      stretch={matter ? 0.5 : 3.1}
-      flow={matter ? 0.1 : 0.84}
-      tension={matter ? 0.08 : 0.28}
+      stretch={matter ? 0.72 : 4.35}
+      flow={matter ? 0.18 : 1.18}
+      tension={matter ? 0.1 : 0.36}
       refraction={matter ? 1.28 : 1.78}
       dispersion={matter ? 1.16 : 1.58}
       rimColor="iridescent"
-      rimWidth={matter ? 1.15 : 2.15}
+      rimWidth={matter ? 0.9 : 0.82}
       highlight={matter ? 1.25 : 1.8}
-      edgeLine={matter ? 0.8 : 1.25}
+      edgeLine={matter ? 0.62 : 0.34}
       shimmer={matter ? 0.55 : 1.72}
       shimmerSpeed={matter ? 0.8 : 1.42}
       glow={matter ? 1.05 : 1.8}
