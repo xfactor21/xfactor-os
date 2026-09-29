@@ -91,9 +91,24 @@ function loadLayout(mode: 'plasma' | 'matter', scopeId: string, signals: Signal[
   }
 }
 
-function signalMaterial(signal: Signal, plasma: PlasmaController): MatterMaterial {
+function signalMaterial(signal: Signal, plasma: PlasmaController, groups: SpatialGroup[] = []): MatterMaterial {
+  const bundle = groups.find(group => group.entityKind === 'signal' && group.memberIds.includes(signal.id));
+  if (bundle?.material) return bundle.material;
   if (signal.type === 'task' && signal.done) return plasma.matterMap.doneTask;
   return plasma.matterMap[signal.type];
+}
+
+function nearestSignalPeer(id: string, layout: Layout, signals: Signal[]): string | undefined {
+  const homes = homeLayout(signals);
+  const origin = layout[id] ?? homes[id];
+  if (!origin) return undefined;
+  return signals
+    .filter(signal => signal.id !== id)
+    .map(signal => {
+      const point = layout[signal.id] ?? homes[signal.id];
+      return { id: signal.id, distance: point ? Math.hypot(point.x - origin.x, point.y - origin.y) : Number.POSITIVE_INFINITY };
+    })
+    .sort((a, b) => a.distance - b.distance)[0]?.id;
 }
 
 function NormalSignalList({
@@ -196,34 +211,37 @@ function LiquidBoard({
   return <PlasmaProvider
     mood={plasma.look === 'afterglow' ? 'tidal' : plasma.look === 'pink-riot' ? 'ember' : 'aurora'}
     theme="dark"
+    background="#07020a"
     tint={plasma.look === 'afterglow' ? '#8b5cf6' : '#ff2aa3'}
-    opacity={0.68}
-    frost={Math.max(0.03, plasma.frost * 0.22)}
-    blend={Math.max(plasma.blend, compact ? 40 : 68)}
-    viscosity={0.1}
-    stretch={3.15}
-    flow={0.78}
-    tension={0.24}
-    refraction={1.72}
-    dispersion={1.56}
+    opacity={0.86}
+    frost={Math.max(0.015, plasma.frost * 0.14)}
+    blend={compact ? 14 : 22}
+    viscosity={0.055}
+    stretch={4.8}
+    flow={1.28}
+    tension={0.38}
+    refraction={2.12}
+    dispersion={1.9}
     rimColor="iridescent"
-    rimWidth={2.15}
-    highlight={1.8}
-    edgeLine={1.25}
-    shimmer={1.75}
-    shimmerSpeed={1.4}
-    glow={1.9}
-    wash={0.88}
-    grain={0.12}
+    rimWidth={0.86}
+    highlight={1.95}
+    edgeLine={0.36}
+    shimmer={2.25}
+    shimmerSpeed={1.48}
+    glow={2.3}
+    wash={1.12}
+    grain={0.06}
     grid={24}
-    magnet={72}
-    quality={compact ? 0.74 : 1.08}
-    maxSurfaces={compact ? 7 : 16}
+    magnet={46}
+    quality={compact ? 0.72 : 1.0}
+    maxSurfaces={compact ? 6 : 14}
     pointerDrop={false}
     pointerPull
     ambientDrops={false}
     ground="clear"
-    zIndex={18}
+    formIn={false}
+    formOut={false}
+    zIndex={8}
   >
     {signals.map((signal, index) => {
       const fallback = homeLayout(signals)[signal.id] ?? { x: 18 + (index % 3) * 282, y: 18 + Math.floor(index / 3) * 192 };
@@ -243,17 +261,21 @@ function LiquidBoard({
         onDragEnd={next => settle(signal.id, next)}
         onJoinChange={joined => setJoinedIds(current => {
           const next = new Set(current);
+          const wasJoined = current.has(signal.id);
           if (joinedAny(joined)) {
-            const other=[...current].find(id=>id!==signal.id);
             next.add(signal.id);
-            if(other)onFuse?.(other,signal.id);
+            if (!wasJoined) {
+              const other = nearestSignalPeer(signal.id, layout, signals);
+              if (other) onFuse?.(other, signal.id);
+            }
           } else next.delete(signal.id);
           return next;
         })}
         tint={bundle?.color ?? typeTint[plasma.look][signal.type]}
-        opacity={signal.done ? 0.38 : 0.64}
+        opacity={signal.done ? 0.58 : 0.9}
         frost={signal.type === 'note' ? Math.min(0.24, plasma.frost * 0.2 + 0.03) : Math.max(0.02, plasma.frost * 0.14)}
-        elevation={signal.pinned ? 0.82 : 0.56}
+        elevation={signal.pinned ? 0.86 : 0.62}
+        lean={18}
         radius={signal.type === 'spark' ? 34 : 27}
         padding={16}
         style={{ width: 258, height: 170, position: 'absolute', left: 0, top: 0 }}
@@ -307,7 +329,7 @@ function MatterBoard({
   const grouped = useMemo(() => {
     const map = new Map<MatterMaterial, Signal[]>();
     signals.forEach(signal => {
-      const material = signalMaterial(signal, plasma);
+      const material = signalMaterial(signal, plasma, groups);
       const current = map.get(material) ?? [];
       current.push(signal);
       map.set(material, current);
@@ -330,8 +352,9 @@ function MatterBoard({
         mood={plasma.look === 'afterglow' ? 'tidal' : plasma.look === 'pink-riot' ? 'ember' : 'aurora'}
         theme="dark"
         material={material}
+        background="#07020a"
         tint={plasma.look === 'afterglow' ? '#8b5cf6' : '#ff2aa3'}
-        opacity={material === 'crystal' ? 0.52 : material === 'cloud' ? 0.5 : 0.82}
+        opacity={material === 'crystal' ? 0.62 : material === 'cloud' ? 0.58 : 0.88}
         frost={material === 'plasma' || material === 'crystal' ? Math.min(0.26, plasma.frost * 0.3) : 0}
         blend={physics.blend}
         viscosity={physics.viscosity}
@@ -361,7 +384,9 @@ function MatterBoard({
         pointerPull
         ambientDrops={false}
         ground="clear"
-        zIndex={18}
+        formIn={false}
+        formOut={false}
+        zIndex={8}
       >
         {materialSignals.map(signal => {
           const offset = layout[signal.id] ?? { x: 18, y: 18 };
@@ -379,14 +404,17 @@ function MatterBoard({
             onPointerMoveCapture={event => rememberPointer(signal.id, event)}
             onDragEnd={next => settle(signal.id, next)}
             onJoinChange={joined => setJoinedIds(current => {
-          const next = new Set(current);
-          if (joinedAny(joined)) {
-            const other=[...current].find(id=>id!==signal.id);
-            next.add(signal.id);
-            if(other)onFuse?.(other,signal.id);
-          } else next.delete(signal.id);
-          return next;
-        })}
+              const next = new Set(current);
+              const wasJoined = current.has(signal.id);
+              if (joinedAny(joined)) {
+                next.add(signal.id);
+                if (!wasJoined) {
+                  const other = nearestSignalPeer(signal.id, layout, materialSignals);
+                  if (other) onFuse?.(other, signal.id);
+                }
+              } else next.delete(signal.id);
+              return next;
+            })}
             tint={bundle?.color ?? typeTint[plasma.look][signal.type]}
             opacity={signal.done ? 0.38 : material === 'metal' ? 0.86 : material === 'stone' ? 0.9 : material === 'wood' ? 0.82 : material === 'crystal' ? 0.52 : material === 'cloud' ? 0.48 : 0.64}
             frost={material === 'crystal' ? Math.min(0.28, plasma.frost * 0.32 + 0.03) : material === 'plasma' ? Math.min(0.18, plasma.frost * 0.22) : 0}
