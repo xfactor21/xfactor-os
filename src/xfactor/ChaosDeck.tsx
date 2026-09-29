@@ -345,6 +345,10 @@ export default function ChaosDeck() {
     if(label==='Create pile') createPileFromSelection();
     if(label==='Backup workspace') exportBackup();
     if(label==='Restore workspace') importRef.current?.click();
+    if(label==='Save damage') { setView('deck'); saveLayout(); }
+    if(label==='Normal mode') plasma.setMode('normal');
+    if(label==='Plasma mode') plasma.setMode('plasma');
+    if(label==='Matter mode') plasma.setMode('matter');
   }
   function runPaletteInput() {
     const parsed=parseCommand(paletteQuery);
@@ -357,11 +361,29 @@ export default function ChaosDeck() {
     if(entityResults[0])return openEntity(entityResults[0]);
     const first=commands[0]; if(first)command(first.label);
   }
+  const commandGroups=['CREATE','ORGANIZE','SPATIAL','PLAN','MAKE','SYSTEM'] as const;
   const commands = [
-    {label:'New incident',hint:'CREATE',icon:Plus},{label:'Riot Mode',hint:'LAYOUT',icon:Shuffle},{label:'Stack It',hint:'LAYOUT',icon:Layers3},
-    {label:'Create pile',hint:'ORGANIZE',icon:FolderPlus},{label:'Signal',hint:'OPEN',icon:Radio},{label:'Piles',hint:'OPEN',icon:Boxes},{label:'Vault',hint:'OPEN',icon:Archive},{label:'Tape',hint:'OPEN',icon:History},{label:'xFiles',hint:'DEV TOOL',icon:FolderTree},{label:'xBrowser',hint:'DEV TOOL',icon:Globe2},{label:'Workbench',hint:'BUILD',icon:TerminalSquare},{label:'Design Lab',hint:'DEV TOOL',icon:Hammer},{label:'Settings',hint:'SYSTEM',icon:Settings},
-    {label:'Backup workspace',hint:'EXPORT',icon:Download},{label:'Restore workspace',hint:'IMPORT',icon:Upload},
-  ].filter(c=>c.label.toLowerCase().includes(paletteQuery.toLowerCase()));
+    {label:'New incident',hint:'CREATE INCIDENT',group:'CREATE',icon:Plus},
+    {label:'Create pile',hint:'BUNDLE SELECTION',group:'ORGANIZE',icon:FolderPlus},
+    {label:'Riot Mode',hint:'SCATTER FLOOR',group:'ORGANIZE',icon:Shuffle},
+    {label:'Stack It',hint:'AUTO ARRANGE FLOOR',group:'ORGANIZE',icon:Layers3},
+    {label:'Save damage',hint:'SAVE FLOOR LAYOUT',group:'ORGANIZE',icon:Save},
+    {label:'Normal mode',hint:'STANDARD SURFACES',group:'SPATIAL',icon:Layers3},
+    {label:'Plasma mode',hint:'LIQUID ORGANIZER',group:'SPATIAL',icon:Sparkles},
+    {label:'Matter mode',hint:'MATERIAL ORGANIZER',group:'SPATIAL',icon:Box},
+    {label:'Floor',hint:'INCIDENT FLOOR',group:'PLAN',icon:Crosshair},
+    {label:'Piles',hint:'COLLECTIONS',group:'PLAN',icon:Boxes},
+    {label:'Signal',hint:'CAPTURES + TASKS',group:'PLAN',icon:Radio},
+    {label:'Vault',hint:'FILES + REFERENCES',group:'PLAN',icon:Archive},
+    {label:'Tape',hint:'WORKSPACE HISTORY',group:'PLAN',icon:History},
+    {label:'xFiles',hint:'LOCAL FILESYSTEM',group:'MAKE',icon:FolderTree},
+    {label:'xBrowser',hint:'RESEARCH + CAPTURE',group:'MAKE',icon:Globe2},
+    {label:'Design Lab',hint:'VISUAL TOOLS',group:'MAKE',icon:Hammer},
+    {label:'Workbench',hint:'CODE + RUN + GIT',group:'MAKE',icon:TerminalSquare},
+    {label:'Settings',hint:'DEVICE + WORKSPACE',group:'SYSTEM',icon:Settings},
+    {label:'Backup workspace',hint:'EXPORT JSON',group:'SYSTEM',icon:Download},
+    {label:'Restore workspace',hint:'IMPORT JSON',group:'SYSTEM',icon:Upload},
+  ].filter(c=>c.label.toLowerCase().includes(paletteQuery.toLowerCase())||c.hint.toLowerCase().includes(paletteQuery.toLowerCase()));
 
   return <div className={`xf-root ${plasma.mode === 'plasma' ? `xf-plasma-mode plasma-${plasma.look}` : plasma.mode === 'matter' ? `xf-matter-mode matter-${plasma.look}` : ''}`}>
     {plasma.switching&&<div className="xf-spatial-curtain"><Sparkles/><b>RE-FORMING WORKSPACE</b><span>LOCKING GEOMETRY · REGISTERING SURFACES</span></div>}
@@ -464,7 +486,7 @@ export default function ChaosDeck() {
 
     {account&&<AccountPanel onClose={()=>setAccount(false)}/>}
     {settingsOpen&&<SettingsPanel settings={osSettings.settings} onPatch={osSettings.patch} onReset={osSettings.reset} onClose={()=>setSettingsOpen(false)}/>}
-    {palette&&<div className="xf-palette-backdrop" onMouseDown={()=>setPalette(false)}><div className="xf-palette" onMouseDown={e=>e.stopPropagation()}><div className="palette-input"><Search size={18}/><input autoFocus value={paletteQuery} onChange={e=>setPaletteQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')runPaletteInput()}} placeholder="TYPE WHAT YOU WANT TO DO..."/><kbd>ESC</kbd></div>{commands.map(c=><button className="palette-row" key={c.label} onClick={()=>command(c.label)}><c.icon/>{c.label}<span>{c.hint}</span></button>)}{entityResults.length>0&&<div className="palette-divider">FOUND IN THE MESS</div>}{entityResults.map(r=><button className="palette-row entity" key={`${r.kind}-${r.id}`} onClick={()=>openEntity(r)}><Crosshair/>{r.label}<span>{r.kind}</span></button>)}<div className="palette-foot">TRY: “NEW PROJECT MONSTER X”, “TASK SHIP THE BUILD”, “OPEN VAULT”, “FIND AUDIO”</div></div></div>}
+    {palette&&<div className="xf-palette-backdrop" onMouseDown={()=>setPalette(false)}><div className="xf-palette" onMouseDown={e=>e.stopPropagation()}><div className="palette-input"><Search size={18}/><input autoFocus value={paletteQuery} onChange={e=>setPaletteQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')runPaletteInput()}} placeholder="TYPE WHAT YOU WANT TO DO..."/><kbd>ESC</kbd></div>{commandGroups.map(group=>{const rows=commands.filter(c=>c.group===group);return rows.length?<div className="palette-command-group" key={group}><div className="palette-divider">{group}</div>{rows.map(c=><button className="palette-row" key={c.label} onClick={()=>command(c.label)}><c.icon/>{c.label}<span>{c.hint}</span></button>)}</div>:null})}{entityResults.length>0&&<div className="palette-divider">FOUND IN THE MESS</div>}{entityResults.map(r=><button className="palette-row entity" key={`${r.kind}-${r.id}`} onClick={()=>openEntity(r)}><Crosshair/>{r.label}<span>{r.kind}</span></button>)}<div className="palette-foot">TRY: “NEW PROJECT MONSTER X”, “TASK SHIP THE BUILD”, “OPEN VAULT”, “FIND AUDIO”</div></div></div>}
   </div>;
 }
 
