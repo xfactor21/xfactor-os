@@ -53,3 +53,9 @@ html[data-xf-motion="reduced"] *{animation-duration:.001ms!important;animation-i
 .xf-root.xf-plasma-mode #dpBoardGrid,.xf-root.xf-matter-mode #dpBoardGrid{position:relative!important;display:block!important;min-height:920px!important;overflow:hidden!important;border:1px solid rgba(255,255,255,.04);background:radial-gradient(circle at 18% 10%,rgba(255,42,163,.05),transparent 26%),radial-gradient(circle at 82% 18%,rgba(32,217,255,.04),transparent 28%),rgba(4,4,7,.20)}
 .xf-root.xf-plasma-mode #dpBoardGrid>.dpNew,.xf-root.xf-matter-mode #dpBoardGrid>.dpNew{position:absolute;right:18px;top:18px;width:220px;min-height:150px;z-index:45}
 .xf-root.xf-plasma-mode #dpBoardGrid>.xf-spatial-free,.xf-root.xf-matter-mode #dpBoardGrid>.xf-spatial-free{margin:0!important}
+
+.xbrowser-grid aside button em{display:block;margin-top:4px;color:#20d9ff;font:800 7px 'IBM Plex Mono';letter-spacing:.08em;font-style:normal}
+.xbrowser-media{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px;align-items:center}
+.xbrowser-media>a{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.xbrowser-media>button{border:1px solid #352b3c;background:#0d0912;color:#d5bddc;padding:5px 6px;font-size:7px;font-weight:800}
+.palette-command-group+.palette-command-group{border-top:1px solid #1d191d}
