@@ -100,7 +100,6 @@ function NormalSignalList({
   incidents,
   onUpdate,
   onDelete,
-  onFuse,
 }: {
   signals: Signal[];
   incidents: Incident[];
@@ -162,6 +161,7 @@ function LiquidBoard({
   onLayout,
   onUpdate,
   onDelete,
+  onFuse,
 }: {
   signals: Signal[];
   incidents: Incident[];
@@ -269,6 +269,7 @@ function MatterBoard({
   onLayout,
   onUpdate,
   onDelete,
+  onFuse,
 }: {
   signals: Signal[];
   incidents: Incident[];
@@ -280,6 +281,7 @@ function MatterBoard({
   onLayout: (id: string, next: Offset) => void;
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
+  onFuse?: (a:string,b:string)=>void;
 }) {
   const momentum = useRef(new Map<string, PointerMomentum>());
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
@@ -479,7 +481,7 @@ export default function PlasmaSignalWorkspace({
 
       <div ref={stage} className={`xf-plasma-stage ${plasma.mode === 'matter' ? 'xf-matter-stage' : ''}`}>
         <div className="xf-plasma-hint">{plasma.mode === 'matter' ? 'LIKE MATTER FUSES // UNLIKE MATTER STAYS DISTINCT // ALL OF IT STILL SNAPS TO THE GRID' : 'DRAG UNTIL THEY TOUCH // PROXIMITY IS TEMPORARY ORGANIZATION'}</div>
-        {plasma.mode === 'plasma' ? <LiquidBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete}/> : <MatterBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete}/>} 
+        {plasma.mode === 'plasma' ? <LiquidBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete} onFuse={onFuse}/> : <MatterBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete} onFuse={onFuse}/>} 
         {filtered.length > visibleSignals.length && <div className="xf-plasma-overflow">SHOWING {visibleSignals.length} OF {filtered.length} // FILTER TO REDUCE GPU LOAD</div>}
       </div>
     </>}
