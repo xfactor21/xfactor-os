@@ -451,6 +451,7 @@ export default function ChaosDeck() {
   openSignals={chosen ? ws.signals.filter(signal => signal.incidentId === chosen.id && !signal.done).length : 0}
   taskCount={chosen ? ws.signals.filter(signal => signal.incidentId === chosen.id && signal.type === 'task' && !signal.done).length : 0}
   assetCount={chosen ? ws.assets.filter(asset => asset.incidentId === chosen.id && !asset.archived).length : 0}
+  defaultLayout={osSettings.settings.workbenchPreset}
 /></SpatialSurface></section>}
     </main></SpatialRoomProvider>
 
