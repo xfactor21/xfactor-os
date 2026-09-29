@@ -89,17 +89,32 @@ await check('Hotwire Signal can be edited, retyped, routed, completed, and persi
   await page.keyboard.press('Control+J');
   let row = page.locator('.signal-row-full').filter({ hasText: 'core smoke task' });
   await row.waitFor();
-  await row.locator('textarea').fill('core smoke edited');
-  row = page.locator('.signal-row-full').filter({ hasText: 'core smoke edited' });
-  await row.waitFor();
+  const editor = row.locator('textarea');
+  await editor.fill('core smoke edited');
+  await page.waitForFunction(() => {
+    const workspace = JSON.parse(localStorage.getItem('xfactor-os-workspace-v2') || '{}');
+    return workspace.signals?.some(signal => signal.text === 'core smoke edited');
+  });
+  row = page.locator('.signal-row-full').filter({ has: page.locator('textarea') }).filter({ has: page.locator('textarea') }).first();
+  const editedRows = page.locator('.signal-row-full');
+  for (let index = 0; index < await editedRows.count(); index += 1) {
+    const candidate = editedRows.nth(index);
+    if (await candidate.locator('textarea').inputValue() === 'core smoke edited') { row = candidate; break; }
+  }
   const selects = row.locator('select');
   await selects.nth(0).selectOption('note');
   await selects.nth(1).selectOption({ label: 'CORE ALPHA' });
   await row.locator('button').first().click();
   await page.reload({ waitUntil: 'networkidle' });
   await page.getByRole('button', { name: /SIGNAL/i }).first().click();
-  const persisted = page.locator('.signal-row-full').filter({ hasText: 'core smoke edited' });
-  await persisted.waitFor();
+  const persistedRows = page.locator('.signal-row-full');
+  let persisted = persistedRows.first();
+  let foundPersisted = false;
+  for (let index = 0; index < await persistedRows.count(); index += 1) {
+    const candidate = persistedRows.nth(index);
+    if (await candidate.locator('textarea').inputValue() === 'core smoke edited') { persisted = candidate; foundPersisted = true; break; }
+  }
+  if (!foundPersisted) throw new Error('Edited Signal did not persist');
   if ((await persisted.locator('select').nth(0).inputValue()) !== 'note') throw new Error('Signal type did not persist');
   const routedLabel = await persisted.locator('select').nth(1).locator('option:checked').innerText();
   if (routedLabel !== 'CORE ALPHA') throw new Error(`Signal route did not persist: ${routedLabel}`);
