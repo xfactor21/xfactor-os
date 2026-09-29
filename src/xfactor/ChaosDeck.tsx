@@ -3,11 +3,15 @@ import {
   Activity, Archive, Boxes, Command, Crosshair, Download, ExternalLink, FileJson, FileText, Flame,
   FolderMinus, FolderPlus, Grip, Hammer, History, Image, Layers3, Link2, Music, Pin, Plus, Radio,
   RotateCcw, Save, Search, Shuffle, Sparkles, Star, TerminalSquare, Trash2, Upload, Video, X, Zap,
-  Check, Code2, Eye, EyeOff, SlidersHorizontal, ArrowRightLeft
+  Check, Code2, Eye, EyeOff, SlidersHorizontal, ArrowRightLeft, FolderTree, Globe2, Settings
 } from 'lucide-react';
 import Studio from '../modules/studio';
 import { loadBoards } from '../modules/studio/boards';
 import DeveloperWorkbench from './DeveloperWorkbench';
+import FileExplorerRoom from './FileExplorerRoom';
+import BrowserRoom from './BrowserRoom';
+import SettingsRoom from './SettingsRoom';
+import { applyM6Settings, loadM6Settings, type M6Settings } from './m6Settings';
 import PlasmaSignalWorkspace from './PlasmaSignalWorkspace';
 import GlobalSpatialToggle from './GlobalSpatialToggle';
 import { SpatialRoomProvider, SpatialSurface } from './TrueSpatial';
@@ -25,7 +29,8 @@ import { useAuthStore } from '../stores/authStore';
 import { supabaseConfigured } from '../lib/supabase';
 import './xfactor.css';
 
-type View = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'terminal';
+type View = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'files' | 'browser' | 'terminal' | 'settings';
+const BUILD_VERSION = '0.6.0';
 type DragState = { id: string; ox: number; oy: number; rect: DOMRect };
 
 const assetIcon = (kind: string) => kind === 'image' ? Image : kind === 'audio' ? Music : kind === 'video' ? Video : kind === 'code' ? Code2 : kind === 'studio' ? Hammer : FileText;
@@ -60,6 +65,7 @@ export default function ChaosDeck() {
   const [persistenceError, setPersistenceError] = useState(false);
   const [cloudError, setCloudError] = useState(false);
   const [notice,setNotice]=useState<string>();
+  const [m6Settings,setM6Settings]=useState<M6Settings>(loadM6Settings);
   const drag = useRef<DragState | null>(null);
   const floorRef = useRef<HTMLDivElement>(null);
   const importRef=useRef<HTMLInputElement>(null);
@@ -71,6 +77,12 @@ export default function ChaosDeck() {
   const initAuth = useAuthStore(s => s.init);
 
   useEffect(() => { setPersistenceError(!saveWorkspace(ws)); }, [ws]);
+  useEffect(() => {
+    applyM6Settings(m6Settings);
+    const onSettings=(event:Event)=>setM6Settings((event as CustomEvent<M6Settings>).detail ?? loadM6Settings());
+    window.addEventListener('xfactor:m6-settings',onSettings as EventListener);
+    return()=>window.removeEventListener('xfactor:m6-settings',onSettings as EventListener);
+  }, []);
   useEffect(() => { if(!notice)return; const t=window.setTimeout(()=>setNotice(undefined),2600);return()=>window.clearTimeout(t); },[notice]);
   useEffect(() => {
     const id=ws.selectedIncidentId;
@@ -275,6 +287,12 @@ export default function ChaosDeck() {
     if(label==='Tape') setView('tape');
     if(label==='Floor') setView('deck');
     if(label==='Terminal'||label==='Workbench') setView('terminal');
+    if(label==='Files') setView('files');
+    if(label==='Browser') setView('browser');
+    if(label==='Settings') setView('settings');
+    if(label==='Normal mode') plasma.setMode('normal');
+    if(label==='Plasma mode') plasma.setMode('plasma');
+    if(label==='Matter mode') plasma.setMode('matter');
     if(label==='Create pile') createPileFromSelection();
     if(label==='Backup workspace') exportBackup();
     if(label==='Restore workspace') importRef.current?.click();
@@ -292,7 +310,9 @@ export default function ChaosDeck() {
   }
   const commands = [
     {label:'New incident',hint:'CREATE',icon:Plus},{label:'Riot Mode',hint:'LAYOUT',icon:Shuffle},{label:'Stack It',hint:'LAYOUT',icon:Layers3},
-    {label:'Create pile',hint:'ORGANIZE',icon:FolderPlus},{label:'Signal',hint:'OPEN',icon:Radio},{label:'Piles',hint:'OPEN',icon:Boxes},{label:'Vault',hint:'OPEN',icon:Archive},{label:'Tape',hint:'OPEN',icon:History},{label:'Workbench',hint:'BUILD',icon:TerminalSquare},{label:'Design Lab',hint:'OPEN',icon:Hammer},
+    {label:'Create pile',hint:'ORGANIZE',icon:FolderPlus},{label:'Signal',hint:'PLANNING',icon:Radio},{label:'Piles',hint:'PLANNING',icon:Boxes},{label:'Vault',hint:'PLANNING',icon:Archive},{label:'Tape',hint:'PLANNING',icon:History},
+    {label:'Files',hint:'DEV TOOLS',icon:FolderTree},{label:'Browser',hint:'DEV TOOLS',icon:Globe2},{label:'Design Lab',hint:'DEV TOOLS',icon:Hammer},{label:'Workbench',hint:'DEV TOOLS',icon:TerminalSquare},{label:'Settings',hint:'SYSTEM',icon:Settings},
+    {label:'Normal mode',hint:'SPATIAL',icon:Layers3},{label:'Plasma mode',hint:'SPATIAL',icon:Sparkles},{label:'Matter mode',hint:'SPATIAL',icon:Boxes},
     {label:'Backup workspace',hint:'EXPORT',icon:Download},{label:'Restore workspace',hint:'IMPORT',icon:Upload},
   ].filter(c=>c.label.toLowerCase().includes(paletteQuery.toLowerCase()));
 
@@ -306,9 +326,9 @@ export default function ChaosDeck() {
     <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={e=>void importBackup(e.target.files?.[0])}/>
     <input ref={fileRef} type="file" multiple hidden onChange={e=>void ingestFiles(e.target.files)}/>
     <header className="xf-topbar">
-      <div className="xf-brand"><img src="/xfactor-mask.jpeg"/><div><b>xFACTOR.OS</b><span>// CONTROLLED CHAOS SYSTEM</span></div></div>
-      <div className="xf-top-status"><span><Radio size={12}/> SIGNAL {signalStrength}%</span><span><Activity size={12}/> {ws.activity.length} EVENTS</span><span className="hot"><Flame size={12}/> {visibleIncidents.filter(i=>i.heat>80).length} HOT</span></div>
-      <GlobalSpatialToggle plasma={plasma}/>
+      <div className="xf-brand"><img src="/xfactor-mask.jpeg"/><div><b>xFACTOR.OS</b><span>// CONTROLLED CHAOS SYSTEM <i>v{BUILD_VERSION}</i></span></div></div>
+      <div className="xf-top-status"><button title="Signal strength is a live activity pulse for captured thoughts. Open Signal." onClick={()=>setView('signal')}><Radio size={13}/> SIGNAL {signalStrength}%</button><button title="Recorded workspace events. Open Tape for the full history." onClick={()=>setView('tape')}><Activity size={13}/> {ws.activity.length} EVENTS</button><button className="hot" title="Incidents above 80 heat. Open the Floor to inspect them." onClick={()=>setView('deck')}><Flame size={13}/> {visibleIncidents.filter(i=>i.heat>80).length} HOT</button></div>
+      <div className="xf-spatial-zone"><small>SPATIAL ORGANIZER</small><GlobalSpatialToggle plasma={plasma}/></div>
       <button className="xf-account-btn" onClick={()=>setAccount(true)}>{authUser?authUser.email?.split('@')[0]:'LOCAL'}<span>{authUser?'SYNCED':supabaseConfigured?'SIGN IN':'OFFLINE'}</span></button>
       <button className="xf-command" onClick={()=>setPalette(true)}><Command size={14}/> COMMAND <kbd>CTRL K</kbd></button>
     </header>
@@ -317,10 +337,15 @@ export default function ChaosDeck() {
       <button className={`rail-x ${view==='deck'?'active':''}`} onClick={()=>setView('deck')}><span>×</span><small>FLOOR</small></button>
       <button className={`rail-x ${view==='piles'?'active':''}`} onClick={()=>setView('piles')}><Boxes/><small>PILES</small></button>
       <button className={`rail-x ${view==='signal'?'active':''}`} onClick={()=>setView('signal')}><Radio/><small>SIGNAL</small></button>
-      <button className="rail-x" onClick={()=>setStudio(true)}><Hammer/><small>LAB</small></button>
-      <button className={`rail-x ${view==='vault'?'active':''}`} onClick={()=>setView('vault')}><Archive/><small>VAULT</small></button>
-      <button className={`rail-x ${view==='tape'?'active':''}`} onClick={()=>setView('tape')}><History/><small>TAPE</small></button>
-      <div className="rail-grow"/><button className={`rail-x ${view==='terminal'?'active':''}`} onClick={()=>setView('terminal')}><TerminalSquare/><small>BUILD</small></button><div className="rail-mark">X<br/><i>21</i></div>
+      <button className={`rail-x ${view==='vault'?'active':''}`} title="Vault: files, references, code, captures, and offline browser material." onClick={()=>setView('vault')}><Archive/><small>VAULT</small></button>
+      <button className={`rail-x ${view==='tape'?'active':''}`} title="Tape: append-only operational history." onClick={()=>setView('tape')}><History/><small>TAPE</small></button>
+      <div className="rail-grow"/>
+      <div className="rail-dev-label">DEV</div>
+      <button className={`rail-x ${view==='files'?'active':''}`} title="Experimental local file explorer." onClick={()=>setView('files')}><FolderTree/><small>FILES</small></button>
+      <button className={`rail-x ${view==='browser'?'active':''}`} title="Research browser, bookmarks, capture, and Vault tools." onClick={()=>setView('browser')}><Globe2/><small>BROWSER</small></button>
+      <button className="rail-x" title="Design Lab projects and creative tools." onClick={()=>setStudio(true)}><Hammer/><small>LAB</small></button>
+      <button className={`rail-x ${view==='terminal'?'active':''}`} title="Project Cockpit: code, preview, terminal, Git, search, and problems." onClick={()=>setView('terminal')}><TerminalSquare/><small>BUILD</small></button>
+      <button className={`rail-x ${view==='settings'?'active':''}`} title="xFactor.OS system settings." onClick={()=>setView('settings')}><Settings/><small>SETTINGS</small></button>
     </aside>
 
     <SpatialRoomProvider plasma={plasma} room={view}><main className="xf-main">
@@ -361,6 +386,12 @@ export default function ChaosDeck() {
 
       {view==='tape' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">TAPE //</span><h1>THE MESS HAS A MEMORY.</h1><p>Append-only operational history. Nothing here controls the data; it tells you what happened to it.</p></div><div className="xf-floor-actions"><button onClick={exportBackup}><Download size={14}/> BACKUP WORKSPACE</button><button onClick={()=>importRef.current?.click()}><Upload size={14}/> RESTORE BACKUP</button></div></div><div className="tape-ledger">{ws.activity.length===0?<Empty label="NO TAPE YET" detail="Your actions will start leaving a trail here."/>:ws.activity.map(a=><SpatialSurface as="article" group="tape-ledger" key={a.id}><span>{relative(a.createdAt)} AGO</span><b>{a.type.toUpperCase()}</b><p>{a.label}</p><small>{a.incidentId?ws.incidents.find(i=>i.id===a.incidentId)?.name??'FORMER INCIDENT':'SYSTEM'}</small></SpatialSurface>)}</div></section>}
 
+      {view==='files' && <FileExplorerRoom/>}
+
+      {view==='browser' && <BrowserRoom onVaultReference={(name,url,kind='link',tags=[])=>{const asset=newAsset(name,kind,url,chosen?.id,'reference');asset.tags=tags;patch(p=>({...p,assets:[asset,...p.assets],activity:[event('asset','Browser reference vaulted',chosen?.id),...p.activity]}));setNotice('SAVED TO VAULT')}} onVaultBlob={async(name,blob,kind,tags=[])=>{const id=crypto.randomUUID(),blobKey='file-'+id;await putAssetBlob(blobKey,blob);const asset=newAsset(name,kind,undefined,chosen?.id,'file');asset.id=id;asset.blobKey=blobKey;asset.mime=blob.type;asset.size=blob.size;asset.tags=tags;patch(p=>({...p,assets:[asset,...p.assets],activity:[event('asset','Browser capture vaulted',chosen?.id),...p.activity]}));setNotice('CAPTURE SAVED TO VAULT')}} onOpenVault={()=>setView('vault')}/>}
+
+      {view==='settings' && <SettingsRoom/>}
+
       {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">WORKBENCH //</span><h1>BUILD THE INCIDENT.</h1><p>Code, run, preview and debug without dropping the project context. The active Incident owns this Workbench; the shared runtime keeps the project and terminal in the same environment.</p></div></div><SpatialSurface className="dev-spatial-shell" group="workbench-shell" fuse={false}><DeveloperWorkbench
   active
   projectId={chosen?.id}
@@ -374,10 +405,12 @@ export default function ChaosDeck() {
 /></SpatialSurface></section>}
     </main></SpatialRoomProvider>
 
-    <div className="xf-hotwire"><Zap size={15}/><b>HOTWIRE</b><input value={capture} onChange={e=>setCapture(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCapture('spark')}} placeholder={chosen?`THROW A THOUGHT INTO ${chosen.name}...`:'THROW A THOUGHT INTO THE SYSTEM...'}/><button onClick={()=>addCapture('task')}>TASK</button><button onClick={()=>addCapture('note')}>NOTE</button><button onClick={()=>addCapture('link')}><Link2 size={11}/></button><button onClick={()=>addCapture('spark')}>BURN IT IN</button></div>
+    {m6Settings.commandFab&&<button className={`xf-command-fab ${palette?'active':''}`} title="Open the Command Deck (Ctrl/Cmd + K)" aria-label="Open Command Deck" onClick={()=>{setPalette(v=>!v);setPaletteQuery('')}}><Command size={22}/><span>{palette?'CLOSE':'COMMAND'}</span></button>}
+
+    <div className="xf-hotwire"><Zap size={17}/><b>HOTWIRE</b><input value={capture} onChange={e=>setCapture(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCapture('spark')}} placeholder={chosen?`THROW A THOUGHT INTO ${chosen.name}...`:'THROW A THOUGHT INTO THE SYSTEM...'}/><button onClick={()=>addCapture('task')}>TASK</button><button onClick={()=>addCapture('note')}>NOTE</button><button onClick={()=>addCapture('link')}><Link2 size={11}/></button><button onClick={()=>addCapture('spark')}>BURN IT IN</button></div>
 
     {account&&<AccountPanel onClose={()=>setAccount(false)}/>}
-    {palette&&<div className="xf-palette-backdrop" onMouseDown={()=>setPalette(false)}><div className="xf-palette" onMouseDown={e=>e.stopPropagation()}><div className="palette-input"><Search size={18}/><input autoFocus value={paletteQuery} onChange={e=>setPaletteQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')runPaletteInput()}} placeholder="TYPE WHAT YOU WANT TO DO..."/><kbd>ESC</kbd></div>{commands.map(c=><button className="palette-row" key={c.label} onClick={()=>command(c.label)}><c.icon/>{c.label}<span>{c.hint}</span></button>)}{entityResults.length>0&&<div className="palette-divider">FOUND IN THE MESS</div>}{entityResults.map(r=><button className="palette-row entity" key={`${r.kind}-${r.id}`} onClick={()=>openEntity(r)}><Crosshair/>{r.label}<span>{r.kind}</span></button>)}<div className="palette-foot">TRY: “NEW PROJECT MONSTER X”, “TASK SHIP THE BUILD”, “OPEN VAULT”, “FIND AUDIO”</div></div></div>}
+    {palette&&<div className="xf-palette-backdrop" onMouseDown={()=>setPalette(false)}><div className="xf-palette" onMouseDown={e=>e.stopPropagation()}><div className="palette-input"><Search size={18}/><input autoFocus value={paletteQuery} onChange={e=>setPaletteQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')runPaletteInput()}} placeholder="TYPE WHAT YOU WANT TO DO..."/><kbd>ESC</kbd></div>{commands.map(c=><button className="palette-row" key={c.label} onClick={()=>command(c.label)}><c.icon/>{c.label}<span>{c.hint}</span></button>)}{entityResults.length>0&&<div className="palette-divider">FOUND IN THE MESS</div>}{entityResults.map(r=><button className="palette-row entity" key={`${r.kind}-${r.id}`} onClick={()=>openEntity(r)}><Crosshair/>{r.label}<span>{r.kind}</span></button>)}<div className="palette-foot">TRY: “OPEN FILES”, “OPEN BROWSER”, “PLASMA MODE”, “NEW PROJECT MONSTER X”, “TASK SHIP THE BUILD”, “FIND AUDIO”</div></div></div>}
   </div>;
 }
 
