@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Archive, ArrowLeft, ArrowRight, BookMarked, Code2, Download, ExternalLink, Globe2, Image, RefreshCw, Search, Star, Video } from 'lucide-react';
 import type { AssetKind } from './domain';
 import { loadM6Settings } from './m6Settings';
+import { isTauri } from '../lib/platform';
 
 type Bookmark = { id: string; url: string; title: string; createdAt: number };
 type MediaHit = { url: string; kind: 'image'|'audio'|'video'|'style'|'script' };
@@ -46,6 +47,19 @@ export default function BrowserRoom({
     const url=normalizeUrl(raw);
     const next=[...history.slice(0,historyIndex+1),url];
     setHistory(next);setHistoryIndex(next.length-1);setCurrent(url);setAddress(url);setStatus('NAVIGATED');
+  }
+
+  async function openIsolated(raw=current) {
+    const url=normalizeUrl(raw);
+    if(!isTauri()){window.open(url,'_blank','noopener,noreferrer');return;}
+    try {
+      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+      const label='xf-browser-'+Date.now();
+      new WebviewWindow(label,{url,title:`xFactor Browser // ${new URL(url).hostname}`,width:1220,height:820,resizable:true,focus:true});
+      setStatus('ISOLATED DESKTOP WEBVIEW OPEN');
+    } catch(err) {
+      setStatus('WEBVIEW OPEN FAILED: '+(err instanceof Error?err.message:String(err)));
+    }
   }
   function back(){if(!canBack)return;const i=historyIndex-1;setHistoryIndex(i);setCurrent(history[i]);setAddress(history[i]);}
   function forward(){if(!canForward)return;const i=historyIndex+1;setHistoryIndex(i);setCurrent(history[i]);setAddress(history[i]);}
@@ -146,10 +160,10 @@ export default function BrowserRoom({
       <div className="m6-browser-nav"><button disabled={!canBack} onClick={back}><ArrowLeft/></button><button disabled={!canForward} onClick={forward}><ArrowRight/></button><button onClick={()=>setCurrent(current)}><RefreshCw/></button></div>
       <div className="m6-address"><Globe2/><input value={address} onChange={e=>setAddress(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')navigate()}}/><button onClick={()=>navigate()}>GO</button></div>
       <button className="m6-bookmark" onClick={bookmark}><Star size={15}/> SAVE SITE</button>
-      <button onClick={()=>window.open(current,'_blank','noopener,noreferrer')}><ExternalLink size={15}/> OPEN OUTSIDE</button>
+      <button className="m6-browser-isolated" onClick={()=>void openIsolated()}><ExternalLink size={15}/> {isTauri()?'OPEN ISOLATED':'OPEN TAB'}</button>
     </div>
 
-    <div className="m6-browser-status"><b>{host}</b><span>{status}</span><small>CAPTURE ONLY USES DIRECTLY ACCESSIBLE HTTP(S) CONTENT · NO AUTH/DRM BYPASS</small></div>
+    <div className="m6-browser-status"><b>{host}</b><span>{status}</span><small>{isTauri()?'REMOTE SITES OPEN IN A NON-PRIVILEGED CHILD WEBVIEW · ':''}CAPTURE ONLY USES DIRECTLY ACCESSIBLE HTTP(S) CONTENT · NO AUTH/DRM BYPASS</small></div>
 
     <div className="m6-browser-layout">
       <section className="m6-browser-frame"><iframe key={current} title="xFactor browser" src={current} sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-downloads"/></section>
