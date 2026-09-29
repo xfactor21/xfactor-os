@@ -4,7 +4,9 @@
 
 xFactor.OS is the deliberately physical, damaged, loud counterpart to xOS. It reuses proven engines where that saves real work, but it does not inherit xOS's galaxy/brain visual language.
 
-## 0.5.0 product surfaces
+## 0.8.0 product surfaces
+
+**M6 direction:** Plasma is an organizing interaction, not a decorative theme. Fused items keep separate identities while gaining durable bundle relationships that remain visible in Normal and can share spatial/material treatment later.
 
 - **The Floor** — spatial draggable Incident workspace with Riot/Stack and Saved Damage layouts.
 - **Incidents + Blackbox** — editable project workbench with status, priority, heat, description, next move, tags, tasks, relations and Tape.
@@ -20,4 +22,4 @@ xFactor.OS is the deliberately physical, damaged, loud counterpart to xOS. It re
 
 ## Truthful completeness
 
-Read `BUILD-MATRIX.md`. It explicitly distinguishes **BUILT** from **BUILT / VERIFICATION GATE** and lists what is deliberately not claimed. The 0.5.0 source scope is implemented and dependency-backed browser/runtime plus Windows packaging gates are green. Public distribution still requires live credential-backed cloud acceptance if cloud sync is enabled, Windows signing, and real-machine installer acceptance.
+Read `BUILD-MATRIX.md`. It explicitly distinguishes **BUILT** from **BUILT / VERIFICATION GATE** and lists what is deliberately not claimed. The 0.8.0 source scope is implemented and dependency-backed browser/runtime plus Windows packaging gates are green. Public distribution still requires live credential-backed cloud acceptance if cloud sync is enabled, Windows signing, and real-machine installer acceptance.
