@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   ExternalLink,
   FileCode2,
@@ -18,6 +18,7 @@ import CodeEditor, { type EditorLanguage } from '../design-system/CodeEditor';
 import TerminalRoom from '../modules/terminal';
 import GitPanel from './GitPanel';
 import { isTauri } from '../lib/platform';
+import { loadM6Settings, saveM6Settings, type WorkbenchViewMode } from './m6Settings';
 import {
   chooseProjectFolder,
   collectProjectMirrorFiles,
@@ -240,6 +241,9 @@ export default function DeveloperWorkbench({
   const [searchBusy, setSearchBusy] = useState(false);
   const [searchMeta, setSearchMeta] = useState('');
   const [dockView, setDockView] = useState<DockView>('terminal');
+  const [workbenchView,setWorkbenchView] = useState<WorkbenchViewMode>(()=>loadM6Settings().workbenchView);
+  const [explorerWidth,setExplorerWidth] = useState(()=>Number(localStorage.getItem('xfactor-workbench-explorer-width')||220));
+  const [previewWidth,setPreviewWidth] = useState(()=>Number(localStorage.getItem('xfactor-workbench-preview-width')||360));
   const searchInputRef = useRef<HTMLInputElement>(null);
   const wcRef = useRef<Awaited<ReturnType<typeof getWebContainer>> | null>(null);
   const mountedKeyRef = useRef<string | undefined>(undefined);
@@ -302,6 +306,26 @@ export default function DeveloperWorkbench({
     serverOffRef.current?.();
     devProcessRef.current?.kill();
   }, []);
+
+  useEffect(() => {
+    const onSettings=(event:Event)=>{
+      const next=(event as CustomEvent<ReturnType<typeof loadM6Settings>>).detail ?? loadM6Settings();
+      setWorkbenchView(next.workbenchView);
+    };
+    window.addEventListener('xfactor:m6-settings',onSettings as EventListener);
+    return()=>window.removeEventListener('xfactor:m6-settings',onSettings as EventListener);
+  }, []);
+
+  function setViewPreset(next:WorkbenchViewMode){
+    setWorkbenchView(next);
+    saveM6Settings({...loadM6Settings(),workbenchView:next});
+  }
+  function changeExplorerWidth(next:number){
+    const value=Math.max(160,Math.min(360,next));setExplorerWidth(value);localStorage.setItem('xfactor-workbench-explorer-width',String(value));
+  }
+  function changePreviewWidth(next:number){
+    const value=Math.max(260,Math.min(640,next));setPreviewWidth(value);localStorage.setItem('xfactor-workbench-preview-width',String(value));
+  }
 
   useEffect(() => {
     if (!active) return;
@@ -734,6 +758,17 @@ export default function DeveloperWorkbench({
         </div>
       </section>
 
+      <div className="dev-layout-rack">
+        <strong>LAYOUT //</strong>
+        <div className="dev-view-presets">
+          <button className={workbenchView==='cockpit'?'active':''} onClick={()=>setViewPreset('cockpit')}>COCKPIT</button>
+          <button className={workbenchView==='code-focus'?'active':''} onClick={()=>setViewPreset('code-focus')}>CODE FOCUS</button>
+          <button className={workbenchView==='preview-focus'?'active':''} onClick={()=>setViewPreset('preview-focus')}>PREVIEW FOCUS</button>
+        </div>
+        <label>EXPLORER <input type="range" min="160" max="360" step="10" value={explorerWidth} onChange={event=>changeExplorerWidth(Number(event.target.value))}/><span>{explorerWidth}px</span></label>
+        <label>PREVIEW <input type="range" min="260" max="640" step="10" value={previewWidth} onChange={event=>changePreviewWidth(Number(event.target.value))}/><span>{previewWidth}px</span></label>
+      </div>
+
       <div className="dev-cockpit-toolbar">
         <div className="dev-cockpit-tools">
           <button onClick={() => void createFile()}><Plus size={13}/> NEW FILE</button>
@@ -759,7 +794,7 @@ export default function DeveloperWorkbench({
         <button onClick={() => void bindFolder()}>REBIND FOLDER</button>
       </div>}
 
-      <div className="dev-workbench-grid">
+      <div className={`dev-workbench-grid view-${workbenchView}`} style={{'--dev-explorer-w':`${explorerWidth}px`,'--dev-preview-w':`${previewWidth}px`} as CSSProperties}>
         <aside className="dev-explorer">
           <div className="dev-pane-title"><FolderOpen size={13}/> {mode === 'local' ? binding?.name ?? 'LOCAL PROJECT' : 'PROJECT'}<span>{projectFileCount}</span></div>
           {mode === 'local' ? (
