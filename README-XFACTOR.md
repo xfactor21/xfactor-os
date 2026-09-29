@@ -1,5 +1,6 @@
 # xFactor.OS — Controlled Chaos System
 
+> **Current M6 milestone:** xFactor.OS **0.6.0** — spatial organization, adaptive Workbench, Files, Browser, Settings, and readability pass.\n\n
 > **The studio after an explosion — except every piece knows exactly where it belongs.**
 
 xFactor.OS is the deliberately physical, damaged, loud counterpart to xOS. It reuses proven engines where that saves real work, but it does not inherit xOS's galaxy/brain visual language.

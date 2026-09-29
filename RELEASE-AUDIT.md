@@ -1,5 +1,6 @@
 # xFactor.OS Release Audit — 0.5.0
 
+> **Current M6 milestone:** xFactor.OS **0.6.0** — spatial organization, adaptive Workbench, Files, Browser, Settings, and readability pass.\n\n
 ## Current verdict
 
 **ENGINEERING RELEASE CANDIDATE VERIFIED / PUBLIC DISTRIBUTION STILL GATED.**

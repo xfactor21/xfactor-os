@@ -1,5 +1,6 @@
 # xFactor.OS
 
+> **Current M6 milestone:** xFactor.OS **0.6.0** — spatial organization, adaptive Workbench, Files, Browser, Settings, and readability pass.\n\n
 **The studio after an explosion — except every piece knows exactly where it belongs.**
 
 xFactor.OS is a local-first controlled-chaos operating workspace for builders, creators, developers, and people whose real work refuses to fit inside a tidy dashboard.

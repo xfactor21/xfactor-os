@@ -1,5 +1,6 @@
 # xFactor.OS — Truthful Build Matrix
 
+> **Current M6 milestone:** xFactor.OS **0.6.0** — spatial organization, adaptive Workbench, Files, Browser, Settings, and readability pass.\n\n
 Version: **0.5.0**
 
 This matrix exists so “routed,” “implemented,” “runtime-verified,” and “distribution-ready” are not conflated. `BUILT` means real source implementation exists in the production entry path. `VERIFIED` means the relevant behavior has passed dependency-backed CI and/or real browser/desktop execution. `DEPLOYMENT GATE` means owner credentials, signing, or physical/real-machine acceptance remains outside the engineering build.
