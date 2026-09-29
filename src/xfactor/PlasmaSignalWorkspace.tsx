@@ -163,6 +163,7 @@ function LiquidBoard({
   onLayout,
   onUpdate,
   onDelete,
+  onBundle,
 }: {
   signals: Signal[];
   incidents: Incident[];
@@ -174,6 +175,7 @@ function LiquidBoard({
   onLayout: (id: string, next: Offset) => void;
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
+  onBundle?: (firstId: string, secondId: string) => void;
 }) {
   const momentum = useRef(new Map<string, PointerMomentum>());
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
@@ -195,7 +197,7 @@ function LiquidBoard({
     background="#07020a"
     opacity={0.84}
     frost={Math.max(0.01, plasma.frost * 0.09)}
-    blend={Math.max(plasma.blend, compact ? 56 : 88)}
+    blend={compact ? 14 : 22}
     viscosity={0.055}
     stretch={4.8}
     flow={1.28}
@@ -211,10 +213,8 @@ function LiquidBoard({
     glow={2.3}
     wash={1.12}
     grain={0.06}
-    formIn
-    formSpeed={1.6}
     grid={24}
-    magnet={72}
+    magnet={compact ? 22 : 30}
     quality={compact ? 0.74 : 1.08}
     maxSurfaces={compact ? 7 : 16}
     pointerDrop={false}
