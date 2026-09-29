@@ -3,6 +3,7 @@ export type IncidentPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type SignalType = 'spark' | 'task' | 'note' | 'link';
 export type AssetKind = 'image' | 'audio' | 'video' | 'document' | 'code' | 'link' | 'studio' | 'other';
 export type AssetSource = 'reference' | 'file' | 'studio';
+export type SpatialEntityKind = 'incident' | 'pile' | 'signal' | 'asset' | 'activity' | 'studio';
 
 export interface Position { x: number; y: number; rotation: number; }
 
@@ -77,6 +78,17 @@ export interface SavedLayout {
   createdAt: number;
 }
 
+export interface SpatialGroup {
+  id: string;
+  name: string;
+  entityKind: SpatialEntityKind;
+  memberIds: string[];
+  color: string;
+  material?: 'plasma' | 'crystal' | 'metal' | 'wood' | 'stone' | 'cloud';
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface WorkspaceState {
   schemaVersion: 2;
   /** Monotonic-enough wall-clock timestamp for whole-workspace conflict resolution. */
@@ -88,5 +100,6 @@ export interface WorkspaceState {
   activity: ActivityEvent[];
   positions: Record<string, Position>;
   savedLayouts: SavedLayout[];
+  spatialGroups: SpatialGroup[];
   selectedIncidentId?: string;
 }
