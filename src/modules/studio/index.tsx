@@ -32,6 +32,7 @@ import VideoTrimmer from './tools/VideoTrimmer';
 import PdfMarkup from './tools/PdfMarkup';
 import PrintLayout from './tools/PrintLayout';
 import ModelViewer from './tools/ModelViewer';
+import { SpatialSurface } from '../../xfactor/TrueSpatial';
 
 interface ModeMeta {
   label: string;
@@ -173,8 +174,8 @@ export default function Studio({ active }: { active: boolean }) {
             <div className="dpNewPlus"><Icon name="plus" size={22} /></div>
             <div>NEW BOARD</div>
           </div>
-          {boards.map((board) => (
-            <div key={board.id} className="dpBoardCard" onClick={() => openBoardById(board.id)}>
+          {boards.map((board,index) => (
+            <SpatialSurface as="div" spatialId={board.id} free index={index} freeWidth={280} freeHeight={190} group="studio-boards" key={board.id} className="dpBoardCard" onClick={() => openBoardById(board.id)}>
               <button className="dpBoardDel" onClick={(event) => handleDelete(board.id, event)} title="delete board"><Icon name="trash" size={12} /></button>
               <div className="dpBoardIcon"><Icon name={MODE_META[board.mode].icon} size={20} /></div>
               {renamingId === board.id ? (
@@ -201,7 +202,7 @@ export default function Studio({ active }: { active: boolean }) {
               )}
               <div className="dpBoardMode">{MODE_META[board.mode].label}</div>
               <div className="dpBoardUpdated">{timeAgo(board.updatedAt)}</div>
-            </div>
+            </SpatialSurface>
           ))}
         </div>
 
