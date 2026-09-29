@@ -144,7 +144,12 @@ pub async fn browser_audit_component(url: String, selector: String) -> Result<Co
   let mut snippets = Vec::new();
   for node in document.select(&parsed_selector).take(20) {
     let chunk = node.html();
-    snippets.push(if chunk.len() > 80_000 { chunk[..80_000].to_string() } else { chunk });
+    let clipped = if chunk.len() > 80_000 {
+      let mut end = 80_000.min(chunk.len());
+      while end > 0 && !chunk.is_char_boundary(end) { end -= 1; }
+      chunk[..end].to_string()
+    } else { chunk };
+    snippets.push(clipped);
   }
   Ok(ComponentAudit { selector, matches: snippets.len(), html: snippets })
 }
