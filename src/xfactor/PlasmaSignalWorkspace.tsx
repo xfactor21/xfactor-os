@@ -248,7 +248,7 @@ function LiquidBoard({
             }).sort((a,b)=>a.distance-b.distance)[0];
             if (nearest && nearest.distance < 330) onBundle(signal.id,nearest.id);
           }
-        }
+        }}
         tint={typeTint[plasma.look][signal.type]}
         opacity={signal.done ? 0.58 : 0.9}
         frost={signal.type === 'note' ? Math.min(0.09, plasma.frost * 0.08 + 0.01) : 0.01}
