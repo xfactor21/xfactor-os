@@ -165,6 +165,7 @@ function LiquidBoard({
   onUpdate,
   onDelete,
   onFuse,
+  groups = [],
 }: {
   signals: Signal[];
   incidents: Incident[];
