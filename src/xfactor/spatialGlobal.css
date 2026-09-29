@@ -76,3 +76,25 @@
   filter:brightness(1.06);
 }
 
+/* M6.1 spatial layering: the WebGL body is the card; DOM content floats above it. */
+.xf-root.xf-plasma-mode .xf-true-spatial,
+.xf-root.xf-matter-mode .xf-true-spatial{
+  background:transparent!important;
+  background-image:none!important;
+  background-color:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+  isolation:isolate;
+}
+.xf-root.xf-plasma-mode .xf-true-spatial>*,
+.xf-root.xf-matter-mode .xf-true-spatial>*{
+  position:relative;
+  z-index:24;
+}
+.xf-root.xf-plasma-mode .xf-true-spatial::before,
+.xf-root.xf-matter-mode .xf-true-spatial::before{
+  z-index:21!important;
+}
+.xf-global-spatial[aria-busy="true"]{opacity:.72}
+.xf-global-spatial[aria-busy="true"] button,
+.xf-global-spatial[aria-busy="true"] select{cursor:progress}
