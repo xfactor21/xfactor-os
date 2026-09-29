@@ -15,6 +15,7 @@ interface PlasmaSignalWorkspaceProps {
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
   plasma: PlasmaController;
+  onFuse?: (a:string,b:string)=>void;
 }
 
 type Layout = Record<string, Offset>;
@@ -99,6 +100,7 @@ function NormalSignalList({
   incidents,
   onUpdate,
   onDelete,
+  onFuse,
 }: {
   signals: Signal[];
   incidents: Incident[];
@@ -171,6 +173,7 @@ function LiquidBoard({
   onLayout: (id: string, next: Offset) => void;
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
+  onFuse?: (a:string,b:string)=>void;
 }) {
   const momentum = useRef(new Map<string, PointerMomentum>());
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
@@ -232,7 +235,15 @@ function LiquidBoard({
         onPointerDownCapture={event => momentum.current.set(signal.id, beginMomentum(event.clientX, event.clientY))}
         onPointerMoveCapture={event => rememberPointer(signal.id, event)}
         onDragEnd={next => settle(signal.id, next)}
-        onJoinChange={joined => setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; })}
+        onJoinChange={joined => setJoinedIds(current => {
+          const next = new Set(current);
+          if (joinedAny(joined)) {
+            const other=[...current].find(id=>id!==signal.id);
+            next.add(signal.id);
+            if(other)onFuse?.(other,signal.id);
+          } else next.delete(signal.id);
+          return next;
+        })}
         tint={typeTint[plasma.look][signal.type]}
         opacity={signal.done ? 0.38 : 0.64}
         frost={signal.type === 'note' ? Math.min(0.24, plasma.frost * 0.2 + 0.03) : Math.max(0.02, plasma.frost * 0.14)}
@@ -356,7 +367,15 @@ function MatterBoard({
             onPointerDownCapture={event => momentum.current.set(signal.id, beginMomentum(event.clientX, event.clientY))}
             onPointerMoveCapture={event => rememberPointer(signal.id, event)}
             onDragEnd={next => settle(signal.id, next)}
-            onJoinChange={joined => setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; })}
+            onJoinChange={joined => setJoinedIds(current => {
+          const next = new Set(current);
+          if (joinedAny(joined)) {
+            const other=[...current].find(id=>id!==signal.id);
+            next.add(signal.id);
+            if(other)onFuse?.(other,signal.id);
+          } else next.delete(signal.id);
+          return next;
+        })}
             tint={typeTint[plasma.look][signal.type]}
             opacity={signal.done ? 0.38 : material === 'metal' ? 0.86 : material === 'stone' ? 0.9 : material === 'wood' ? 0.82 : material === 'crystal' ? 0.52 : material === 'cloud' ? 0.48 : 0.64}
             frost={material === 'crystal' ? Math.min(0.28, plasma.frost * 0.32 + 0.03) : material === 'plasma' ? Math.min(0.18, plasma.frost * 0.22) : 0}
@@ -382,6 +401,7 @@ export default function PlasmaSignalWorkspace({
   onUpdate,
   onDelete,
   plasma,
+  onFuse,
 }: PlasmaSignalWorkspaceProps) {
   const stage = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<Layout>({});
