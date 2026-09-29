@@ -28,4 +28,7 @@ assert('project search is promoted into dock', source.includes("dockView === 'se
 assert('keyboard save/search/terminal shortcuts exist', source.includes("event.key.toLowerCase() === 's'") && source.includes('event.shiftKey') && source.includes("event.key === '`'"));
 assert('cockpit CSS has desktop and compact layouts', css.includes('.dev-cockpit .dev-workbench-grid') && css.includes('@media(max-width:760px)'));
 assert('old vertical M2 beacon is suppressed', css.includes('.dev-cockpit .dev-m2-beacon'));
+assert('M6 Workbench exposes three adaptive view presets', source.includes("'cockpit'") && source.includes("'code-focus'") && source.includes("'preview-focus'") && source.includes('dev-view-presets'));
+assert('M6 Workbench persists user sizing', source.includes('xfactor-workbench-explorer-width') && source.includes('xfactor-workbench-preview-width'));
+assert('M6 Workbench grid responds to view presets', css.includes('.view-code-focus') && css.includes('.view-preview-focus') && css.includes('--dev-explorer-w'));
 console.log('\nWorkbench M4 Project Cockpit source checks passed.');
