@@ -14,8 +14,8 @@ export interface OsSettings {
 
 const KEY='xfactor-os-settings-v1';
 export const DEFAULT_SETTINGS:OsSettings={
-  uiScale:1.16,
-  iconScale:1.12,
+  uiScale:1.24,
+  iconScale:1.18,
   motion:'full',
   spatialQuality:'balanced',
   hoverHelp:true,
