@@ -45,7 +45,7 @@ jobs:
           const cargoLock = fs.readFileSync('src-tauri/Cargo.lock', 'utf8');
           const activeDocs = ['README.md', 'README-XFACTOR.md', 'RELEASE-AUDIT.md', 'BUILD-MATRIX.md'].map(path => [path, fs.readFileSync(path, 'utf8')]);
           const version = pkg.version;
-          if (version !== '0.5.0') throw new Error(`expected release 0.5.0, got ${version}`);
+          if (version !== '0.8.0') throw new Error(`expected release 0.8.0, got ${version}`);
           if (lock.version !== version || lock.packages?.['']?.version !== version) throw new Error('package-lock version drift');
           if (tauri.version !== version) throw new Error('Tauri version drift');
           if (!new RegExp(`^version = "${version.replaceAll('.', '\\.') }"$`, 'm').test(cargo)) throw new Error('Cargo.toml version drift');
@@ -70,7 +70,7 @@ jobs:
           const version = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
           const html = fs.readFileSync('dist/index.html', 'utf8');
           if (html.includes('__XFACTOR_VERSION__')) throw new Error('unresolved version token in production HTML');
-          if (!html.includes(`xFactor.OS // v${version}`)) throw new Error('visible build badge missing release version');
+          if (!html.includes(`name="xfactor-build-version" content="${version}"`)) throw new Error('build-version meta missing release version');
           if (!html.includes(`xFactor.OS v${version}`)) throw new Error('document title missing release version');
-          console.log(`Production UI visibly identifies xFactor.OS v${version}.`);
+          console.log(`Production shell metadata identifies xFactor.OS v${version}; browser acceptance verifies the visible header version.`);
           NODE
