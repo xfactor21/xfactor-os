@@ -3,7 +3,7 @@ export type ParsedCommand =
   | {type:'stack'}
   | {type:'new-incident';name?:string}
   | {type:'capture';text:string;signalType:'spark'|'task'|'note'|'link'}
-  | {type:'open';target:'signal'|'piles'|'vault'|'terminal'|'lab'|'tape'|'floor'}
+  | {type:'open';target:'signal'|'piles'|'vault'|'terminal'|'lab'|'tape'|'floor'|'files'|'browser'|'settings'}
   | {type:'search';query:string}
   | {type:'unknown'};
 
