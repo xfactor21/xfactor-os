@@ -2,24 +2,26 @@ import { createContext, createElement, useContext, useState, type ElementType, t
 import { Plasma, PlasmaProvider, type Offset } from '@cruxgarden/plasma-ui';
 import type { PlasmaController, SpatialMode } from './plasmaMode';
 
-export type SpatialRoom = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'terminal' | 'files' | 'browser' | 'settings';
+export type SpatialRoom = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'terminal' | 'studio' | 'files' | 'browser' | 'settings';
 
 type MaterialName = 'plasma' | 'crystal' | 'metal' | 'wood' | 'stone' | 'cloud';
 
-const ROOM_MATERIAL: Record<'deck'|'piles'|'vault'|'tape'|'terminal', MaterialName> = {
+const ROOM_MATERIAL: Record<'deck'|'piles'|'vault'|'tape'|'terminal'|'studio', MaterialName> = {
   deck: 'metal',
   piles: 'stone',
   vault: 'crystal',
   tape: 'wood',
   terminal: 'metal',
+  studio: 'crystal',
 };
 
-const ROOM_BLEND: Record<'deck'|'piles'|'vault'|'tape'|'terminal', number> = {
+const ROOM_BLEND: Record<'deck'|'piles'|'vault'|'tape'|'terminal'|'studio', number> = {
   deck: 20,
   piles: 11,
   vault: 14,
   tape: 9,
   terminal: 7,
+  studio: 12,
 };
 
 const PlasmaSurface = Plasma as any;
@@ -70,7 +72,7 @@ export function SpatialRoomProvider({
     return <SpatialContext.Provider value={value}>{children}</SpatialContext.Provider>;
   }
 
-  const spatialRoom = room as 'deck'|'piles'|'vault'|'tape'|'terminal';
+  const spatialRoom = room as 'deck'|'piles'|'vault'|'tape'|'terminal'|'studio';
   const material: MaterialName = plasma.mode === 'matter' ? ROOM_MATERIAL[spatialRoom] : 'plasma';
   const matter = plasma.mode === 'matter';
   const blend = matter ? Math.max(5, ROOM_BLEND[spatialRoom]-3) : ROOM_BLEND[spatialRoom];
