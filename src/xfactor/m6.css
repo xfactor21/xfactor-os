@@ -1,5 +1,5 @@
 /* xFactor.OS M6 — Organized Disorganization */
-:root{--xf-ui-scale:1.16;--xf-icon-scale:1.12}
+:root{--xf-ui-scale:1.24;--xf-icon-scale:1.18}
 .xf-root{font-size:calc(14px * var(--xf-ui-scale))}
 .xf-root button,.xf-root input,.xf-root select,.xf-root textarea{font-size:calc(11px * var(--xf-ui-scale))}
 .xf-root svg{width:calc(1em * var(--xf-icon-scale));height:calc(1em * var(--xf-icon-scale))}
