@@ -100,13 +100,11 @@ function NormalSignalList({
   incidents,
   onUpdate,
   onDelete,
-  onBundle,
 }: {
   signals: Signal[];
   incidents: Incident[];
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
-  onBundle?: (firstId: string, secondId: string) => void;
 }) {
   if (!signals.length) return <div className="xf-empty plasma-empty"><Sparkles size={22}/><b>NO SIGNAL YET</b><p>Use Hotwire below. Capture anything before your brain talks you out of it.</p></div>;
   return <div className="signal-full">{signals.map(signal => <article className={`signal-row signal-row-full ${signal.done ? 'done' : ''}`} key={signal.id}>
