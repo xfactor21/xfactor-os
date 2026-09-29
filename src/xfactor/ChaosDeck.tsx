@@ -14,7 +14,7 @@ import SettingsPanel from './SettingsPanel';
 import { useOsSettings } from './osSettings';
 import PlasmaSignalWorkspace from './PlasmaSignalWorkspace';
 import GlobalSpatialToggle from './GlobalSpatialToggle';
-import { SpatialRoomProvider, SpatialSurface } from './TrueSpatial';
+import { SpatialRoomProvider, SpatialSurface, type SpatialRoom } from './TrueSpatial';
 import { usePlasmaMode } from './plasmaMode';
 import './spatialGlobal.css';
 import type { Asset, Incident, IncidentPriority, IncidentStatus, Signal, SignalType, SpatialEntityKind, WorkspaceState } from './domain';
@@ -260,6 +260,59 @@ export default function ChaosDeck() {
   function exportBackup(){downloadText(`xfactor-os-backup-${new Date().toISOString().slice(0,10)}.json`,exportWorkspace(ws));record('Exported workspace backup','backup');}
   async function importBackup(file?:File){if(!file)return;const restored=importWorkspace(await file.text());if(!restored){setNotice('BACKUP REJECTED — INVALID WORKSPACE');return;}setWs(restored);setSelectedIds(restored.selectedIncidentId?[restored.selectedIncidentId]:[]);setNotice('WORKSPACE RESTORED');if(importRef.current)importRef.current.value='';}
   function toggleRelation(a:string,b:string){if(a===b)return;patch(p=>({...p,incidents:p.incidents.map(i=>{if(i.id!==a&&i.id!==b)return i;const other=i.id===a?b:a;return {...i,relatedIncidentIds:i.relatedIncidentIds.includes(other)?i.relatedIncidentIds.filter(x=>x!==other):[...i.relatedIncidentIds,other],updatedAt:Date.now()};}),activity:[event('relation','Changed incident relation',a),...p.activity]}));}
+  function vaultText(name:string,content:string){
+    const id=crypto.randomUUID(),blobKey=`text-${id}`;
+    const blob=new Blob([content],{type:'text/plain'});
+    void putAssetBlob(blobKey,blob).then(()=>{
+      const asset=newAsset(name,'code',undefined,chosen?.id,'file');
+      asset.id=id;asset.blobKey=blobKey;asset.mime='text/plain';asset.size=blob.size;
+      patch(p=>({...p,assets:[asset,...p.assets],activity:[event('asset',`Vaulted ${name}`,chosen?.id),...p.activity]}));
+      setNotice('SAVED TO VAULT');
+    }).catch(()=>setNotice('COULD NOT SAVE TO VAULT'));
+  }
+  function vaultLink(url:string,name:string){
+    const asset=newAsset(name||url,'link',url,chosen?.id,'reference');
+    patch(p=>({...p,assets:[asset,...p.assets],activity:[event('asset',`Vaulted ${name||url}`,chosen?.id),...p.activity]}));
+    setNotice('PAGE SAVED TO VAULT');
+  }
+  function spatialKindForRoom(room:SpatialRoom):SpatialEntityKind|undefined {
+    if(room==='deck')return 'incident';
+    if(room==='piles')return 'pile';
+    if(room==='signal')return 'signal';
+    if(room==='vault')return 'asset';
+    if(room==='tape')return 'activity';
+    if(room==='lab')return 'studio';
+    return undefined;
+  }
+  function fuseSpatial(room:SpatialRoom,a:string,b:string){
+    if(a===b)return;
+    const kind=spatialKindForRoom(room);if(!kind)return;
+    patch(p=>{
+      const existing=p.spatialGroups.find(group=>group.entityKind===kind&&(group.memberIds.includes(a)||group.memberIds.includes(b)));
+      const now=Date.now();
+      let groupId=existing?.id;
+      let groupName=existing?.name;
+      let spatialGroups=p.spatialGroups;
+      if(existing){
+        const members=[...new Set([...existing.memberIds,a,b])];
+        spatialGroups=p.spatialGroups.map(group=>group.id===existing.id?{...group,memberIds:members,updatedAt:now}:group);
+      }else{
+        const index=p.spatialGroups.filter(group=>group.entityKind===kind).length+1;
+        groupName=`AUTO BUNDLE ${String(index).padStart(2,'0')}`;
+        const created=newSpatialGroup(kind,[a,b],groupName,index%2?'#ff2aa3':'#20d9ff');
+        groupId=created.id;spatialGroups=[created,...p.spatialGroups];
+      }
+      let piles=p.piles,incidents=p.incidents;
+      if(kind==='incident'){
+        let pile=p.piles.find(item=>item.name===groupName);
+        if(!pile){pile=newPile(groupName||'AUTO BUNDLE');pile.stamp='PLASMA BUNDLE';piles=[pile,...p.piles];}
+        const targetMembers=spatialGroups.find(group=>group.id===groupId)?.memberIds??[a,b];
+        incidents=p.incidents.map(item=>targetMembers.includes(item.id)&&!item.pileIds.includes(pile!.id)?{...item,pileIds:[...item.pileIds,pile!.id],updatedAt:now}:item);
+      }
+      return {...p,spatialGroups,piles,incidents,activity:[event('spatial',`${kind.toUpperCase()} bundle created/extended in ${room}`),...p.activity]};
+    });
+    setNotice('PLASMA BUNDLE LINKED');
+  }
 
   const entityResults = useMemo(() => {
     const q=paletteQuery.trim().toLowerCase(); if(q.length<2)return [];
