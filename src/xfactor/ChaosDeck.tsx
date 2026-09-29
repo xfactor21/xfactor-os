@@ -28,6 +28,7 @@ import { SupabaseWorkspaceSyncAdapter } from './syncAdapter';
 import { useAuthStore } from '../stores/authStore';
 import { supabaseConfigured } from '../lib/supabase';
 import './xfactor.css';
+import './m6.css';
 
 type View = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'files' | 'browser' | 'terminal';
 type DragState = { id: string; ox: number; oy: number; rect: DOMRect };
