@@ -3,20 +3,24 @@ import {
   Activity, Archive, Boxes, Command, Crosshair, Download, ExternalLink, FileJson, FileText, Flame,
   FolderMinus, FolderPlus, Grip, Hammer, History, Image, Layers3, Link2, Music, Pin, Plus, Radio,
   RotateCcw, Save, Search, Shuffle, Sparkles, Star, TerminalSquare, Trash2, Upload, Video, X, Zap,
-  Check, Code2, Eye, EyeOff, SlidersHorizontal, ArrowRightLeft
+  Check, Code2, Eye, EyeOff, SlidersHorizontal, ArrowRightLeft, FolderTree, Globe2, Settings, CircleHelp
 } from 'lucide-react';
 import Studio from '../modules/studio';
 import { loadBoards } from '../modules/studio/boards';
 import DeveloperWorkbench from './DeveloperWorkbench';
+import XFiles from './XFiles';
+import XBrowser from './XBrowser';
+import SettingsPanel from './SettingsPanel';
+import { useOsSettings } from './osSettings';
 import PlasmaSignalWorkspace from './PlasmaSignalWorkspace';
 import GlobalSpatialToggle from './GlobalSpatialToggle';
 import { SpatialRoomProvider, SpatialSurface } from './TrueSpatial';
 import { usePlasmaMode } from './plasmaMode';
 import './spatialGlobal.css';
-import type { Asset, Incident, IncidentPriority, IncidentStatus, Signal, SignalType, WorkspaceState } from './domain';
+import type { Asset, Incident, IncidentPriority, IncidentStatus, Signal, SignalType, SpatialEntityKind, WorkspaceState } from './domain';
 import {
   event, exportWorkspace, importWorkspace, loadWorkspace, newAsset, newIncident, newLayout, newPile,
-  newSignal, normalizeWorkspace, saveWorkspace, workspaceClock, WORKSPACE_STORAGE_KEY
+  newSignal, newSpatialGroup, normalizeWorkspace, saveWorkspace, workspaceClock, WORKSPACE_STORAGE_KEY
 } from './store';
 import { deleteAssetBlob, getAssetBlob, kindFromFile, putAssetBlob } from './assetStore';
 import { parseCommand } from './commandGrammar';
@@ -25,7 +29,7 @@ import { useAuthStore } from '../stores/authStore';
 import { supabaseConfigured } from '../lib/supabase';
 import './xfactor.css';
 
-type View = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'terminal';
+type View = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'files' | 'browser' | 'terminal';
 type DragState = { id: string; ox: number; oy: number; rect: DOMRect };
 
 const assetIcon = (kind: string) => kind === 'image' ? Image : kind === 'audio' ? Music : kind === 'video' ? Video : kind === 'code' ? Code2 : kind === 'studio' ? Hammer : FileText;
@@ -49,6 +53,7 @@ export default function ChaosDeck() {
   const [studio, setStudio] = useState(false);
   const [palette, setPalette] = useState(false);
   const [account, setAccount] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
   const [signalQuery, setSignalQuery] = useState('');
   const [vaultQuery, setVaultQuery] = useState('');
@@ -69,6 +74,7 @@ export default function ChaosDeck() {
   const syncGeneration = useRef(0);
   const authUser = useAuthStore(s => s.user);
   const initAuth = useAuthStore(s => s.init);
+  const osSettings = useOsSettings();
 
   useEffect(() => { setPersistenceError(!saveWorkspace(ws)); }, [ws]);
   useEffect(() => { if(!notice)return; const t=window.setTimeout(()=>setNotice(undefined),2600);return()=>window.clearTimeout(t); },[notice]);
