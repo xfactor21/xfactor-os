@@ -1,8 +1,8 @@
-import { createContext, createElement, useContext, type ElementType, type HTMLAttributes, type ReactNode } from 'react';
-import { Plasma, PlasmaProvider } from '@cruxgarden/plasma-ui';
+import { createContext, createElement, useContext, type ElementType, type HTMLAttributes, type ReactNode, type RefObject } from 'react';
+import { Plasma, PlasmaProvider, type Offset } from '@cruxgarden/plasma-ui';
 import type { PlasmaController, SpatialMode } from './plasmaMode';
 
-export type SpatialRoom = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'terminal';
+export type SpatialRoom = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'lab' | 'terminal' | 'files' | 'browser' | 'settings';
 
 type MaterialName = 'plasma' | 'crystal' | 'metal' | 'wood' | 'stone' | 'cloud';
 
@@ -11,6 +11,7 @@ const ROOM_MATERIAL: Record<Exclude<SpatialRoom, 'signal' | 'files' | 'browser' 
   piles: 'stone',
   vault: 'crystal',
   tape: 'wood',
+  lab: 'crystal',
   terminal: 'metal',
 };
 
@@ -35,16 +36,18 @@ export function SpatialRoomProvider({
 }) {
   const value = { mode: plasma.mode, room };
 
-  if (plasma.mode === 'normal' || room === 'signal') {
+  if (room === 'signal' || room === 'files' || room === 'browser' || room === 'settings') {
     return <SpatialContext.Provider value={value}>{children}</SpatialContext.Provider>;
   }
 
+  // Keep the room renderer mounted while display modes change. Recreating the
+  // full-screen WebGL renderer plus every surface at once caused M5's visible
+  // multi-second switch storm.
   const material: MaterialName = plasma.mode === 'matter' ? ROOM_MATERIAL[room] : 'plasma';
   const matter = plasma.mode === 'matter';
 
   return <SpatialContext.Provider value={value}>
     <PlasmaProvider
-      key={`${plasma.mode}:${room}:${plasma.look}`}
       mood={plasma.look === 'afterglow' ? 'tidal' : plasma.look === 'pink-riot' ? 'ember' : 'aurora'}
       theme="dark"
       material={material}
@@ -69,11 +72,13 @@ export function SpatialRoomProvider({
       grain={0.14}
       grid={24}
       magnet={matter ? 42 : 62}
-      quality={1}
-      maxSurfaces={24}
+      quality={0.9}
+      maxSurfaces={18}
       pointerDrop={false}
       pointerPull
       ambientDrops={false}
+      formIn={false}
+      formOut={false}
       ground="clear"
       zIndex={18}
     >
@@ -92,7 +97,7 @@ export function SpatialSurface({
   tint,
   elevation,
   ...rest
-}: HTMLAttributes<HTMLElement> & {
+}: Omit<HTMLAttributes<HTMLElement>, 'onDragEnd'> & {
   as?: ElementType;
   children?: ReactNode;
   fuse?: boolean;
@@ -100,6 +105,14 @@ export function SpatialSurface({
   radius?: number;
   tint?: string;
   elevation?: number;
+  draggable?: boolean;
+  snap?: boolean;
+  bounds?: RefObject<HTMLElement | null>;
+  offset?: Offset;
+  defaultOffset?: Offset;
+  onDragStart?: () => void;
+  onDragEnd?: (offset: Offset) => void;
+  onJoinChange?: (joined: boolean) => void;
 }) {
   const { mode } = useContext(SpatialContext);
   const classes = ['xf-true-spatial', className].filter(Boolean).join(' ');
@@ -120,6 +133,6 @@ export function SpatialSurface({
     elevation={elevation ?? (mode === 'plasma' ? 0.52 : 0.42)}
     {...rest}
   >
-    {children}
+    <div className="xf-spatial-content">{children}</div>
   </PlasmaSurface>;
 }
