@@ -370,7 +370,7 @@ export default function ChaosDeck() {
     {label:'Save damage',hint:'SAVE FLOOR LAYOUT',group:'ORGANIZE',icon:Save},
     {label:'Normal mode',hint:'STANDARD SURFACES',group:'SPATIAL',icon:Layers3},
     {label:'Plasma mode',hint:'LIQUID ORGANIZER',group:'SPATIAL',icon:Sparkles},
-    {label:'Matter mode',hint:'MATERIAL ORGANIZER',group:'SPATIAL',icon:Box},
+    {label:'Matter mode',hint:'MATERIAL ORGANIZER',group:'SPATIAL',icon:Boxes},
     {label:'Floor',hint:'INCIDENT FLOOR',group:'PLAN',icon:Crosshair},
     {label:'Piles',hint:'COLLECTIONS',group:'PLAN',icon:Boxes},
     {label:'Signal',hint:'CAPTURES + TASKS',group:'PLAN',icon:Radio},
