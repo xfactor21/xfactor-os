@@ -36,7 +36,8 @@ type DragState = { id: string; ox: number; oy: number; rect: DOMRect };
 const assetIcon = (kind: string) => kind === 'image' ? Image : kind === 'audio' ? Music : kind === 'video' ? Video : kind === 'code' ? Code2 : kind === 'studio' ? Hammer : FileText;
 const statusOrder: IncidentStatus[]=['FERAL','LIVE','BREACH','DORMANT'];
 const priorityOrder: IncidentPriority[]=['LOW','MEDIUM','HIGH','CRITICAL'];
-const BUILD_VERSION='0.8.0';
+declare const __XFACTOR_BUILD_VERSION__: string;
+const BUILD_VERSION=__XFACTOR_BUILD_VERSION__;
 
 function relative(ts:number) {
   const sec = Math.max(1, Math.floor((Date.now()-ts)/1000));
