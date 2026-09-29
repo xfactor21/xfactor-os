@@ -16,7 +16,7 @@ export interface M6Settings {
 
 const KEY='xfactor-m6-settings-v1';
 export const DEFAULT_M6_SETTINGS:M6Settings={
-  uiScale:1.16,
+  uiScale:1,
   density:'comfortable',
   reducedMotion:false,
   plasmaQuality:0.92,

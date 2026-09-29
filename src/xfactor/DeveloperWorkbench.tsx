@@ -43,6 +43,8 @@ import {
   type LocalProjectBinding,
 } from './localProjectBindings';
 import './workbench.css';
+import { SpatialSurface } from './TrueSpatial';
+import type { WorkbenchPreset } from './m6Settings';
 
 type WorkbenchFile = { path: string; content: string };
 type LocalBuffer = { content: string; savedContent: string };
@@ -207,6 +209,7 @@ export default function DeveloperWorkbench({
   openSignals = 0,
   taskCount = 0,
   assetCount = 0,
+  defaultPreset = 'cockpit',
 }: {
   active: boolean;
   projectId?: string;
@@ -217,6 +220,7 @@ export default function DeveloperWorkbench({
   openSignals?: number;
   taskCount?: number;
   assetCount?: number;
+  defaultPreset?: WorkbenchPreset;
 }) {
   const key = storageKey(projectId);
   const [sandboxFiles, setSandboxFiles] = useState<WorkbenchFile[]>(() => loadFiles(key));
@@ -240,6 +244,13 @@ export default function DeveloperWorkbench({
   const [searchBusy, setSearchBusy] = useState(false);
   const [searchMeta, setSearchMeta] = useState('');
   const [dockView, setDockView] = useState<DockView>('terminal');
+  const layoutKey = `xfactor-workbench-layout-v2:${projectId || 'scratch'}`;
+  const initialLayout = (()=>{try{return JSON.parse(localStorage.getItem(layoutKey)||'{}') as {preset?:WorkbenchPreset;explorer?:number;preview?:number;dock?:number;flipped?:boolean}}catch{return {}}})();
+  const [layoutPreset,setLayoutPreset]=useState<WorkbenchPreset>(initialLayout.preset??defaultPreset);
+  const [explorerWidth,setExplorerWidth]=useState(initialLayout.explorer??220);
+  const [previewWidth,setPreviewWidth]=useState(initialLayout.preview??360);
+  const [dockHeight,setDockHeight]=useState(initialLayout.dock??260);
+  const [panelsFlipped,setPanelsFlipped]=useState(Boolean(initialLayout.flipped));
   const searchInputRef = useRef<HTMLInputElement>(null);
   const wcRef = useRef<Awaited<ReturnType<typeof getWebContainer>> | null>(null);
   const mountedKeyRef = useRef<string | undefined>(undefined);
@@ -269,6 +280,18 @@ export default function DeveloperWorkbench({
     setActivePath(first);
     setTabs([first]);
   }, [key, projectId]);
+
+  useEffect(()=>{
+    try{localStorage.setItem(layoutKey,JSON.stringify({preset:layoutPreset,explorer:explorerWidth,preview:previewWidth,dock:dockHeight,flipped:panelsFlipped}))}catch{/* layout is device-local */}
+  },[layoutKey,layoutPreset,explorerWidth,previewWidth,dockHeight,panelsFlipped]);
+
+  function applyLayoutPreset(preset:WorkbenchPreset){
+    setLayoutPreset(preset);
+    if(preset==='code'){setExplorerWidth(180);setPreviewWidth(250);setDockHeight(200);}
+    else if(preset==='preview'){setExplorerWidth(170);setPreviewWidth(560);setDockHeight(190);}
+    else if(preset==='debug'){setExplorerWidth(190);setPreviewWidth(300);setDockHeight(360);}
+    else{setExplorerWidth(220);setPreviewWidth(360);setDockHeight(260);}
+  }
 
   useEffect(() => {
     localStorage.setItem(key, JSON.stringify(sandboxFiles));
@@ -752,6 +775,15 @@ export default function DeveloperWorkbench({
           <button onClick={() => { setDockView('search'); window.setTimeout(() => searchInputRef.current?.focus(), 0); }}><Search size={12}/> SEARCH</button>
         </div>
       </div>
+      <div className="dev-layout-controls">
+        <strong>LAYOUT //</strong>
+        <select aria-label="Workbench view preset" value={layoutPreset} onChange={event=>applyLayoutPreset(event.target.value as WorkbenchPreset)}><option value="cockpit">COCKPIT</option><option value="code">CODE FOCUS</option><option value="preview">PREVIEW FOCUS</option><option value="debug">DEBUG</option></select>
+        <button onClick={()=>setPanelsFlipped(value=>!value)}>FLIP SIDES</button>
+        <label>FILES <input type="range" min="150" max="360" step="10" value={explorerWidth} onChange={event=>{setLayoutPreset('cockpit');setExplorerWidth(Number(event.target.value))}}/></label>
+        <label>PREVIEW <input type="range" min="220" max="700" step="20" value={previewWidth} onChange={event=>{setLayoutPreset('cockpit');setPreviewWidth(Number(event.target.value))}}/></label>
+        <label>DOCK <input type="range" min="170" max="440" step="10" value={dockHeight} onChange={event=>{setLayoutPreset('cockpit');setDockHeight(Number(event.target.value))}}/></label>
+        <small>PLASMA PANELS STAY DISTINCT // NO WORKBENCH FUSION</small>
+      </div>
 
       {mode === 'local' && scanError && <div className="dev-binding-error">
         <b>LOCAL PROJECT ACCESS NEEDS ATTENTION</b>
@@ -759,8 +791,8 @@ export default function DeveloperWorkbench({
         <button onClick={() => void bindFolder()}>REBIND FOLDER</button>
       </div>}
 
-      <div className="dev-workbench-grid">
-        <aside className="dev-explorer">
+      <div className="dev-workbench-grid dev-adaptive-grid" style={{gridTemplateColumns:panelsFlipped?`${previewWidth}px minmax(380px,1fr) ${explorerWidth}px`:`${explorerWidth}px minmax(380px,1fr) ${previewWidth}px`}}>
+        <SpatialSurface as="aside" className="dev-explorer dev-workbench-plasma-panel" group="workbench-panels" fuse={false} style={{gridColumn:panelsFlipped?3:1,gridRow:1}}>
           <div className="dev-pane-title"><FolderOpen size={13}/> {mode === 'local' ? binding?.name ?? 'LOCAL PROJECT' : 'PROJECT'}<span>{projectFileCount}</span></div>
           {mode === 'local' ? (
             projectScan ? <ProjectTree
@@ -790,9 +822,9 @@ export default function DeveloperWorkbench({
               ? <>{projectScan?.fileCount ?? 0} FILES · {projectScan?.directoryCount ?? 0} DIRS<br/>DISK IS AUTHORITATIVE{projectScan?.truncated ? <><br/>TREE TRUNCATED FOR SAFETY</> : null}</>
               : <>INCIDENT SANDBOX<br/>AUTO-SAVED LOCALLY<br/>NODE ROOT: /workspace</>}
           </div>
-        </aside>
+        </SpatialSurface>
 
-        <section className="dev-code-pane">
+        <SpatialSurface as="section" className="dev-code-pane dev-workbench-plasma-panel" group="workbench-panels" fuse={false} style={{gridColumn:2,gridRow:1}}>
           <div className="dev-tabs">
             {tabs.map((tab) => {
               const dirty = mode === 'local' && Boolean(localBuffers[tab] && localBuffers[tab].content !== localBuffers[tab].savedContent);
@@ -811,9 +843,9 @@ export default function DeveloperWorkbench({
               onChange={updateActive}
             />
           </> : <div className="dev-no-file">{mode === 'local' ? 'OPEN A TEXT FILE FROM THE PROJECT TREE' : 'CREATE OR OPEN A FILE'}</div>}
-        </section>
+        </SpatialSurface>
 
-        <section className="dev-preview-pane">
+        <SpatialSurface as="section" className="dev-preview-pane dev-workbench-plasma-panel" group="workbench-panels" fuse={false} style={{gridColumn:panelsFlipped?1:3,gridRow:1}}>
           <div className="dev-pane-title"><Play size={13}/> {previewUrl ? 'LIVE DEV SERVER' : mode === 'local' ? 'PROJECT PREVIEW' : 'STATIC PREVIEW'}<span>{previewUrl ? 'LIVE' : 'IDLE'}</span></div>
           {mode === 'local' && !previewUrl
             ? <div className="dev-local-preview-empty"><b>YOUR APP RUNS HERE.</b><p>Hit RUN PROJECT. xFactor.OS mirrors the approved project into its shared runtime, launches the detected package script, and keeps the preview beside the code.</p><small>LIKELY SECRET FILES STAY OUT OF THE MIRROR BY DEFAULT.</small></div>
@@ -825,10 +857,10 @@ export default function DeveloperWorkbench({
             />}
           {devError && <div className="dev-error">{devError}</div>}
           {logs.length > 0 && <pre className="dev-process-log">{logs.join('').slice(-7000)}</pre>}
-        </section>
+        </SpatialSurface>
       </div>
 
-      <section className="dev-cockpit-dock">
+      <SpatialSurface as="section" className="dev-cockpit-dock dev-workbench-plasma-panel" group="workbench-panels" fuse={false} style={{height:dockHeight,maxHeight:dockHeight}}>
         <div className="dev-dock-tabs">
           <button className={dockView === 'terminal' ? 'active' : ''} onClick={() => setDockView('terminal')}><TerminalSquare size={12}/> TERMINAL</button>
           <button className={dockView === 'problems' ? 'active' : ''} onClick={() => setDockView('problems')}><AlertTriangle size={12}/> PROBLEMS <i>{problems.length}</i></button>
@@ -854,7 +886,7 @@ export default function DeveloperWorkbench({
             {searchHits.length > 0 ? <div className="dev-search-results">{searchHits.slice(0, 80).map((hit, index) => <button key={`${hit.path}:${hit.line}:${hit.column}:${index}`} onClick={() => openFile(hit.path)}><b>{hit.path}</b><span>{hit.line}:{hit.column}</span><p>{hit.preview}</p></button>)}</div> : <div className="dev-dock-empty">SEARCH FILE CONTENT ACROSS THE BOUND PROJECT. LIKELY SECRET FILES ARE SKIPPED BY DEFAULT.</div>}
           </> : <div className="dev-dock-empty"><b>PROJECT SEARCH NEEDS A REAL PROJECT.</b><span>Bind a desktop folder and search the actual codebase from here.</span>{isTauri() && projectId && <button onClick={() => void bindFolder()}><FolderOpen size={12}/> OPEN REAL PROJECT</button>}</div>}
         </div>}
-      </section>
+      </SpatialSurface>
     </section>
   );
 }

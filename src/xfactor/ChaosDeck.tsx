@@ -363,7 +363,7 @@ export default function ChaosDeck() {
     {label:'Backup workspace',hint:'EXPORT',icon:Download,group:'SYSTEM'},{label:'Restore workspace',hint:'IMPORT',icon:Upload,group:'SYSTEM'},
   ].filter(item=>item.label.toLowerCase().includes(paletteQuery.toLowerCase())||item.group.toLowerCase().includes(paletteQuery.toLowerCase()));
 
-  if (studio) return <div className="xf-studio-shell"><button className="xf-studio-exit" onClick={()=>setStudio(false)}><X size={15}/> EXIT LAB</button><Studio active plasma={plasma} /></div>;
+  if (studio) return <div className={`xf-studio-shell xf-root ${plasma.mode==='plasma'?`xf-plasma-mode plasma-${plasma.look}`:plasma.mode==='matter'?`xf-matter-mode matter-${plasma.look}`:''}`}><div className="xf-studio-spatial"><GlobalSpatialToggle plasma={plasma}/></div><button className="xf-studio-exit" onClick={()=>setStudio(false)}><X size={15}/> EXIT LAB</button><Studio active plasma={plasma} /></div>;
 
   return <div className={`xf-root m6-density-${settings.density} ${settings.reducedMotion?'m6-reduce-motion ':''}${plasma.mode === 'plasma' ? `xf-plasma-mode plasma-${plasma.look}` : plasma.mode === 'matter' ? `xf-matter-mode matter-${plasma.look}` : ''}`} style={{'--xf-ui-scale':settings.uiScale,'--xf-spatial-gap':`${settings.spatialGap}px`} as React.CSSProperties}>
     <div className="xf-noise"/><div className="xf-scan"/>
@@ -432,6 +432,8 @@ export default function ChaosDeck() {
       onUpdate={updateSignal}
       onDelete={signal=>patch(p=>({...p,signals:p.signals.filter(x=>x.id!==signal.id),activity:[event('signal','Removed signal',signal.incidentId),...p.activity]}))}
       plasma={plasma}
+      spatialClusters={ws.spatialClusters}
+      onBundle={(a,b)=>bundleSpatial('signal',a,b)}
     />}
 
 {view==='vault' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">BLACK VAULT //</span><h1>BURY IT WITH COORDINATES.</h1><p>Files, links, Design Lab documents, and references stay attached to the work that made them matter.</p></div><div className="xf-floor-actions"><button onClick={()=>fileRef.current?.click()}><Upload size={14}/> IMPORT FILES</button><button onClick={()=>setVaultArchived(v=>!v)}>{vaultArchived?<Eye size={14}/>:<EyeOff size={14}/>} {vaultArchived?'ACTIVE':'ARCHIVED'}</button></div></div><div className="vault-search"><Search size={14}/><input value={vaultQuery} onChange={e=>setVaultQuery(e.target.value)} placeholder="SEARCH THE VAULT..."/></div><div className="vault-add"><Archive size={15}/><input value={assetDraft} onChange={e=>setAssetDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addAssetDraft()}} placeholder="PASTE A URL OR NAME A REFERENCE..."/><button onClick={addAssetDraft}>VAULT IT</button></div><div className="vault-grid">{ws.assets.filter(a=>a.archived===vaultArchived).filter(a=>!vaultQuery||`${a.name} ${a.kind} ${a.tags.join(' ')}`.toLowerCase().includes(vaultQuery.toLowerCase())).length===0?<Empty label={vaultArchived?'NO ARCHIVED ASSETS':'VAULT IS EMPTY'} detail="Import files, paste a URL, or create something in Design Lab."/>:ws.assets.filter(a=>a.archived===vaultArchived).filter(a=>!vaultQuery||`${a.name} ${a.kind} ${a.tags.join(' ')}`.toLowerCase().includes(vaultQuery.toLowerCase())).map(a=><AssetCard key={a.id} asset={a} incidentName={ws.incidents.find(i=>i.id===a.incidentId)?.name} onPatch={changes=>patch(p=>({...p,assets:p.assets.map(x=>x.id===a.id?{...x,...changes,updatedAt:Date.now()}:x)}))} onDelete={()=>void deleteAsset(a)} onStudio={()=>setStudio(true)}/>)}</div></section>}
@@ -441,7 +443,7 @@ export default function ChaosDeck() {
       {view==='files' && <LocalFileExplorer/>}
       {view==='browser' && <XBrowser captureDepth={settings.browserCaptureDepth} onVault={vaultBrowserCapture}/>}
       {view==='settings' && <M6SettingsPanel settings={settings} onPatch={patchSettings} onReset={resetSettings}/>}
-      {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">WORKBENCH //</span><h1>BUILD THE INCIDENT.</h1><p>Code, run, preview and debug without dropping the project context. The active Incident owns this Workbench; the shared runtime keeps the project and terminal in the same environment.</p></div></div><SpatialSurface className="dev-spatial-shell" group="workbench-shell" fuse={false}><DeveloperWorkbench
+      {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">WORKBENCH //</span><h1>BUILD THE INCIDENT.</h1><p>Code, run, preview and debug without dropping the project context. Rearrange the cockpit, resize the working zones, or pick a focus view without changing the underlying project.</p></div></div><DeveloperWorkbench
   active
   projectId={chosen?.id}
   projectName={chosen?.name}
@@ -451,7 +453,8 @@ export default function ChaosDeck() {
   openSignals={chosen ? ws.signals.filter(signal => signal.incidentId === chosen.id && !signal.done).length : 0}
   taskCount={chosen ? ws.signals.filter(signal => signal.incidentId === chosen.id && signal.type === 'task' && !signal.done).length : 0}
   assetCount={chosen ? ws.assets.filter(asset => asset.incidentId === chosen.id && !asset.archived).length : 0}
-/></SpatialSurface></section>}
+  defaultPreset={settings.defaultWorkbenchPreset}
+/></section>}
     </main></SpatialRoomProvider>
 
     <div className="xf-hotwire"><Zap size={15}/><b>HOTWIRE</b><input value={capture} onChange={e=>setCapture(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCapture('spark')}} placeholder={chosen?`THROW A THOUGHT INTO ${chosen.name}...`:'THROW A THOUGHT INTO THE SYSTEM...'}/><button onClick={()=>addCapture('task')}>TASK</button><button onClick={()=>addCapture('note')}>NOTE</button><button onClick={()=>addCapture('link')}><Link2 size={11}/></button><button onClick={()=>addCapture('spark')}>BURN IT IN</button></div>

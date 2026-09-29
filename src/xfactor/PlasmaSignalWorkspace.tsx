@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import { Check, Pin, RotateCcw, Search, Sparkles, Trash2 } from 'lucide-react';
 import { Plasma, PlasmaProvider, type Offset } from '@cruxgarden/plasma-ui';
-import type { Incident, Signal, SignalType } from './domain';
+import type { Incident, Signal, SignalType, SpatialCluster } from './domain';
 import type { MatterMaterial, MatterSlot, PlasmaController, PlasmaLook, PlasmaPolicy } from './plasmaMode';
 import { beginMomentum, joinedAny, momentumTarget, sampleMomentum, type PointerMomentum } from './spatialPhysics';
+import SpatialOrganizer from './SpatialOrganizer';
 import './plasmaMode.css';
 
 interface PlasmaSignalWorkspaceProps {
@@ -15,6 +16,8 @@ interface PlasmaSignalWorkspaceProps {
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
   plasma: PlasmaController;
+  spatialClusters?: SpatialCluster[];
+  onBundle?: (a: string, b: string) => void;
 }
 
 type Layout = Record<string, Offset>;
@@ -73,8 +76,8 @@ function homeLayout(signals: Signal[]): Layout {
   const layout: Layout = {};
   signals.forEach((signal, index) => {
     layout[signal.id] = {
-      x: 18 + (index % 3) * 282,
-      y: 18 + Math.floor(index / 3) * 192,
+      x: 24 + (index % 3) * 350,
+      y: 24 + Math.floor(index / 3) * 240,
     };
   });
   return layout;
@@ -89,7 +92,8 @@ function loadLayout(mode: 'plasma' | 'matter', scopeId: string, signals: Signal[
   }
 }
 
-function signalMaterial(signal: Signal, plasma: PlasmaController): MatterMaterial {
+function signalMaterial(signal: Signal, plasma: PlasmaController, cluster?: SpatialCluster): MatterMaterial {
+  if (cluster) return cluster.matterMaterial;
   if (signal.type === 'task' && signal.done) return plasma.matterMap.doneTask;
   return plasma.matterMap[signal.type];
 }
@@ -99,14 +103,19 @@ function NormalSignalList({
   incidents,
   onUpdate,
   onDelete,
+  plasma,
+  clusters,
 }: {
   signals: Signal[];
   incidents: Incident[];
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
+  plasma: PlasmaController;
+  clusters: Map<string, SpatialCluster>;
 }) {
   if (!signals.length) return <div className="xf-empty plasma-empty"><Sparkles size={22}/><b>NO SIGNAL YET</b><p>Use Hotwire below. Capture anything before your brain talks you out of it.</p></div>;
-  return <div className="signal-full">{signals.map(signal => <article className={`signal-row signal-row-full ${signal.done ? 'done' : ''}`} key={signal.id}>
+  return <SpatialOrganizer items={signals} roomKey="m6:signal:normal" plasma={plasma} fuse={false} gap={52} width={370} height={156} columns={3} renderItem={signal => { const cluster=clusters.get(signal.id); return <article className={`signal-row signal-row-full m6-signal-card ${cluster?'xf-clustered ':''}${signal.done ? 'done' : ''}`} style={cluster?{'--cluster-color':cluster.color} as React.CSSProperties:undefined} key={signal.id}>
+    {cluster&&<span className="xf-cluster-tag">{cluster.name}</span>}
     <button onClick={() => onUpdate(signal.id, { done: !signal.done })}>{signal.done ? <Check size={14}/> : <span className={`sig-dot ${signal.type}`}/>}</button>
     <div className="signal-body">
       <small>{signal.type.toUpperCase()} · {relative(signal.createdAt)} AGO</small>
@@ -122,23 +131,25 @@ function NormalSignalList({
     </div>
     <button className={signal.pinned ? 'active-icon' : ''} onClick={() => onUpdate(signal.id, { pinned: !signal.pinned })}><Pin size={13}/></button>
     <button onClick={() => onDelete(signal)}><Trash2 size={13}/></button>
-  </article>)}</div>;
+  </article>; }}/>
 }
 
 function SignalSurfaceContent({
   signal,
   incidents,
   material,
+  cluster,
   onUpdate,
   onDelete,
 }: {
   signal: Signal;
   incidents: Incident[];
   material?: MatterMaterial;
+  cluster?: SpatialCluster;
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
 }) {
-  return <div className={`xf-plasma-note-inner ${material ? `matter-inner material-${material}` : ''}`}>
+  return <div className={`xf-plasma-note-inner ${material ? `matter-inner material-${material}` : ''}`} style={cluster?{'--cluster-color':cluster.color} as React.CSSProperties:undefined}>{cluster&&<span className="xf-cluster-tag">{cluster.name}</span>}
     <div className="xf-plasma-note-head"><span>{signal.type.toUpperCase()} · {relative(signal.createdAt)} AGO{material ? ` · ${material.toUpperCase()}` : ''}</span><button data-plasma-nodrag className={signal.pinned ? 'active' : ''} onClick={() => onUpdate(signal.id, { pinned: !signal.pinned })}><Pin size={12}/></button></div>
     <textarea data-plasma-nodrag value={signal.text} onChange={event => onUpdate(signal.id, { text: event.target.value })}/>
     <div className="xf-plasma-note-route" data-plasma-nodrag>
@@ -160,6 +171,8 @@ function LiquidBoard({
   onLayout,
   onUpdate,
   onDelete,
+  clusters,
+  onBundle,
 }: {
   signals: Signal[];
   incidents: Incident[];
@@ -171,6 +184,8 @@ function LiquidBoard({
   onLayout: (id: string, next: Offset) => void;
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
+  clusters: Map<string, SpatialCluster>;
+  onBundle?: (a: string, b: string) => void;
 }) {
   const momentum = useRef(new Map<string, PointerMomentum>());
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
@@ -183,6 +198,14 @@ function LiquidBoard({
     const target = momentumTarget(next, momentum.current.get(id), rect, { width: 258, height: 170 });
     momentum.current.delete(id);
     onLayout(id, target);
+    if(onBundle){
+      const center={x:target.x+129,y:target.y+85};
+      const other=signals.filter(signal=>signal.id!==id).map(signal=>{
+        const p=layout[signal.id]??homeLayout(signals)[signal.id];
+        return {id:signal.id,distance:Math.hypot(center.x-(p.x+129),center.y-(p.y+85))};
+      }).filter(hit=>hit.distance<330).sort((a,b)=>a.distance-b.distance)[0];
+      if(other)onBundle(id,other.id);
+    }
   };
 
   return <PlasmaProvider
@@ -220,6 +243,7 @@ function LiquidBoard({
     {signals.map((signal, index) => {
       const fallback = homeLayout(signals)[signal.id] ?? { x: 18 + (index % 3) * 282, y: 18 + Math.floor(index / 3) * 192 };
       const offset = layout[signal.id] ?? fallback;
+      const cluster = clusters.get(signal.id);
       return <Plasma
         key={signal.id}
         className={`xf-plasma-note type-${signal.type} ${signal.done ? 'done' : ''} ${joinedIds.has(signal.id) ? 'is-fused' : ''}`}
@@ -233,7 +257,7 @@ function LiquidBoard({
         onPointerMoveCapture={event => rememberPointer(signal.id, event)}
         onDragEnd={next => settle(signal.id, next)}
         onJoinChange={joined => setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; })}
-        tint={typeTint[plasma.look][signal.type]}
+        tint={cluster?.color ?? typeTint[plasma.look][signal.type]}
         opacity={signal.done ? 0.38 : 0.64}
         frost={signal.type === 'note' ? Math.min(0.24, plasma.frost * 0.2 + 0.03) : Math.max(0.02, plasma.frost * 0.14)}
         elevation={signal.pinned ? 0.82 : 0.56}
@@ -241,7 +265,7 @@ function LiquidBoard({
         padding={16}
         style={{ width: 258, height: 170, position: 'absolute', left: 0, top: 0 }}
       >
-        <SignalSurfaceContent signal={signal} incidents={incidents} onUpdate={onUpdate} onDelete={onDelete}/>
+        <SignalSurfaceContent signal={signal} incidents={incidents} cluster={cluster} onUpdate={onUpdate} onDelete={onDelete}/>
       </Plasma>;
     })}
   </PlasmaProvider>;
@@ -258,6 +282,7 @@ function MatterBoard({
   onLayout,
   onUpdate,
   onDelete,
+  clusters,
 }: {
   signals: Signal[];
   incidents: Incident[];
@@ -269,6 +294,7 @@ function MatterBoard({
   onLayout: (id: string, next: Offset) => void;
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
+  clusters: Map<string, SpatialCluster>;
 }) {
   const momentum = useRef(new Map<string, PointerMomentum>());
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
@@ -286,7 +312,7 @@ function MatterBoard({
   const grouped = useMemo(() => {
     const map = new Map<MatterMaterial, Signal[]>();
     signals.forEach(signal => {
-      const material = signalMaterial(signal, plasma);
+      const material = signalMaterial(signal, plasma, clusters.get(signal.id));
       const current = map.get(material) ?? [];
       current.push(signal);
       map.set(material, current);
@@ -344,6 +370,7 @@ function MatterBoard({
       >
         {materialSignals.map(signal => {
           const offset = layout[signal.id] ?? { x: 18, y: 18 };
+          const cluster = clusters.get(signal.id);
           return <Plasma
             key={signal.id}
             className={`xf-plasma-note xf-matter-note material-${material} type-${signal.type} ${signal.done ? 'done' : ''} ${joinedIds.has(signal.id) ? 'is-fused' : ''}`}
@@ -357,7 +384,7 @@ function MatterBoard({
             onPointerMoveCapture={event => rememberPointer(signal.id, event)}
             onDragEnd={next => settle(signal.id, next)}
             onJoinChange={joined => setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; })}
-            tint={typeTint[plasma.look][signal.type]}
+            tint={cluster?.color ?? typeTint[plasma.look][signal.type]}
             opacity={signal.done ? 0.38 : material === 'metal' ? 0.86 : material === 'stone' ? 0.9 : material === 'wood' ? 0.82 : material === 'crystal' ? 0.52 : material === 'cloud' ? 0.48 : 0.64}
             frost={material === 'crystal' ? Math.min(0.28, plasma.frost * 0.32 + 0.03) : material === 'plasma' ? Math.min(0.18, plasma.frost * 0.22) : 0}
             elevation={signal.pinned ? 0.74 : material === 'cloud' ? 0.12 : 0.42}
@@ -365,7 +392,7 @@ function MatterBoard({
             padding={16}
             style={{ width: 258, height: 170, position: 'absolute', left: 0, top: 0 }}
           >
-            <SignalSurfaceContent signal={signal} incidents={incidents} material={material} onUpdate={onUpdate} onDelete={onDelete}/>
+            <SignalSurfaceContent signal={signal} incidents={incidents} material={material} cluster={cluster} onUpdate={onUpdate} onDelete={onDelete}/>
           </Plasma>;
         })}
       </PlasmaProvider>;
@@ -382,11 +409,14 @@ export default function PlasmaSignalWorkspace({
   onUpdate,
   onDelete,
   plasma,
+  spatialClusters = [],
+  onBundle,
 }: PlasmaSignalWorkspaceProps) {
   const stage = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<Layout>({});
   const [scope, setScope] = useState<'incident' | 'all'>(selectedIncidentId ? 'incident' : 'all');
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 700px)').matches);
+  const clusterMap = useMemo(() => { const map=new Map<string,SpatialCluster>(); spatialClusters.filter(cluster=>cluster.kind==='signal').forEach(cluster=>cluster.memberIds.forEach(id=>map.set(id,cluster))); return map; }, [spatialClusters]);
 
   const filtered = useMemo(() => signals.filter(signal => {
     if (query && !`${signal.text} ${signal.type}`.toLowerCase().includes(query.toLowerCase())) return false;
@@ -442,7 +472,7 @@ export default function PlasmaSignalWorkspace({
       {plasma.active && <><button className={scope === 'incident' ? 'active' : ''} disabled={!selectedIncidentId} onClick={() => setScope('incident')}>CURRENT INCIDENT</button><button className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>ALL SIGNALS</button></>}
     </div>
 
-    {plasma.mode === 'normal' ? <NormalSignalList signals={filtered} incidents={incidents} onUpdate={onUpdate} onDelete={onDelete}/> : <>
+    {plasma.mode === 'normal' ? <NormalSignalList signals={filtered} incidents={incidents} onUpdate={onUpdate} onDelete={onDelete} plasma={plasma} clusters={clusterMap}/> : <>
       <div className={`plasma-controls ${plasma.mode === 'matter' ? 'matter-controls' : ''}`}>
         <div className="plasma-control-group"><span>KEEP IT ON //</span>{(['session', '30m', 'remember'] as PlasmaPolicy[]).map(policy => <button key={policy} className={plasma.policy === policy ? 'active' : ''} onClick={() => plasma.setPolicy(policy)}>{policy === 'session' ? 'THIS SESSION' : policy === '30m' ? '30 MIN' : 'UNTIL OFF'}</button>)}</div>
         <div className="plasma-control-group"><span>LOOK //</span>{(['neon-x', 'pink-riot', 'afterglow'] as PlasmaLook[]).map(look => <button key={look} className={plasma.look === look ? 'active' : ''} onClick={() => plasma.setLook(look)}>{look === 'neon-x' ? 'NEON X' : look === 'pink-riot' ? 'PINK RIOT' : 'AFTERGLOW'}</button>)}</div>
@@ -459,7 +489,7 @@ export default function PlasmaSignalWorkspace({
 
       <div ref={stage} className={`xf-plasma-stage ${plasma.mode === 'matter' ? 'xf-matter-stage' : ''}`}>
         <div className="xf-plasma-hint">{plasma.mode === 'matter' ? 'LIKE MATTER FUSES // UNLIKE MATTER STAYS DISTINCT // ALL OF IT STILL SNAPS TO THE GRID' : 'DRAG UNTIL THEY TOUCH // PROXIMITY IS TEMPORARY ORGANIZATION'}</div>
-        {plasma.mode === 'plasma' ? <LiquidBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete}/> : <MatterBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete}/>} 
+        {plasma.mode === 'plasma' ? <LiquidBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete} clusters={clusterMap} onBundle={onBundle}/> : <MatterBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete} clusters={clusterMap}/>} 
         {filtered.length > visibleSignals.length && <div className="xf-plasma-overflow">SHOWING {visibleSignals.length} OF {filtered.length} // FILTER TO REDUCE GPU LOAD</div>}
       </div>
     </>}

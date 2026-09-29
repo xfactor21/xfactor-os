@@ -32,6 +32,9 @@ import VideoTrimmer from './tools/VideoTrimmer';
 import PdfMarkup from './tools/PdfMarkup';
 import PrintLayout from './tools/PrintLayout';
 import ModelViewer from './tools/ModelViewer';
+import SpatialOrganizer from '../../xfactor/SpatialOrganizer';
+import { SpatialRoomProvider } from '../../xfactor/TrueSpatial';
+import type { PlasmaController } from '../../xfactor/plasmaMode';
 
 interface ModeMeta {
   label: string;
@@ -77,6 +80,11 @@ const UTILITY_ORDER: StudioMode[] = [
 ];
 
 const LEGACY_KEY = 'xos-studio-v1';
+const BOARD_FOLDER_KEY='xfactor-studio-folders-v1';
+type BoardFolder={id:string;name:string;color:string;memberIds:string[];createdAt:number;updatedAt:number};
+const BOARD_FOLDER_COLORS=['#ff2aa3','#20d9ff','#9b5cff','#68f0ae','#ff9f43'];
+function loadBoardFolders():BoardFolder[]{try{return JSON.parse(localStorage.getItem(BOARD_FOLDER_KEY)||'[]') as BoardFolder[]}catch{return []}}
+function saveBoardFolders(folders:BoardFolder[]){try{localStorage.setItem(BOARD_FOLDER_KEY,JSON.stringify(folders))}catch{/* presentation metadata only */}}
 let seedBoardId: string | null = null;
 
 function seedFromLegacyIfNeeded(): StudioBoard[] {
@@ -94,7 +102,7 @@ function seedFromLegacyIfNeeded(): StudioBoard[] {
   return loadBoards();
 }
 
-export default function Studio({ active }: { active: boolean }) {
+export default function Studio({ active, plasma }: { active: boolean; plasma?: PlasmaController }) {
   const [boards, setBoards] = useState<StudioBoard[]>(seedFromLegacyIfNeeded);
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -103,11 +111,38 @@ export default function Studio({ active }: { active: boolean }) {
   const [newMode, setNewMode] = useState<StudioMode>('draw');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameVal, setRenameVal] = useState('');
+  const [folders,setFolders]=useState<BoardFolder[]>(loadBoardFolders);
 
   const openBoard = boards.find((board) => board.id === openId) || null;
 
   function refresh() {
     setBoards(loadBoards());
+    setFolders(loadBoardFolders());
+  }
+
+  function folderFor(boardId:string){return folders.find(folder=>folder.memberIds.includes(boardId));}
+  function bundleBoards(a:string,b:string){
+    if(a===b)return;
+    setFolders(current=>{
+      const left=current.find(folder=>folder.memberIds.includes(a));
+      const right=current.find(folder=>folder.memberIds.includes(b));
+      const now=Date.now();
+      let next=current;
+      if(left&&right&&left.id===right.id)return current;
+      if(left&&right){
+        const merged={...left,memberIds:[...new Set([...left.memberIds,...right.memberIds])],updatedAt:now};
+        next=current.filter(folder=>folder.id!==right.id).map(folder=>folder.id===left.id?merged:folder);
+      }else if(left||right){
+        const existing=(left||right)!;
+        next=current.map(folder=>folder.id===existing.id?{...existing,memberIds:[...new Set([...existing.memberIds,a,b])],updatedAt:now}:folder);
+      }else{
+        const id=crypto.randomUUID();
+        const folder:BoardFolder={id,name:'LAB FOLDER '+String(current.length+1).padStart(2,'0'),color:BOARD_FOLDER_COLORS[current.length%BOARD_FOLDER_COLORS.length],memberIds:[a,b],createdAt:now,updatedAt:now};
+        next=[folder,...current];
+      }
+      saveBoardFolders(next);
+      return next;
+    });
   }
 
   function openBoardById(id: string) {
@@ -168,42 +203,10 @@ export default function Studio({ active }: { active: boolean }) {
         <h2 className="rh" style={{ paddingLeft: 4 }}><Icon name="designStudio" size={18} /> xFACTOR DESIGN LAB</h2>
         <div className="rsub" style={{ paddingLeft: 4 }}>A BOARD PER PROJECT · PICK A MODE LIKE PICKING A FILE TYPE · EVERYTHING FEEDS THE CORE</div>
 
-        <div id="dpBoardGrid">
-          <div className="dpBoardCard dpNew" onClick={() => setCreating(true)}>
-            <div className="dpNewPlus"><Icon name="plus" size={22} /></div>
-            <div>NEW BOARD</div>
-          </div>
-          {boards.map((board) => (
-            <div key={board.id} className="dpBoardCard" onClick={() => openBoardById(board.id)}>
-              <button className="dpBoardDel" onClick={(event) => handleDelete(board.id, event)} title="delete board"><Icon name="trash" size={12} /></button>
-              <div className="dpBoardIcon"><Icon name={MODE_META[board.mode].icon} size={20} /></div>
-              {renamingId === board.id ? (
-                <input
-                  autoFocus
-                  className="dpBoardRename"
-                  value={renameVal}
-                  onChange={(event) => setRenameVal(event.target.value)}
-                  onClick={(event) => event.stopPropagation()}
-                  onBlur={() => commitRename(board.id)}
-                  onKeyDown={(event) => event.key === 'Enter' && commitRename(board.id)}
-                />
-              ) : (
-                <div
-                  className="dpBoardName"
-                  onDoubleClick={(event) => {
-                    event.stopPropagation();
-                    setRenamingId(board.id);
-                    setRenameVal(board.name);
-                  }}
-                >
-                  {board.name}
-                </div>
-              )}
-              <div className="dpBoardMode">{MODE_META[board.mode].label}</div>
-              <div className="dpBoardUpdated">{timeAgo(board.updatedAt)}</div>
-            </div>
-          ))}
-        </div>
+        <div className="m6-lab-toolbar"><button className="wbtn" onClick={() => setCreating(true)}><Icon name="plus" size={16}/> NEW BOARD</button><span>{boards.length} PROJECTS · DRAG TO ORGANIZE{plasma?.mode==='plasma'?' · FUSE TO MAKE A FOLDER':''}</span></div>
+        {boards.length===0?<div id="dpBoardGrid"><div className="dpBoardCard dpNew" onClick={() => setCreating(true)}><div className="dpNewPlus"><Icon name="plus" size={22} /></div><div>NEW BOARD</div></div></div>:plasma?
+          <SpatialRoomProvider plasma={plasma} room="lab"><SpatialOrganizer items={boards} roomKey="m6:design-lab" plasma={plasma} width={230} height={150} gap={72} columns={4} onBundle={bundleBoards} renderItem={board=>{const folder=folderFor(board.id);return <div className={"dpBoardCard m6-lab-card "+(folder?"xf-clustered":"")} style={folder?{"--cluster-color":folder.color} as React.CSSProperties:undefined} onClick={() => openBoardById(board.id)}>{folder&&<span className="xf-cluster-tag">{folder.name}</span>}<button className="dpBoardDel" onClick={(event) => handleDelete(board.id, event)} title="delete board"><Icon name="trash" size={12} /></button><div className="dpBoardIcon"><Icon name={MODE_META[board.mode].icon} size={20} /></div>{renamingId===board.id?<input autoFocus className="dpBoardRename" value={renameVal} onChange={event=>setRenameVal(event.target.value)} onClick={event=>event.stopPropagation()} onBlur={()=>commitRename(board.id)} onKeyDown={event=>event.key==='Enter'&&commitRename(board.id)}/>:<div className="dpBoardName" onDoubleClick={event=>{event.stopPropagation();setRenamingId(board.id);setRenameVal(board.name)}}>{board.name}</div>}<div className="dpBoardMode">{MODE_META[board.mode].label}</div><div className="dpBoardUpdated">{timeAgo(board.updatedAt)}</div></div>}}/></SpatialRoomProvider>
+          :<div id="dpBoardGrid">{boards.map(board=><div key={board.id} className="dpBoardCard" onClick={()=>openBoardById(board.id)}><button className="dpBoardDel" onClick={event=>handleDelete(board.id,event)} title="delete board"><Icon name="trash" size={12}/></button><div className="dpBoardIcon"><Icon name={MODE_META[board.mode].icon} size={20}/></div><div className="dpBoardName">{board.name}</div><div className="dpBoardMode">{MODE_META[board.mode].label}</div><div className="dpBoardUpdated">{timeAgo(board.updatedAt)}</div></div>)}</div>}
 
         {creating && (
           <div className="dpModal" onClick={() => setCreating(false)}>
