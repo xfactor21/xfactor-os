@@ -1,4 +1,4 @@
-import type { ActivityEvent, Asset, AssetSource, Incident, IncidentPriority, IncidentStatus, Pile, Position, SavedLayout, Signal, SignalType, WorkspaceState } from './domain';
+import type { ActivityEvent, Asset, AssetSource, Incident, IncidentPriority, IncidentStatus, Pile, Position, SavedLayout, Signal, SignalType, SpatialEntityKind, SpatialGroup, WorkspaceState } from './domain';
 
 export const WORKSPACE_STORAGE_KEY = 'xfactor-os-workspace-v2';
 const KEY = WORKSPACE_STORAGE_KEY;
@@ -29,6 +29,7 @@ export function freshWorkspace(): WorkspaceState {
     activity:[],
     positions:{},
     savedLayouts:[],
+    spatialGroups:[],
     selectedIncidentId:undefined,
   };
 }
@@ -132,6 +133,27 @@ function normalizeLayout(value: unknown): SavedLayout | null {
   return { id:value.id, name:text(value.name,'SAVED LAYOUT').slice(0,240), positions, createdAt:finite(value.createdAt,now()) };
 }
 
+function normalizeSpatialGroup(value: unknown): SpatialGroup | null {
+  if (!isRecord(value) || typeof value.id !== 'string' || !value.id) return null;
+  const kinds: SpatialEntityKind[] = ['incident','pile','signal','asset','activity','studio'];
+  const entityKind = kinds.includes(value.entityKind as SpatialEntityKind) ? value.entityKind as SpatialEntityKind : 'incident';
+  const createdAt = finite(value.createdAt, now());
+  const material = isMaterialName(value.material) ? value.material : undefined;
+  return {
+    id:value.id,
+    name:text(value.name,'AUTO BUNDLE').slice(0,160),
+    entityKind,
+    memberIds:[...new Set(stringArray(value.memberIds))].slice(0,300),
+    color:text(value.color,'#ff2aa3').slice(0,32),
+    material,
+    createdAt,
+    updatedAt:finite(value.updatedAt,createdAt),
+  };
+}
+function isMaterialName(value: unknown): value is NonNullable<SpatialGroup['material']> {
+  return value === 'plasma' || value === 'crystal' || value === 'metal' || value === 'wood' || value === 'stone' || value === 'cloud';
+}
+
 /** Return the newest meaningful timestamp represented by the workspace.
  * The explicit workspace clock covers mutations such as pile collapse or floor movement
  * that do not naturally update an entity timestamp. Legacy schema-v2 payloads still
@@ -145,6 +167,7 @@ export function workspaceClock(state: WorkspaceState): number {
     ...state.assets.flatMap(item => [item.createdAt, item.updatedAt]),
     ...state.activity.map(item => item.createdAt),
     ...state.savedLayouts.map(item => item.createdAt),
+    ...state.spatialGroups.flatMap(item => [item.createdAt,item.updatedAt]),
   );
 }
 
@@ -163,6 +186,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
   if (isRecord(value.positions)) for (const [id,pos] of Object.entries(value.positions)) if (incidentIds.has(id)) { const clean=normalizePosition(pos); if(clean) positions[id]=clean; }
   const separatedPositions = separateIdenticalPositions(cleanIncidents,positions);
   const savedLayouts = (Array.isArray(value.savedLayouts) ? value.savedLayouts : []).map(normalizeLayout).filter((v): v is SavedLayout => Boolean(v));
+  const spatialGroups = (Array.isArray(value.spatialGroups) ? value.spatialGroups : []).map(normalizeSpatialGroup).filter((v): v is SpatialGroup => Boolean(v));
   const updatedAt = Math.max(
     0, finite(value.updatedAt, 0),
     ...cleanIncidents.flatMap(item => [item.createdAt, item.updatedAt]),
@@ -171,6 +195,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
     ...assets.flatMap(item => [item.createdAt, item.updatedAt]),
     ...activity.map(item => item.createdAt),
     ...savedLayouts.map(item => item.createdAt),
+    ...spatialGroups.flatMap(item => [item.createdAt,item.updatedAt]),
   );
   return {
     schemaVersion:2,
@@ -182,6 +207,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
     activity:activity.slice(0,5000),
     positions:separatedPositions,
     savedLayouts:savedLayouts.slice(0,50),
+    spatialGroups:spatialGroups.slice(0,200),
     selectedIncidentId:typeof value.selectedIncidentId === 'string' && incidentIds.has(value.selectedIncidentId) ? value.selectedIncidentId : undefined,
   };
 }
@@ -247,3 +273,4 @@ export function newPile(name='NEW PILE'): Pile { return {id:uid(),name,stamp:'CO
 export function newSignal(textValue:string,type:SignalType='spark',incidentId?:string): Signal { const ts=now(); return {id:uid(),text:textValue,type,incidentId,pinned:false,done:false,createdAt:ts,updatedAt:ts}; }
 export function newAsset(name:string, kind:Asset['kind']='other', uri?:string, incidentId?:string, source:AssetSource='reference'): Asset { const ts=now(); return {id:uid(),name,kind,source,uri,incidentId,tags:[],favorite:false,archived:false,createdAt:ts,updatedAt:ts}; }
 export function newLayout(name:string, positions:Record<string,Position>): SavedLayout { return {id:uid(),name,positions:typeof structuredClone === 'function' ? structuredClone(positions) : JSON.parse(JSON.stringify(positions)) as Record<string,Position>,createdAt:now()}; }
+export function newSpatialGroup(entityKind:SpatialEntityKind, memberIds:string[], name='AUTO BUNDLE', color='#ff2aa3'): SpatialGroup { const ts=now(); return {id:uid(),name,entityKind,memberIds:[...new Set(memberIds)],color,createdAt:ts,updatedAt:ts}; }
