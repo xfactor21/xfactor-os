@@ -232,11 +232,13 @@ function LiquidBoard({
     grain={0.12}
     grid={24}
     magnet={72}
-    quality={compact ? 0.74 : 1.08}
+    quality={compact ? 0.7 : 0.92}
     maxSurfaces={compact ? 7 : 16}
     pointerDrop={false}
     pointerPull
     ambientDrops={false}
+    formIn={false}
+    formOut={false}
     ground="clear"
     zIndex={18}
   >
@@ -360,11 +362,13 @@ function MatterBoard({
         grain={material === 'stone' || material === 'wood' ? 0.62 : 0.16}
         grid={24}
         magnet={48}
-        quality={compact ? 0.56 : 0.9}
+        quality={compact ? 0.52 : 0.82}
         maxSurfaces={Math.max(1, Math.min(materialSignals.length, compact ? 5 : 10))}
         pointerDrop={false}
         pointerPull
         ambientDrops={false}
+        formIn={false}
+        formOut={false}
         ground="clear"
         zIndex={18}
       >
