@@ -13,6 +13,9 @@ import {
   TerminalSquare,
   Trash2,
   X,
+  ArrowLeftRight,
+  Columns3,
+  PanelBottom,
 } from 'lucide-react';
 import CodeEditor, { type EditorLanguage } from '../design-system/CodeEditor';
 import TerminalRoom from '../modules/terminal';
@@ -42,6 +45,7 @@ import {
   unbindLocalProject,
   type LocalProjectBinding,
 } from './localProjectBindings';
+import { SpatialSurface } from './TrueSpatial';
 import './workbench.css';
 
 type WorkbenchFile = { path: string; content: string };
@@ -49,6 +53,7 @@ type LocalBuffer = { content: string; savedContent: string };
 type DevStatus = 'idle' | 'booting' | 'installing' | 'starting' | 'running' | 'error';
 type WorkspaceMode = 'sandbox' | 'local';
 type DockView = 'terminal' | 'problems' | 'git' | 'search';
+type WorkbenchLayoutPreset = 'balanced' | 'code' | 'preview' | 'terminal';
 
 const STARTER_FILES: WorkbenchFile[] = [
   {
@@ -207,6 +212,7 @@ export default function DeveloperWorkbench({
   openSignals = 0,
   taskCount = 0,
   assetCount = 0,
+  defaultLayout = 'balanced',
 }: {
   active: boolean;
   projectId?: string;
@@ -217,6 +223,7 @@ export default function DeveloperWorkbench({
   openSignals?: number;
   taskCount?: number;
   assetCount?: number;
+  defaultLayout?: WorkbenchLayoutPreset;
 }) {
   const key = storageKey(projectId);
   const [sandboxFiles, setSandboxFiles] = useState<WorkbenchFile[]>(() => loadFiles(key));
@@ -240,7 +247,13 @@ export default function DeveloperWorkbench({
   const [searchBusy, setSearchBusy] = useState(false);
   const [searchMeta, setSearchMeta] = useState('');
   const [dockView, setDockView] = useState<DockView>('terminal');
+  const [layoutPreset, setLayoutPreset] = useState<WorkbenchLayoutPreset>(defaultLayout);
+  const [explorerWidth, setExplorerWidth] = useState(220);
+  const [previewWidth, setPreviewWidth] = useState(380);
+  const [dockHeight, setDockHeight] = useState(250);
+  const [previewFirst, setPreviewFirst] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const layoutKey = `xfactor-workbench-layout-v2:${projectId || 'scratch'}`;
   const wcRef = useRef<Awaited<ReturnType<typeof getWebContainer>> | null>(null);
   const mountedKeyRef = useRef<string | undefined>(undefined);
   const devProcessRef = useRef<{ kill(): void } | null>(null);
@@ -302,6 +315,45 @@ export default function DeveloperWorkbench({
     serverOffRef.current?.();
     devProcessRef.current?.kill();
   }, []);
+
+  useEffect(() => {
+    try {
+      const stored=JSON.parse(localStorage.getItem(layoutKey)||'null') as {explorerWidth?:number;previewWidth?:number;dockHeight?:number;previewFirst?:boolean;layoutPreset?:WorkbenchLayoutPreset}|null;
+      if(stored){
+        if(typeof stored.explorerWidth==='number')setExplorerWidth(Math.max(150,Math.min(420,stored.explorerWidth)));
+        if(typeof stored.previewWidth==='number')setPreviewWidth(Math.max(240,Math.min(760,stored.previewWidth)));
+        if(typeof stored.dockHeight==='number')setDockHeight(Math.max(180,Math.min(520,stored.dockHeight)));
+        setPreviewFirst(Boolean(stored.previewFirst));
+        if(stored.layoutPreset)setLayoutPreset(stored.layoutPreset);
+      }else applyLayout(defaultLayout,false);
+    }catch{applyLayout(defaultLayout,false);}
+  },[layoutKey]);
+
+  useEffect(() => {
+    try{localStorage.setItem(layoutKey,JSON.stringify({explorerWidth,previewWidth,dockHeight,previewFirst,layoutPreset}))}catch{/* device-local */}
+  },[layoutKey,explorerWidth,previewWidth,dockHeight,previewFirst,layoutPreset]);
+
+  function applyLayout(preset:WorkbenchLayoutPreset,persist=true){
+    setLayoutPreset(preset);
+    if(preset==='balanced'){setExplorerWidth(220);setPreviewWidth(380);setDockHeight(250);}
+    if(preset==='code'){setExplorerWidth(180);setPreviewWidth(270);setDockHeight(200);setDockView('problems');}
+    if(preset==='preview'){setExplorerWidth(180);setPreviewWidth(620);setDockHeight(200);}
+    if(preset==='terminal'){setExplorerWidth(190);setPreviewWidth(300);setDockHeight(430);setDockView('terminal');}
+    if(!persist)return;
+  }
+
+  function beginResize(kind:'explorer'|'preview'|'dock',event:React.PointerEvent){
+    event.preventDefault();
+    const startX=event.clientX,startY=event.clientY;
+    const startExplorer=explorerWidth,startPreview=previewWidth,startDock=dockHeight;
+    const move=(pointer:PointerEvent)=>{
+      if(kind==='explorer')setExplorerWidth(Math.max(150,Math.min(420,startExplorer+(pointer.clientX-startX))));
+      if(kind==='preview')setPreviewWidth(Math.max(240,Math.min(760,startPreview-(pointer.clientX-startX))));
+      if(kind==='dock')setDockHeight(Math.max(180,Math.min(520,startDock-(pointer.clientY-startY))));
+    };
+    const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);};
+    window.addEventListener('pointermove',move);window.addEventListener('pointerup',end,{once:true});
+  }
 
   useEffect(() => {
     if (!active) return;
@@ -746,6 +798,11 @@ export default function DeveloperWorkbench({
           {previewUrl && <button onClick={() => window.open(previewUrl, '_blank', 'noopener,noreferrer')}><ExternalLink size={13}/> OPEN LIVE</button>}
         </div>
         <div className="dev-cockpit-jump">
+          <div className="dev-layout-presets" title="Workbench layout presets">
+            <Columns3 size={12}/>
+            {(['balanced','code','preview','terminal'] as WorkbenchLayoutPreset[]).map(preset=><button key={preset} className={layoutPreset===preset?'active':''} onClick={()=>applyLayout(preset)}>{preset.toUpperCase()}</button>)}
+            <button className={previewFirst?'active':''} onClick={()=>setPreviewFirst(value=>!value)}><ArrowLeftRight size={11}/> FLIP</button>
+          </div>
           <button onClick={() => setDockView('terminal')}><TerminalSquare size={12}/> TERMINAL</button>
           <button onClick={() => setDockView('problems')}><AlertTriangle size={12}/> PROBLEMS {problems.length ? `· ${problems.length}` : ''}</button>
           <button onClick={() => setDockView('git')}>GIT</button>
@@ -759,8 +816,8 @@ export default function DeveloperWorkbench({
         <button onClick={() => void bindFolder()}>REBIND FOLDER</button>
       </div>}
 
-      <div className="dev-workbench-grid">
-        <aside className="dev-explorer">
+      <div className={`dev-workbench-grid ${previewFirst?'preview-first':''}`} style={{'--dev-explorer-w':`${explorerWidth}px`,'--dev-preview-w':`${previewWidth}px`} as React.CSSProperties}>
+        <SpatialSurface as="aside" className="dev-explorer" group="workbench-panels" fuse={false}>
           <div className="dev-pane-title"><FolderOpen size={13}/> {mode === 'local' ? binding?.name ?? 'LOCAL PROJECT' : 'PROJECT'}<span>{projectFileCount}</span></div>
           {mode === 'local' ? (
             projectScan ? <ProjectTree
@@ -790,9 +847,9 @@ export default function DeveloperWorkbench({
               ? <>{projectScan?.fileCount ?? 0} FILES · {projectScan?.directoryCount ?? 0} DIRS<br/>DISK IS AUTHORITATIVE{projectScan?.truncated ? <><br/>TREE TRUNCATED FOR SAFETY</> : null}</>
               : <>INCIDENT SANDBOX<br/>AUTO-SAVED LOCALLY<br/>NODE ROOT: /workspace</>}
           </div>
-        </aside>
-
-        <section className="dev-code-pane">
+        </SpatialSurface>
+        <button className="dev-resize-handle vertical explorer" aria-label="Resize explorer" onPointerDown={event=>beginResize('explorer',event)}/>
+        <SpatialSurface as="section" className="dev-code-pane" group="workbench-panels" fuse={false}>
           <div className="dev-tabs">
             {tabs.map((tab) => {
               const dirty = mode === 'local' && Boolean(localBuffers[tab] && localBuffers[tab].content !== localBuffers[tab].savedContent);
@@ -811,9 +868,9 @@ export default function DeveloperWorkbench({
               onChange={updateActive}
             />
           </> : <div className="dev-no-file">{mode === 'local' ? 'OPEN A TEXT FILE FROM THE PROJECT TREE' : 'CREATE OR OPEN A FILE'}</div>}
-        </section>
-
-        <section className="dev-preview-pane">
+        </SpatialSurface>
+        <button className="dev-resize-handle vertical preview" aria-label="Resize preview" onPointerDown={event=>beginResize('preview',event)}/>
+        <SpatialSurface as="section" className="dev-preview-pane" group="workbench-panels" fuse={false}>
           <div className="dev-pane-title"><Play size={13}/> {previewUrl ? 'LIVE DEV SERVER' : mode === 'local' ? 'PROJECT PREVIEW' : 'STATIC PREVIEW'}<span>{previewUrl ? 'LIVE' : 'IDLE'}</span></div>
           {mode === 'local' && !previewUrl
             ? <div className="dev-local-preview-empty"><b>YOUR APP RUNS HERE.</b><p>Hit RUN PROJECT. xFactor.OS mirrors the approved project into its shared runtime, launches the detected package script, and keeps the preview beside the code.</p><small>LIKELY SECRET FILES STAY OUT OF THE MIRROR BY DEFAULT.</small></div>
@@ -825,10 +882,11 @@ export default function DeveloperWorkbench({
             />}
           {devError && <div className="dev-error">{devError}</div>}
           {logs.length > 0 && <pre className="dev-process-log">{logs.join('').slice(-7000)}</pre>}
-        </section>
+        </SpatialSurface>
       </div>
 
-      <section className="dev-cockpit-dock">
+      <button className="dev-resize-handle horizontal" aria-label="Resize tool dock" onPointerDown={event=>beginResize('dock',event)}><PanelBottom size={11}/></button>
+      <SpatialSurface as="section" className="dev-cockpit-dock" group="workbench-panels" fuse={false} style={{height:dockHeight}}>
         <div className="dev-dock-tabs">
           <button className={dockView === 'terminal' ? 'active' : ''} onClick={() => setDockView('terminal')}><TerminalSquare size={12}/> TERMINAL</button>
           <button className={dockView === 'problems' ? 'active' : ''} onClick={() => setDockView('problems')}><AlertTriangle size={12}/> PROBLEMS <i>{problems.length}</i></button>
@@ -854,7 +912,7 @@ export default function DeveloperWorkbench({
             {searchHits.length > 0 ? <div className="dev-search-results">{searchHits.slice(0, 80).map((hit, index) => <button key={`${hit.path}:${hit.line}:${hit.column}:${index}`} onClick={() => openFile(hit.path)}><b>{hit.path}</b><span>{hit.line}:{hit.column}</span><p>{hit.preview}</p></button>)}</div> : <div className="dev-dock-empty">SEARCH FILE CONTENT ACROSS THE BOUND PROJECT. LIKELY SECRET FILES ARE SKIPPED BY DEFAULT.</div>}
           </> : <div className="dev-dock-empty"><b>PROJECT SEARCH NEEDS A REAL PROJECT.</b><span>Bind a desktop folder and search the actual codebase from here.</span>{isTauri() && projectId && <button onClick={() => void bindFolder()}><FolderOpen size={12}/> OPEN REAL PROJECT</button>}</div>}
         </div>}
-      </section>
+      </SpatialSurface>
     </section>
   );
 }
