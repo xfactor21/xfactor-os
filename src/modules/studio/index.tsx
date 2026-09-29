@@ -32,6 +32,9 @@ import VideoTrimmer from './tools/VideoTrimmer';
 import PdfMarkup from './tools/PdfMarkup';
 import PrintLayout from './tools/PrintLayout';
 import ModelViewer from './tools/ModelViewer';
+import { SpatialRoomProvider, SpatialSurface } from '../../xfactor/TrueSpatial';
+import GlobalSpatialToggle from '../../xfactor/GlobalSpatialToggle';
+import type { PlasmaController } from '../../xfactor/plasmaMode';
 
 interface ModeMeta {
   label: string;
@@ -94,7 +97,7 @@ function seedFromLegacyIfNeeded(): StudioBoard[] {
   return loadBoards();
 }
 
-export default function Studio({ active }: { active: boolean }) {
+export default function Studio({ active, plasma, onBundle, bundleLabel }: { active: boolean; plasma?: PlasmaController; onBundle?:(firstId:string,secondId:string)=>void; bundleLabel?:(id:string)=>{name:string;color:string}|undefined }) {
   const [boards, setBoards] = useState<StudioBoard[]>(seedFromLegacyIfNeeded);
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -168,13 +171,14 @@ export default function Studio({ active }: { active: boolean }) {
         <h2 className="rh" style={{ paddingLeft: 4 }}><Icon name="designStudio" size={18} /> xFACTOR DESIGN LAB</h2>
         <div className="rsub" style={{ paddingLeft: 4 }}>A BOARD PER PROJECT · PICK A MODE LIKE PICKING A FILE TYPE · EVERYTHING FEEDS THE CORE</div>
 
-        <div id="dpBoardGrid">
+        {plasma && <div className="studio-spatial-switch"><span>ORGANIZE BOARDS //</span><GlobalSpatialToggle plasma={plasma}/></div>}
+        {plasma ? <SpatialRoomProvider plasma={plasma} room="studio"><div id="dpBoardGrid" className={plasma.active?'studio-spatial-grid':''}>
           <div className="dpBoardCard dpNew" onClick={() => setCreating(true)}>
             <div className="dpNewPlus"><Icon name="plus" size={22} /></div>
             <div>NEW BOARD</div>
           </div>
           {boards.map((board) => (
-            <div key={board.id} className="dpBoardCard" onClick={() => openBoardById(board.id)}>
+            <SpatialSurface as="div" key={board.id} className="dpBoardCard" group="studio-boards" spatialId={board.id} spatialDraggable={plasma.active} onSpatialJoin={other=>onBundle?.(board.id,other)} onClick={() => openBoardById(board.id)}>{bundleLabel?.(board.id)&&<span className="studio-bundle-badge" style={{'--bundle-color':bundleLabel(board.id)!.color} as React.CSSProperties}>{bundleLabel(board.id)!.name}</span>}
               <button className="dpBoardDel" onClick={(event) => handleDelete(board.id, event)} title="delete board"><Icon name="trash" size={12} /></button>
               <div className="dpBoardIcon"><Icon name={MODE_META[board.mode].icon} size={20} /></div>
               {renamingId === board.id ? (
@@ -201,9 +205,14 @@ export default function Studio({ active }: { active: boolean }) {
               )}
               <div className="dpBoardMode">{MODE_META[board.mode].label}</div>
               <div className="dpBoardUpdated">{timeAgo(board.updatedAt)}</div>
-            </div>
+            </SpatialSurface>
           ))}
-        </div>
+        </div></SpatialRoomProvider> : <div id="dpBoardGrid">
+          <div className="dpBoardCard dpNew" onClick={() => setCreating(true)}>
+            <div className="dpNewPlus"><Icon name="plus" size={22} /></div><div>NEW BOARD</div>
+          </div>
+          {boards.map((board)=><div key={board.id} className="dpBoardCard" onClick={()=>openBoardById(board.id)}><div className="dpBoardIcon"><Icon name={MODE_META[board.mode].icon} size={20}/></div><div className="dpBoardName">{board.name}</div><div className="dpBoardMode">{MODE_META[board.mode].label}</div><div className="dpBoardUpdated">{timeAgo(board.updatedAt)}</div></div>)}
+        </div>}
 
         {creating && (
           <div className="dpModal" onClick={() => setCreating(false)}>
