@@ -17,6 +17,7 @@ export interface PlasmaAppearance {
 export interface PlasmaController extends PlasmaAppearance {
   active: boolean;
   mode: SpatialMode;
+  switching: boolean;
   policy: PlasmaPolicy;
   scopeId: string;
   activate: (policy?: PlasmaPolicy, mode?: Exclude<SpatialMode, 'normal'>) => void;
@@ -117,6 +118,7 @@ export function usePlasmaMode(incidentId?: string): PlasmaController {
   const scopeId = safeScope(incidentId);
   const [activation, setActivation] = useState(() => readActivation(scopeId));
   const [appearance, setAppearance] = useState<PlasmaAppearance>(readAppearance);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     setActivation(readActivation(scopeId));
@@ -139,36 +141,55 @@ export function usePlasmaMode(incidentId?: string): PlasmaController {
     return () => window.clearTimeout(timer);
   }, [activation.mode, activation.policy, scopeId]);
 
+  const beginVisualSwitch = useCallback((commit:()=>void) => {
+    setSwitching(true);
+    try { document.documentElement.classList.add('xf-spatial-switching'); } catch { /* SSR/test */ }
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      commit();
+      // If renderer registration blocks the main thread, this timeout fires only after it settles,
+      // keeping the transition curtain up instead of exposing the intermediate geometry scramble.
+      window.setTimeout(() => {
+        setSwitching(false);
+        try { document.documentElement.classList.remove('xf-spatial-switching'); } catch { /* enhancement */ }
+      }, 520);
+    }));
+  }, []);
+
   const activate = useCallback((requestedPolicy?: PlasmaPolicy, requestedMode?: Exclude<SpatialMode, 'normal'>) => {
     const policy = requestedPolicy ?? activation.policy;
     const mode = requestedMode ?? (activation.mode === 'normal' ? 'plasma' : activation.mode);
-    try {
-      localStorage.removeItem(REMEMBER_PREFIX + scopeId);
-      localStorage.removeItem(LEGACY_REMEMBER_PREFIX + scopeId);
-      sessionStorage.removeItem(SESSION_PREFIX + scopeId);
-      sessionStorage.removeItem(LEGACY_SESSION_PREFIX + scopeId);
-      if (policy === 'remember') {
-        localStorage.setItem(REMEMBER_PREFIX + scopeId, JSON.stringify({ mode }));
-      } else {
-        sessionStorage.setItem(SESSION_PREFIX + scopeId, JSON.stringify({
-          mode,
-          policy,
-          expiresAt: policy === '30m' ? Date.now() + 30 * 60 * 1000 : undefined,
-        }));
-      }
-    } catch { /* in-memory mode still works */ }
-    setActivation({ mode, policy });
-  }, [activation.mode, activation.policy, scopeId]);
+    const commit = () => {
+      try {
+        localStorage.removeItem(REMEMBER_PREFIX + scopeId);
+        localStorage.removeItem(LEGACY_REMEMBER_PREFIX + scopeId);
+        sessionStorage.removeItem(SESSION_PREFIX + scopeId);
+        sessionStorage.removeItem(LEGACY_SESSION_PREFIX + scopeId);
+        if (policy === 'remember') {
+          localStorage.setItem(REMEMBER_PREFIX + scopeId, JSON.stringify({ mode }));
+        } else {
+          sessionStorage.setItem(SESSION_PREFIX + scopeId, JSON.stringify({
+            mode,
+            policy,
+            expiresAt: policy === '30m' ? Date.now() + 30 * 60 * 1000 : undefined,
+          }));
+        }
+      } catch { /* in-memory mode still works */ }
+      setActivation({ mode, policy });
+    };
+    beginVisualSwitch(commit);
+  }, [activation.mode, activation.policy, scopeId, beginVisualSwitch]);
 
   const deactivate = useCallback(() => {
-    try {
-      localStorage.removeItem(REMEMBER_PREFIX + scopeId);
-      localStorage.removeItem(LEGACY_REMEMBER_PREFIX + scopeId);
-      sessionStorage.removeItem(SESSION_PREFIX + scopeId);
-      sessionStorage.removeItem(LEGACY_SESSION_PREFIX + scopeId);
-    } catch { /* in-memory mode still works */ }
-    setActivation(current => ({ mode: 'normal', policy: current.policy }));
-  }, [scopeId]);
+    beginVisualSwitch(() => {
+      try {
+        localStorage.removeItem(REMEMBER_PREFIX + scopeId);
+        localStorage.removeItem(LEGACY_REMEMBER_PREFIX + scopeId);
+        sessionStorage.removeItem(SESSION_PREFIX + scopeId);
+        sessionStorage.removeItem(LEGACY_SESSION_PREFIX + scopeId);
+      } catch { /* in-memory mode still works */ }
+      setActivation(current => ({ mode: 'normal', policy: current.policy }));
+    });
+  }, [scopeId, beginVisualSwitch]);
 
   const setMode = useCallback((mode: SpatialMode) => {
     if (mode === 'normal') { deactivate(); return; }
@@ -192,6 +213,7 @@ export function usePlasmaMode(incidentId?: string): PlasmaController {
   return useMemo(() => ({
     active: activation.mode !== 'normal',
     mode: activation.mode,
+    switching,
     policy: activation.policy,
     scopeId,
     look: appearance.look,
