@@ -30,13 +30,13 @@ export function momentumTarget(
   momentum: PointerMomentum | undefined,
   bounds: DOMRect | undefined,
   surface: { width: number; height: number },
-  strength = 320,
+  strength = 430,
 ): Offset {
   if (!momentum) return settled;
   const speed = Math.hypot(momentum.vx, momentum.vy);
-  if (speed < 0.1) return settled;
+  if (speed < 0.07) return settled;
 
-  const multiplier = Math.min(strength, 96 + speed * 108);
+  const multiplier = Math.min(strength, 122 + speed * 148);
   let x = settled.x + momentum.vx * multiplier;
   let y = settled.y + momentum.vy * multiplier;
 

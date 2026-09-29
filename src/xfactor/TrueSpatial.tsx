@@ -49,24 +49,27 @@ export function SpatialRoomProvider({
       theme="dark"
       material={material}
       tint={tintFor(plasma)}
-      opacity={matter ? 0.72 : 0.64}
-      frost={matter ? (material === 'crystal' ? 0.24 : 0.04) : 0.05}
-      blend={matter ? 28 : Math.max(48, plasma.blend)}
-      viscosity={matter ? 0.42 : 0.12}
-      stretch={matter ? 0.55 : 2.8}
-      flow={matter ? 0.12 : 0.72}
-      tension={matter ? 0.08 : 0.22}
-      refraction={matter ? 1.28 : 1.7}
-      dispersion={matter ? 1.16 : 1.52}
+      background={matter ? '#05070a' : '#07020a'}
+      opacity={matter ? 0.84 : 0.86}
+      frost={matter ? (material === 'crystal' ? 0.2 : 0.02) : 0.015}
+      blend={matter ? 34 : Math.max(78, plasma.blend)}
+      viscosity={matter ? 0.38 : 0.065}
+      stretch={matter ? 0.72 : 4.35}
+      flow={matter ? 0.18 : 1.18}
+      tension={matter ? 0.1 : 0.36}
+      refraction={matter ? 1.42 : 2.08}
+      dispersion={matter ? 1.28 : 1.86}
       rimColor="iridescent"
-      rimWidth={matter ? 1.15 : 2.1}
-      highlight={matter ? 1.25 : 1.7}
-      edgeLine={matter ? 0.8 : 1.2}
-      shimmer={matter ? 0.55 : 1.65}
-      shimmerSpeed={matter ? 0.8 : 1.35}
-      glow={matter ? 1.05 : 1.75}
-      wash={matter ? 0.7 : 0.86}
-      grain={0.14}
+      rimWidth={matter ? 0.9 : 0.82}
+      highlight={matter ? 1.38 : 1.95}
+      edgeLine={matter ? 0.62 : 0.34}
+      shimmer={matter ? 0.72 : 2.15}
+      shimmerSpeed={matter ? 0.95 : 1.55}
+      glow={matter ? 1.22 : 2.2}
+      wash={matter ? 0.82 : 1.08}
+      grain={0.08}
+      formIn
+      formSpeed={1.5}
       grid={24}
       magnet={matter ? 42 : 62}
       quality={1}
@@ -113,11 +116,13 @@ export function SpatialSurface({
     className={classes}
     fuse={fuse ?? true}
     group={group}
-    lean={mode === 'plasma' ? 14 : 5}
-    radius={radius ?? (mode === 'plasma' ? 26 : 10)}
+    lean={mode === 'plasma' ? 18 : 6}
+    radius={radius ?? (mode === 'plasma' ? 30 : 10)}
     padding={0}
     tint={tint}
-    elevation={elevation ?? (mode === 'plasma' ? 0.52 : 0.42)}
+    opacity={mode === 'plasma' ? 0.9 : undefined}
+    frost={mode === 'plasma' ? 0.01 : undefined}
+    elevation={elevation ?? (mode === 'plasma' ? 0.58 : 0.46)}
     {...rest}
   >
     {children}

@@ -76,3 +76,29 @@
   filter:brightness(1.06);
 }
 
+
+/* M6 TRUE BODY — keep legacy DOM content readable while the WebGL material supplies the card body. */
+.xf-root.xf-plasma-mode .xf-true-spatial,
+.xf-root.xf-matter-mode .xf-true-spatial{
+  isolation:isolate;
+}
+.xf-root.xf-plasma-mode .xf-true-spatial>*,
+.xf-root.xf-matter-mode .xf-true-spatial>*{
+  position:relative;
+  z-index:1;
+}
+.xf-root.xf-plasma-mode .xf-true-spatial{
+  background:rgba(0,0,0,0)!important;
+  border-color:rgba(255,255,255,.012)!important;
+  box-shadow:none!important;
+}
+.xf-root.xf-plasma-mode .xf-true-spatial:hover{
+  filter:saturate(1.32) brightness(1.1);
+}
+.xf-root.xf-plasma-mode .xf-floor{
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px),
+    linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px),
+    radial-gradient(circle at 70% 30%,rgba(255,0,127,.04),transparent 34%),
+    rgba(2,2,5,.08)!important;
+}

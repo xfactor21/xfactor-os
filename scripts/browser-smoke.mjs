@@ -148,6 +148,22 @@ await check('Signal Plasma mode is reversible and data-safe', async () => {
   const signalCanvasZ = await signalCanvas.evaluate((node) => getComputedStyle(node).zIndex);
   if (signalCanvasZ !== '18') throw new Error('Signal Plasma canvas is still behind the board');
   await page.locator('.xf-plasma-note.is-fused').first().waitFor({ timeout: 8000 });
+
+  // M6 physical drag acceptance: the Plasma surface must actually travel and settle.
+  const physical = page.locator('.xf-plasma-note').first();
+  const before = await physical.boundingBox();
+  if (!before) throw new Error('M6 Plasma surface has no drag geometry');
+  await page.mouse.move(before.x + before.width / 2, before.y + 28);
+  await page.mouse.down();
+  await page.mouse.move(before.x + before.width / 2 + 110, before.y + 72, { steps: 8 });
+  const dragging = await physical.getAttribute('data-plasma-dragging');
+  if (dragging !== 'true') throw new Error('M6 Plasma surface did not enter physical drag state');
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  const after = await physical.boundingBox();
+  if (!after || Math.hypot(after.x - before.x, after.y - before.y) < 40) throw new Error('M6 Plasma surface did not travel after drag');
+  console.log('PASS: M6 physical drag settles to a new position');
+
   await plasmaEditor.fill(originalText + ' // PLASMA SAFE');
   await page.getByRole('button', { name: 'NORMAL' }).click();
   await page.getByText("DON'T ORGANIZE IT YET.").waitFor();

@@ -47,3 +47,37 @@
   background:rgba(5,4,10,.035)!important;
 }
 
+
+/* M6 LIQUID BODY — reduce outline dominance and expose the actual WebGL body. */
+.xf-root.xf-plasma-mode .xf-plasma-note-inner{
+  background:linear-gradient(145deg,rgba(3,2,7,.024),rgba(5,3,9,.006))!important;
+  border-color:rgba(255,255,255,.018)!important;
+  box-shadow:none!important;
+}
+.xf-root.xf-plasma-mode .xf-plasma-note[data-plasma-dragging] .xf-plasma-note-inner{
+  background:rgba(3,2,7,.004)!important;
+}
+.xf-root.xf-plasma-mode .xf-plasma-note.is-fused .xf-plasma-note-inner{
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+}
+.xf-root.xf-plasma-mode .xf-plasma-note-route select,
+.xf-root.xf-plasma-mode .xf-plasma-note-foot button{
+  background:rgba(3,3,8,.16)!important;
+  border-color:rgba(255,255,255,.035)!important;
+}
+.xf-root.xf-plasma-mode .xf-plasma-note textarea{
+  text-shadow:0 1px 2px #000,0 0 12px rgba(255,255,255,.08);
+}
+.xf-root.xf-plasma-mode .xf-plasma-stage{
+  background:
+    radial-gradient(circle at 18% 12%,rgba(255,42,163,.065),transparent 38%),
+    radial-gradient(circle at 82% 16%,rgba(32,217,255,.045),transparent 34%),
+    rgba(2,2,5,.08)!important;
+}
+.xf-root.xf-matter-mode .xf-plasma-note-inner{
+  background:rgba(3,3,7,.045)!important;
+  border-color:rgba(255,255,255,.035)!important;
+  box-shadow:none!important;
+}
