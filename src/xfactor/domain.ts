@@ -6,6 +6,21 @@ export type AssetSource = 'reference' | 'file' | 'studio';
 
 export interface Position { x: number; y: number; rotation: number; }
 
+export type SpatialEntityKind = 'incident' | 'signal' | 'pile' | 'asset' | 'studio';
+export type SpatialMaterial = 'plasma' | 'crystal' | 'metal' | 'wood' | 'stone' | 'cloud';
+
+export interface SpatialCluster {
+  id: string;
+  kind: SpatialEntityKind;
+  name: string;
+  color: string;
+  matterMaterial: SpatialMaterial;
+  memberIds: string[];
+  pileId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Incident {
   id: string;
   name: string;
@@ -88,5 +103,6 @@ export interface WorkspaceState {
   activity: ActivityEvent[];
   positions: Record<string, Position>;
   savedLayouts: SavedLayout[];
+  spatialClusters: SpatialCluster[];
   selectedIncidentId?: string;
 }

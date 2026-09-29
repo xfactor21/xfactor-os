@@ -6,7 +6,7 @@ export type SpatialRoom = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'term
 
 type MaterialName = 'plasma' | 'crystal' | 'metal' | 'wood' | 'stone' | 'cloud';
 
-const ROOM_MATERIAL: Record<Exclude<SpatialRoom, 'signal'>, MaterialName> = {
+const ROOM_MATERIAL: Record<Exclude<SpatialRoom, 'signal' | 'files' | 'browser' | 'settings'>, MaterialName> = {
   deck: 'metal',
   piles: 'stone',
   vault: 'crystal',

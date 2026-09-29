@@ -1,4 +1,4 @@
-import type { ActivityEvent, Asset, AssetSource, Incident, IncidentPriority, IncidentStatus, Pile, Position, SavedLayout, Signal, SignalType, WorkspaceState } from './domain';
+import type { ActivityEvent, Asset, AssetSource, Incident, IncidentPriority, IncidentStatus, Pile, Position, SavedLayout, Signal, SignalType, SpatialCluster, SpatialEntityKind, SpatialMaterial, WorkspaceState } from './domain';
 
 export const WORKSPACE_STORAGE_KEY = 'xfactor-os-workspace-v2';
 const KEY = WORKSPACE_STORAGE_KEY;
@@ -29,6 +29,7 @@ export function freshWorkspace(): WorkspaceState {
     activity:[],
     positions:{},
     savedLayouts:[],
+    spatialClusters:[],
     selectedIncidentId:undefined,
   };
 }
@@ -94,6 +95,28 @@ function normalizeActivity(value: unknown): ActivityEvent | null {
   return { id:value.id, type:text(value.type,'event').slice(0,100), label:text(value.label,'Activity').slice(0,1000), incidentId:typeof value.incidentId === 'string' ? value.incidentId : undefined, createdAt:finite(value.createdAt,now()) };
 }
 
+const spatialKinds:SpatialEntityKind[]=['incident','signal','pile','asset','studio'];
+const spatialMaterials:SpatialMaterial[]=['plasma','crystal','metal','wood','stone','cloud'];
+function normalizeSpatialCluster(value:unknown):SpatialCluster|null{
+  if(!isRecord(value)||typeof value.id!=='string'||!value.id)return null;
+  const kind=spatialKinds.includes(value.kind as SpatialEntityKind)?value.kind as SpatialEntityKind:'incident';
+  const material=spatialMaterials.includes(value.matterMaterial as SpatialMaterial)?value.matterMaterial as SpatialMaterial:'plasma';
+  const createdAt=finite(value.createdAt,now());
+  const memberIds=[...new Set(stringArray(value.memberIds))].slice(0,200);
+  if(memberIds.length<2)return null;
+  return {
+    id:value.id,
+    kind,
+    name:text(value.name,'BUNDLE').slice(0,240),
+    color:text(value.color,'#ff2aa3').slice(0,32),
+    matterMaterial:material,
+    memberIds,
+    pileId:typeof value.pileId==='string'?value.pileId:undefined,
+    createdAt,
+    updatedAt:finite(value.updatedAt,createdAt),
+  };
+}
+
 function normalizePosition(value: unknown): Position | null {
   if (!isRecord(value)) return null;
   return { x:Math.max(0,Math.min(100,finite(value.x,20))), y:Math.max(0,Math.min(100,finite(value.y,20))), rotation:Math.max(-180,Math.min(180,finite(value.rotation,0))) };
@@ -145,6 +168,7 @@ export function workspaceClock(state: WorkspaceState): number {
     ...state.assets.flatMap(item => [item.createdAt, item.updatedAt]),
     ...state.activity.map(item => item.createdAt),
     ...state.savedLayouts.map(item => item.createdAt),
+    ...(state.spatialClusters ?? []).flatMap(item => [item.createdAt,item.updatedAt]),
   );
 }
 
@@ -163,6 +187,17 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
   if (isRecord(value.positions)) for (const [id,pos] of Object.entries(value.positions)) if (incidentIds.has(id)) { const clean=normalizePosition(pos); if(clean) positions[id]=clean; }
   const separatedPositions = separateIdenticalPositions(cleanIncidents,positions);
   const savedLayouts = (Array.isArray(value.savedLayouts) ? value.savedLayouts : []).map(normalizeLayout).filter((v): v is SavedLayout => Boolean(v));
+  const validSpatialIds:Record<SpatialEntityKind,Set<string>>={
+    incident:new Set(cleanIncidents.map(item=>item.id)),
+    signal:new Set(signals.map(item=>item.id)),
+    pile:new Set(piles.map(item=>item.id)),
+    asset:new Set(assets.map(item=>item.id)),
+    studio:new Set(assets.filter(item=>item.source==='studio').map(item=>item.uri?.replace(/^studio:\/\//,'')||'').filter(Boolean)),
+  };
+  const spatialClusters=(Array.isArray(value.spatialClusters)?value.spatialClusters:[])
+    .map(normalizeSpatialCluster).filter((v):v is SpatialCluster=>Boolean(v))
+    .map(cluster=>({...cluster,memberIds:cluster.memberIds.filter(id=>validSpatialIds[cluster.kind].has(id)),pileId:cluster.pileId&&pileIds.has(cluster.pileId)?cluster.pileId:undefined}))
+    .filter(cluster=>cluster.memberIds.length>=2);
   const updatedAt = Math.max(
     0, finite(value.updatedAt, 0),
     ...cleanIncidents.flatMap(item => [item.createdAt, item.updatedAt]),
@@ -171,6 +206,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
     ...assets.flatMap(item => [item.createdAt, item.updatedAt]),
     ...activity.map(item => item.createdAt),
     ...savedLayouts.map(item => item.createdAt),
+    ...spatialClusters.flatMap(item => [item.createdAt,item.updatedAt]),
   );
   return {
     schemaVersion:2,
@@ -182,6 +218,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
     activity:activity.slice(0,5000),
     positions:separatedPositions,
     savedLayouts:savedLayouts.slice(0,50),
+    spatialClusters:spatialClusters.slice(0,200),
     selectedIncidentId:typeof value.selectedIncidentId === 'string' && incidentIds.has(value.selectedIncidentId) ? value.selectedIncidentId : undefined,
   };
 }
