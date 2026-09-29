@@ -190,7 +190,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
   const savedLayouts = (Array.isArray(value.savedLayouts) ? value.savedLayouts : []).map(normalizeLayout).filter((v): v is SavedLayout => Boolean(v));
   const spatialBundles = (Array.isArray(value.spatialBundles) ? value.spatialBundles : []).map(normalizeSpatialBundle).filter((v): v is SpatialBundle => Boolean(v)).map(bundle => ({
     ...bundle,
-    members: bundle.members.filter(member => member.kind === 'incident' ? incidentIds.has(member.id) : member.kind === 'signal' ? signals.some(signal => signal.id === member.id) : assets.some(asset => asset.id === member.id)),
+    members: bundle.members.filter(member => member.kind === 'incident' ? incidentIds.has(member.id) : member.kind === 'signal' ? signals.some(signal => signal.id === member.id) : member.kind === 'asset' ? assets.some(asset => asset.id === member.id) : true),
     pileId: bundle.pileId && pileIds.has(bundle.pileId) ? bundle.pileId : undefined,
   })).filter(bundle => bundle.members.length >= 2);
   const updatedAt = Math.max(
