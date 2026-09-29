@@ -321,7 +321,7 @@ export default function ChaosDeck() {
     {label:'Backup workspace',hint:'EXPORT',icon:Download},{label:'Restore workspace',hint:'IMPORT',icon:Upload},
   ].filter(c=>c.label.toLowerCase().includes(paletteQuery.toLowerCase()));
 
-  if (studio) return <div className="xf-studio-shell"><button className="xf-studio-exit" onClick={()=>setStudio(false)}><X size={15}/> EXIT LAB</button><Studio active /></div>;
+  if (studio) return <div className={`xf-studio-shell ${plasma.mode==='plasma'?'xf-plasma-mode':plasma.mode==='matter'?'xf-matter-mode':''}`}><button className="xf-studio-exit" onClick={()=>setStudio(false)}><X size={15}/> EXIT LAB</button><Studio active plasma={plasma} onBundle={(firstId,secondId)=>linkBundle('studio',firstId,secondId)} bundleLabel={id=>bundleBadge(ws,'studio',id)}/></div>;
 
   return <div className={`xf-root ${plasma.mode === 'plasma' ? `xf-plasma-mode plasma-${plasma.look}` : plasma.mode === 'matter' ? `xf-matter-mode matter-${plasma.look}` : ''}`}>
     <div className="xf-noise"/><div className="xf-scan"/>
