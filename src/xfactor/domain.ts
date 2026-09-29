@@ -3,6 +3,19 @@ export type IncidentPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type SignalType = 'spark' | 'task' | 'note' | 'link';
 export type AssetKind = 'image' | 'audio' | 'video' | 'document' | 'code' | 'link' | 'studio' | 'other';
 export type AssetSource = 'reference' | 'file' | 'studio';
+export type SpatialEntityKind = 'incident' | 'signal' | 'asset' | 'studio';
+
+export interface SpatialMember { kind: SpatialEntityKind; id: string; }
+export interface SpatialBundle {
+  id: string;
+  name: string;
+  color: string;
+  material: 'plasma' | 'crystal' | 'metal' | 'wood' | 'stone' | 'cloud';
+  members: SpatialMember[];
+  pileId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
 
 export interface Position { x: number; y: number; rotation: number; }
 
@@ -88,5 +101,6 @@ export interface WorkspaceState {
   activity: ActivityEvent[];
   positions: Record<string, Position>;
   savedLayouts: SavedLayout[];
+  spatialBundles: SpatialBundle[];
   selectedIncidentId?: string;
 }
