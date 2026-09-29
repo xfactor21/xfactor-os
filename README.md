@@ -4,7 +4,9 @@
 
 xFactor.OS is a local-first controlled-chaos operating workspace for builders, creators, developers, and people whose real work refuses to fit inside a tidy dashboard.
 
-## What 0.5.0 actually contains
+## What 0.8.0 actually contains
+
+0.8.0 is the **Organized Disorganization / M6** milestone. In addition to the established Incident/Floor/Signal/Vault/Design Lab system, it adds a persistent spatial-organization model, true movable Plasma rooms, Plasma fusion that survives as bundles/Piles when returning to Normal, an adaptive resizable Workbench, the experimental local xFiles explorer, isolated xBrowser research/capture tooling, larger/readable shell controls, Settings, and a command-palette FAB.
 
 The product entry path now includes a persistent spatial Floor, editable Incidents, overlapping Piles, Signal/Hotwire capture and routing, a full Blackbox Incident workbench, bidirectional Incident relations, Tape history, a Black Vault with real IndexedDB-backed local file ingestion/previews plus URL references, JSON workspace backup/restore, the Command Deck, optional Supabase account/sync UI, the inherited 25-tool Design Lab with Vault metadata integration, and the inherited Node/Python/Ruby/PHP/Go Terminal.
 
@@ -37,7 +39,7 @@ VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
 
-Apply `supabase/migrations/20260815_xfactor_workspace.sql` before live testing. Binary Vault file blobs remain local to the device in 0.5.0; links, file metadata, Studio documents, Incidents, Signal, Piles, layouts, and Tape metadata are in the workspace envelope.
+Apply `supabase/migrations/20260815_xfactor_workspace.sql` before live testing. Binary Vault file blobs remain local to the device in 0.8.0; links, file metadata, Studio documents, Incidents, Signal, Piles, layouts, and Tape metadata are in the workspace envelope.
 
 ## Desktop
 
