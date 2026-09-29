@@ -1,12 +1,12 @@
-import { createContext, createElement, useContext, type ElementType, type HTMLAttributes, type ReactNode } from 'react';
+import { createContext, createElement, useContext, useState, type ElementType, type HTMLAttributes, type ReactNode } from 'react';
 import { Plasma, PlasmaProvider, type Offset } from '@cruxgarden/plasma-ui';
 import type { PlasmaController, SpatialMode } from './plasmaMode';
 
-export type SpatialRoom = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'terminal' | 'files' | 'browser' | 'settings';
+export type SpatialRoom = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'terminal';
 
 type MaterialName = 'plasma' | 'crystal' | 'metal' | 'wood' | 'stone' | 'cloud';
 
-const ROOM_MATERIAL: Partial<Record<SpatialRoom, MaterialName>> = {
+const ROOM_MATERIAL: Record<Exclude<SpatialRoom, 'signal'>, MaterialName> = {
   deck: 'metal',
   piles: 'stone',
   vault: 'crystal',
@@ -14,8 +14,13 @@ const ROOM_MATERIAL: Partial<Record<SpatialRoom, MaterialName>> = {
   terminal: 'metal',
 };
 
-const ROOM_BLEND: Partial<Record<SpatialRoom, number>> = { deck: 30, piles: 10, vault: 16, tape: 8, terminal: 10 };
-const NON_SPATIAL = new Set<SpatialRoom>(['signal','files','browser','settings']);
+const ROOM_BLEND: Record<Exclude<SpatialRoom, 'signal'>, number> = {
+  deck: 20,
+  piles: 11,
+  vault: 14,
+  tape: 9,
+  terminal: 7,
+};
 
 const PlasmaSurface = Plasma as any;
 
@@ -25,6 +30,29 @@ function tintFor(plasma: PlasmaController) {
   if (plasma.look === 'afterglow') return '#8b5cf6';
   if (plasma.look === 'pink-riot') return '#ff238d';
   return '#ff2aa3';
+}
+
+function offsetKey(room: SpatialRoom, mode: SpatialMode, id: string) {
+  return `xfactor-spatial-offset-v1:${room}:${mode}:${id}`;
+}
+function readOffset(room: SpatialRoom, mode: SpatialMode, id?: string): Offset {
+  if (!id || mode === 'normal') return {x:0,y:0};
+  try {
+    const raw=localStorage.getItem(offsetKey(room,mode,id));
+    if (!raw) return {x:0,y:0};
+    const value=JSON.parse(raw) as Offset;
+    return Number.isFinite(value.x)&&Number.isFinite(value.y)?value:{x:0,y:0};
+  } catch { return {x:0,y:0}; }
+}
+function nearestSpatialNeighbor(room: SpatialRoom, id: string, source: HTMLElement): string | undefined {
+  const own=source.getBoundingClientRect();
+  const cx=own.left+own.width/2, cy=own.top+own.height/2;
+  const candidates=[...document.querySelectorAll<HTMLElement>(`[data-spatial-room="${room}"][data-spatial-id]`)]
+    .filter(node=>node.dataset.spatialId && node.dataset.spatialId!==id);
+  return candidates.map(node=>{
+    const rect=node.getBoundingClientRect();
+    return {id:node.dataset.spatialId!,distance:Math.hypot((rect.left+rect.width/2)-cx,(rect.top+rect.height/2)-cy)};
+  }).sort((a,b)=>a.distance-b.distance)[0]?.id;
 }
 
 export function SpatialRoomProvider({
@@ -38,13 +66,13 @@ export function SpatialRoomProvider({
 }) {
   const value = { mode: plasma.mode, room };
 
-  if (plasma.mode === 'normal' || NON_SPATIAL.has(room)) {
+  if (plasma.mode === 'normal' || room === 'signal') {
     return <SpatialContext.Provider value={value}>{children}</SpatialContext.Provider>;
   }
 
-  const material: MaterialName = plasma.mode === 'matter' ? (ROOM_MATERIAL[room] ?? 'metal') : 'plasma';
+  const material: MaterialName = plasma.mode === 'matter' ? ROOM_MATERIAL[room] : 'plasma';
   const matter = plasma.mode === 'matter';
-  const roomBlend = ROOM_BLEND[room] ?? 12;
+  const blend = matter ? Math.max(5, ROOM_BLEND[room]-3) : ROOM_BLEND[room];
 
   return <SpatialContext.Provider value={value}>
     <PlasmaProvider
@@ -52,37 +80,35 @@ export function SpatialRoomProvider({
       theme="dark"
       material={material}
       tint={tintFor(plasma)}
-      background={matter ? '#05070a' : '#07020a'}
-      opacity={matter ? 0.84 : 0.86}
-      frost={matter ? (material === 'crystal' ? 0.2 : 0.02) : 0.015}
-      blend={matter ? Math.max(6, roomBlend - 2) : roomBlend}
-      viscosity={matter ? 0.38 : 0.065}
-      stretch={matter ? 0.72 : 4.35}
-      flow={matter ? 0.18 : 1.18}
-      tension={matter ? 0.1 : 0.36}
-      refraction={matter ? 1.42 : 2.08}
-      dispersion={matter ? 1.28 : 1.86}
+      opacity={matter ? 0.72 : 0.7}
+      frost={matter ? (material === 'crystal' ? 0.2 : 0.03) : 0.035}
+      blend={blend}
+      viscosity={matter ? 0.42 : 0.1}
+      stretch={matter ? 0.5 : 3.1}
+      flow={matter ? 0.1 : 0.84}
+      tension={matter ? 0.08 : 0.28}
+      refraction={matter ? 1.28 : 1.78}
+      dispersion={matter ? 1.16 : 1.58}
       rimColor="iridescent"
-      rimWidth={matter ? 0.9 : 0.82}
-      highlight={matter ? 1.38 : 1.95}
-      edgeLine={matter ? 0.62 : 0.34}
-      shimmer={matter ? 0.72 : 2.15}
-      shimmerSpeed={matter ? 0.95 : 1.55}
-      glow={matter ? 1.22 : 2.2}
-      wash={matter ? 0.82 : 1.08}
-      grain={0.08}
-      formIn={false}
-      formOut={false}
-      formSpeed={2}
+      rimWidth={matter ? 1.15 : 2.15}
+      highlight={matter ? 1.25 : 1.8}
+      edgeLine={matter ? 0.8 : 1.25}
+      shimmer={matter ? 0.55 : 1.72}
+      shimmerSpeed={matter ? 0.8 : 1.42}
+      glow={matter ? 1.05 : 1.8}
+      wash={matter ? 0.7 : 0.9}
+      grain={0.1}
       grid={24}
-      magnet={matter ? 24 : 28}
+      magnet={matter ? 24 : 30}
       quality={1}
-      maxSurfaces={room === 'tape' ? 36 : 24}
+      maxSurfaces={20}
       pointerDrop={false}
       pointerPull
       ambientDrops={false}
       ground="clear"
-      zIndex={18}
+      zIndex={8}
+      formIn={false}
+      formOut={false}
     >
       {children}
     </PlasmaProvider>
@@ -99,11 +125,10 @@ export function SpatialSurface({
   tint,
   elevation,
   spatialId,
-  spatialDraggable,
+  spatialDraggable = false,
   onSpatialJoin,
-  onSpatialDragEnd,
   ...rest
-}: Omit<HTMLAttributes<HTMLElement>, 'onDragEnd'> & {
+}: HTMLAttributes<HTMLElement> & {
   as?: ElementType;
   children?: ReactNode;
   fuse?: boolean;
@@ -113,10 +138,10 @@ export function SpatialSurface({
   elevation?: number;
   spatialId?: string;
   spatialDraggable?: boolean;
-  onSpatialJoin?: (id: string, joined: boolean, group?: string) => void;
-  onSpatialDragEnd?: (id: string, offset: Offset) => void;
+  onSpatialJoin?: (otherId: string) => void;
 }) {
-  const { mode } = useContext(SpatialContext);
+  const { mode, room } = useContext(SpatialContext);
+  const [offset,setOffset]=useState<Offset>(()=>readOffset(room,mode,spatialId));
   const classes = ['xf-true-spatial', className].filter(Boolean).join(' ');
 
   if (mode === 'normal') {
@@ -127,22 +152,32 @@ export function SpatialSurface({
     as={as}
     className={classes}
     fuse={fuse ?? true}
-    group={group}
-    draggable={spatialDraggable ?? false}
-    snap
-    data-spatial-id={spatialId}
-    data-spatial-group={group}
-    onJoinChange={(joined: boolean) => spatialId && onSpatialJoin?.(spatialId, joined, group)}
-    onDragEnd={(offset: Offset) => spatialId && onSpatialDragEnd?.(spatialId, offset)}
-    lean={mode === 'plasma' ? 18 : 6}
-    radius={radius ?? (mode === 'plasma' ? 30 : 10)}
+    group={group ?? `room:${room}`}
+    lean={mode === 'plasma' ? 15 : 5}
+    radius={radius ?? (mode === 'plasma' ? 28 : 10)}
     padding={0}
     tint={tint}
-    opacity={mode === 'plasma' ? 0.9 : undefined}
-    frost={mode === 'plasma' ? 0.01 : undefined}
-    elevation={elevation ?? (mode === 'plasma' ? 0.58 : 0.46)}
+    elevation={elevation ?? (mode === 'plasma' ? 0.58 : 0.42)}
+    draggable={spatialDraggable}
+    snap={spatialDraggable}
+    offset={spatialDraggable ? offset : undefined}
+    onDragEnd={spatialDraggable ? ((next:Offset)=>{
+      setOffset(next);
+      if(spatialId)try{localStorage.setItem(offsetKey(room,mode,spatialId),JSON.stringify(next));}catch{/* enhancement only */}
+    }) : undefined}
+    onJoinChange={spatialId&&onSpatialJoin ? ((joined:boolean)=>{
+      if(!joined)return;
+      const source=document.querySelector<HTMLElement>(`[data-spatial-room="${room}"][data-spatial-id="${CSS.escape(spatialId)}"]`);
+      if(!source)return;
+      const other=nearestSpatialNeighbor(room,spatialId,source);
+      if(other)onSpatialJoin(other);
+    }) : undefined}
+    formIn={false}
+    formOut={false}
+    data-spatial-id={spatialId}
+    data-spatial-room={room}
     {...rest}
   >
-    {children}
+    <div className="xf-spatial-content">{children}</div>
   </PlasmaSurface>;
 }
