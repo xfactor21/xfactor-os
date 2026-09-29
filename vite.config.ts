@@ -12,6 +12,7 @@ const isolationHeaders = {
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: { __XFACTOR_BUILD_VERSION__: JSON.stringify(packageVersion) },
   plugins: [
     react(),
     {
