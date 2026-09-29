@@ -11,6 +11,7 @@ const windows = capability.windows ?? [];
 
 assert('capability applies only to main workspace window', windows.length === 1 && windows[0] === 'main');
 assert('capture-widget receives no shared privileged capability', !windows.includes('capture-widget'));
+assert('xbrowser receives no shared privileged capability', !windows.includes('xbrowser'));
 assert('main retains native open dialog', permissions.has('dialog:allow-open'));
 assert('main retains native save dialog', permissions.has('dialog:allow-save'));
 assert('main retains selected-file read access', permissions.has('fs:allow-read-text-file'));
