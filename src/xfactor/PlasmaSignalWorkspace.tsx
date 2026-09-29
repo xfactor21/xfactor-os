@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import { Check, Pin, RotateCcw, Search, Sparkles, Trash2 } from 'lucide-react';
 import { Plasma, PlasmaProvider, type Offset } from '@cruxgarden/plasma-ui';
-import type { Incident, Signal, SignalType } from './domain';
+import type { Incident, Signal, SignalType, SpatialGroup } from './domain';
 import type { MatterMaterial, MatterSlot, PlasmaController, PlasmaLook, PlasmaPolicy } from './plasmaMode';
 import { beginMomentum, joinedAny, momentumTarget, sampleMomentum, type PointerMomentum } from './spatialPhysics';
 import './plasmaMode.css';
@@ -15,6 +15,7 @@ interface PlasmaSignalWorkspaceProps {
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
   plasma: PlasmaController;
+  groups?: SpatialGroup[];
   onFuse?: (a:string,b:string)=>void;
 }
 
@@ -98,16 +99,18 @@ function signalMaterial(signal: Signal, plasma: PlasmaController): MatterMateria
 function NormalSignalList({
   signals,
   incidents,
+  groups = [],
   onUpdate,
   onDelete,
 }: {
   signals: Signal[];
   incidents: Incident[];
+  groups?: SpatialGroup[];
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
 }) {
   if (!signals.length) return <div className="xf-empty plasma-empty"><Sparkles size={22}/><b>NO SIGNAL YET</b><p>Use Hotwire below. Capture anything before your brain talks you out of it.</p></div>;
-  return <div className="signal-full">{signals.map(signal => <article className={`signal-row signal-row-full ${signal.done ? 'done' : ''}`} key={signal.id}>
+  return <div className="signal-full">{signals.map(signal => {const bundle=groups.find(group=>group.entityKind==='signal'&&group.memberIds.includes(signal.id));return <article className={`signal-row signal-row-full ${bundle?'has-bundle':''} ${signal.done ? 'done' : ''}`} style={{'--bundle-color':bundle?.color} as CSSProperties} key={signal.id}>{bundle&&<div className="spatial-bundle-tag">{bundle.name}</div>}
     <button onClick={() => onUpdate(signal.id, { done: !signal.done })}>{signal.done ? <Check size={14}/> : <span className={`sig-dot ${signal.type}`}/>}</button>
     <div className="signal-body">
       <small>{signal.type.toUpperCase()} · {relative(signal.createdAt)} AGO</small>
@@ -123,7 +126,7 @@ function NormalSignalList({
     </div>
     <button className={signal.pinned ? 'active-icon' : ''} onClick={() => onUpdate(signal.id, { pinned: !signal.pinned })}><Pin size={13}/></button>
     <button onClick={() => onDelete(signal)}><Trash2 size={13}/></button>
-  </article>)}</div>;
+  </article>})}</div>;
 }
 
 function SignalSurfaceContent({
@@ -173,6 +176,7 @@ function LiquidBoard({
   onLayout: (id: string, next: Offset) => void;
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
+  groups?: SpatialGroup[];
   onFuse?: (a:string,b:string)=>void;
 }) {
   const momentum = useRef(new Map<string, PointerMomentum>());
@@ -223,6 +227,7 @@ function LiquidBoard({
     {signals.map((signal, index) => {
       const fallback = homeLayout(signals)[signal.id] ?? { x: 18 + (index % 3) * 282, y: 18 + Math.floor(index / 3) * 192 };
       const offset = layout[signal.id] ?? fallback;
+      const bundle=groups.find(group=>group.entityKind==='signal'&&group.memberIds.includes(signal.id));
       return <Plasma
         key={signal.id}
         className={`xf-plasma-note type-${signal.type} ${signal.done ? 'done' : ''} ${joinedIds.has(signal.id) ? 'is-fused' : ''}`}
@@ -244,7 +249,7 @@ function LiquidBoard({
           } else next.delete(signal.id);
           return next;
         })}
-        tint={typeTint[plasma.look][signal.type]}
+        tint={bundle?.color ?? typeTint[plasma.look][signal.type]}
         opacity={signal.done ? 0.38 : 0.64}
         frost={signal.type === 'note' ? Math.min(0.24, plasma.frost * 0.2 + 0.03) : Math.max(0.02, plasma.frost * 0.14)}
         elevation={signal.pinned ? 0.82 : 0.56}
@@ -252,7 +257,7 @@ function LiquidBoard({
         padding={16}
         style={{ width: 258, height: 170, position: 'absolute', left: 0, top: 0 }}
       >
-        <SignalSurfaceContent signal={signal} incidents={incidents} onUpdate={onUpdate} onDelete={onDelete}/>
+        {bundle&&<div className="spatial-bundle-tag plasma-bundle">{bundle.name}</div>}<SignalSurfaceContent signal={signal} incidents={incidents} onUpdate={onUpdate} onDelete={onDelete}/>
       </Plasma>;
     })}
   </PlasmaProvider>;
@@ -270,6 +275,7 @@ function MatterBoard({
   onUpdate,
   onDelete,
   onFuse,
+  groups = [],
 }: {
   signals: Signal[];
   incidents: Incident[];
@@ -282,6 +288,7 @@ function MatterBoard({
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
   onFuse?: (a:string,b:string)=>void;
+  groups?: SpatialGroup[];
 }) {
   const momentum = useRef(new Map<string, PointerMomentum>());
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
@@ -357,6 +364,7 @@ function MatterBoard({
       >
         {materialSignals.map(signal => {
           const offset = layout[signal.id] ?? { x: 18, y: 18 };
+          const bundle=groups.find(group=>group.entityKind==='signal'&&group.memberIds.includes(signal.id));
           return <Plasma
             key={signal.id}
             className={`xf-plasma-note xf-matter-note material-${material} type-${signal.type} ${signal.done ? 'done' : ''} ${joinedIds.has(signal.id) ? 'is-fused' : ''}`}
@@ -378,7 +386,7 @@ function MatterBoard({
           } else next.delete(signal.id);
           return next;
         })}
-            tint={typeTint[plasma.look][signal.type]}
+            tint={bundle?.color ?? typeTint[plasma.look][signal.type]}
             opacity={signal.done ? 0.38 : material === 'metal' ? 0.86 : material === 'stone' ? 0.9 : material === 'wood' ? 0.82 : material === 'crystal' ? 0.52 : material === 'cloud' ? 0.48 : 0.64}
             frost={material === 'crystal' ? Math.min(0.28, plasma.frost * 0.32 + 0.03) : material === 'plasma' ? Math.min(0.18, plasma.frost * 0.22) : 0}
             elevation={signal.pinned ? 0.74 : material === 'cloud' ? 0.12 : 0.42}
@@ -386,7 +394,7 @@ function MatterBoard({
             padding={16}
             style={{ width: 258, height: 170, position: 'absolute', left: 0, top: 0 }}
           >
-            <SignalSurfaceContent signal={signal} incidents={incidents} material={material} onUpdate={onUpdate} onDelete={onDelete}/>
+            {bundle&&<div className="spatial-bundle-tag plasma-bundle">{bundle.name}</div>}<SignalSurfaceContent signal={signal} incidents={incidents} material={material} onUpdate={onUpdate} onDelete={onDelete}/>
           </Plasma>;
         })}
       </PlasmaProvider>;
@@ -403,6 +411,7 @@ export default function PlasmaSignalWorkspace({
   onUpdate,
   onDelete,
   plasma,
+  groups = [],
   onFuse,
 }: PlasmaSignalWorkspaceProps) {
   const stage = useRef<HTMLDivElement>(null);
@@ -464,7 +473,7 @@ export default function PlasmaSignalWorkspace({
       {plasma.active && <><button className={scope === 'incident' ? 'active' : ''} disabled={!selectedIncidentId} onClick={() => setScope('incident')}>CURRENT INCIDENT</button><button className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>ALL SIGNALS</button></>}
     </div>
 
-    {plasma.mode === 'normal' ? <NormalSignalList signals={filtered} incidents={incidents} onUpdate={onUpdate} onDelete={onDelete}/> : <>
+    {plasma.mode === 'normal' ? <NormalSignalList signals={filtered} incidents={incidents} groups={groups} onUpdate={onUpdate} onDelete={onDelete}/> : <>
       <div className={`plasma-controls ${plasma.mode === 'matter' ? 'matter-controls' : ''}`}>
         <div className="plasma-control-group"><span>KEEP IT ON //</span>{(['session', '30m', 'remember'] as PlasmaPolicy[]).map(policy => <button key={policy} className={plasma.policy === policy ? 'active' : ''} onClick={() => plasma.setPolicy(policy)}>{policy === 'session' ? 'THIS SESSION' : policy === '30m' ? '30 MIN' : 'UNTIL OFF'}</button>)}</div>
         <div className="plasma-control-group"><span>LOOK //</span>{(['neon-x', 'pink-riot', 'afterglow'] as PlasmaLook[]).map(look => <button key={look} className={plasma.look === look ? 'active' : ''} onClick={() => plasma.setLook(look)}>{look === 'neon-x' ? 'NEON X' : look === 'pink-riot' ? 'PINK RIOT' : 'AFTERGLOW'}</button>)}</div>
@@ -481,7 +490,7 @@ export default function PlasmaSignalWorkspace({
 
       <div ref={stage} className={`xf-plasma-stage ${plasma.mode === 'matter' ? 'xf-matter-stage' : ''}`}>
         <div className="xf-plasma-hint">{plasma.mode === 'matter' ? 'LIKE MATTER FUSES // UNLIKE MATTER STAYS DISTINCT // ALL OF IT STILL SNAPS TO THE GRID' : 'DRAG UNTIL THEY TOUCH // PROXIMITY IS TEMPORARY ORGANIZATION'}</div>
-        {plasma.mode === 'plasma' ? <LiquidBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete} onFuse={onFuse}/> : <MatterBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete} onFuse={onFuse}/>} 
+        {plasma.mode === 'plasma' ? <LiquidBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete} onFuse={onFuse} groups={groups}/> : <MatterBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete} onFuse={onFuse} groups={groups}/>} 
         {filtered.length > visibleSignals.length && <div className="xf-plasma-overflow">SHOWING {visibleSignals.length} OF {filtered.length} // FILTER TO REDUCE GPU LOAD</div>}
       </div>
     </>}
