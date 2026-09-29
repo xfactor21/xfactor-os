@@ -394,7 +394,7 @@ export default function ChaosDeck() {
     <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={e=>void importBackup(e.target.files?.[0])}/>
     <input ref={fileRef} type="file" multiple hidden onChange={e=>void ingestFiles(e.target.files)}/>
     <header className="xf-topbar">
-      <div className="xf-brand"><img src="/xfactor-mask.jpeg"/><div><b>xFACTOR.OS</b><span>// ORGANIZED DISORGANIZATION</span></div><small className="xf-build-id">v${BUILD_VERSION} · M6</small></div>
+      <div className="xf-brand"><img src="/xfactor-os-m6.png"/><div><b>xFACTOR.OS</b><span>// ORGANIZED DISORGANIZATION</span></div><small className="xf-build-id">v${BUILD_VERSION} · M6</small></div>
       <div className="xf-top-status">
         <button className="xf-status-explain" title="Signal strength is a live activity pulse, not a health score. Higher means more recent workspace activity."><Radio size={14}/> SIGNAL {signalStrength}%<CircleHelp size={11}/></button>
         <button className="xf-status-explain" title="Events are append-only actions recorded on Tape. Click to open Tape." onClick={()=>setView('tape')}><Activity size={14}/> {ws.activity.length} EVENTS<CircleHelp size={11}/></button>
