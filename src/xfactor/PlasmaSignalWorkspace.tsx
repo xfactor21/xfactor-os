@@ -15,6 +15,7 @@ interface PlasmaSignalWorkspaceProps {
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
   plasma: PlasmaController;
+  onBundle?: (firstId: string, secondId: string) => void;
 }
 
 type Layout = Record<string, Offset>;
@@ -99,11 +100,13 @@ function NormalSignalList({
   incidents,
   onUpdate,
   onDelete,
+  onBundle,
 }: {
   signals: Signal[];
   incidents: Incident[];
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
+  onBundle?: (firstId: string, secondId: string) => void;
 }) {
   if (!signals.length) return <div className="xf-empty plasma-empty"><Sparkles size={22}/><b>NO SIGNAL YET</b><p>Use Hotwire below. Capture anything before your brain talks you out of it.</p></div>;
   return <div className="signal-full">{signals.map(signal => <article className={`signal-row signal-row-full ${signal.done ? 'done' : ''}`} key={signal.id}>
@@ -218,7 +221,9 @@ function LiquidBoard({
     pointerPull
     ambientDrops={false}
     ground="clear"
-    zIndex={18}
+    zIndex={8}
+    formIn={false}
+    formOut={false}
   >
     {signals.map((signal, index) => {
       const fallback = homeLayout(signals)[signal.id] ?? { x: 18 + (index % 3) * 282, y: 18 + Math.floor(index / 3) * 192 };
@@ -235,7 +240,17 @@ function LiquidBoard({
         onPointerDownCapture={event => momentum.current.set(signal.id, beginMomentum(event.clientX, event.clientY))}
         onPointerMoveCapture={event => rememberPointer(signal.id, event)}
         onDragEnd={next => settle(signal.id, next)}
-        onJoinChange={joined => setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; })}
+        onJoinChange={joined => {
+          setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; });
+          if (joinedAny(joined) && onBundle) {
+            const currentOffset = layout[signal.id] ?? fallback;
+            const nearest = signals.filter(other => other.id !== signal.id).map(other => {
+              const otherOffset = layout[other.id] ?? homeLayout(signals)[other.id] ?? {x:18,y:18};
+              return {id:other.id,distance:Math.hypot(otherOffset.x-currentOffset.x,otherOffset.y-currentOffset.y)};
+            }).sort((a,b)=>a.distance-b.distance)[0];
+            if (nearest && nearest.distance < 330) onBundle(signal.id,nearest.id);
+          }
+        }
         tint={typeTint[plasma.look][signal.type]}
         opacity={signal.done ? 0.58 : 0.9}
         frost={signal.type === 'note' ? Math.min(0.09, plasma.frost * 0.08 + 0.01) : 0.01}
@@ -387,6 +402,7 @@ export default function PlasmaSignalWorkspace({
   onUpdate,
   onDelete,
   plasma,
+  onBundle,
 }: PlasmaSignalWorkspaceProps) {
   const stage = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<Layout>({});
@@ -464,7 +480,7 @@ export default function PlasmaSignalWorkspace({
 
       <div ref={stage} className={`xf-plasma-stage ${plasma.mode === 'matter' ? 'xf-matter-stage' : ''}`}>
         <div className="xf-plasma-hint">{plasma.mode === 'matter' ? 'LIKE MATTER FUSES // UNLIKE MATTER STAYS DISTINCT // ALL OF IT STILL SNAPS TO THE GRID' : 'DRAG UNTIL THEY TOUCH // PROXIMITY IS TEMPORARY ORGANIZATION'}</div>
-        {plasma.mode === 'plasma' ? <LiquidBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete}/> : <MatterBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete}/>} 
+        {plasma.mode === 'plasma' ? <LiquidBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete} onBundle={onBundle}/> : <MatterBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete}/>} 
         {filtered.length > visibleSignals.length && <div className="xf-plasma-overflow">SHOWING {visibleSignals.length} OF {filtered.length} // FILTER TO REDUCE GPU LOAD</div>}
       </div>
     </>}
