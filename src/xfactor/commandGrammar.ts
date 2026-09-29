@@ -21,10 +21,10 @@ export function parseCommand(raw:string):ParsedCommand {
     const verb=capture[1].toLowerCase();
     return {type:'capture',text:capture[2].trim(),signalType:verb==='capture'?'spark':verb as 'spark'|'task'|'note'|'link'};
   }
-  const open=value.match(/^(?:open|go to|show)\s+(floor|signal|piles|vault|terminal|term|lab|studio|design lab|tape|activity)$/i);
+  const open=value.match(/^(?:open|go to|show)\s+(floor|signal|piles|vault|terminal|term|lab|studio|design lab|tape|activity|files|xfiles|browser|xbrowser|settings)$/i);
   if(open){
     const target=open[1].toLowerCase();
-    return {type:'open',target:target==='term'?'terminal':target==='studio'||target==='design lab'?'lab':target==='activity'?'tape':target as 'signal'|'piles'|'vault'|'terminal'|'lab'|'tape'|'floor'};
+    return {type:'open',target:target==='term'?'terminal':target==='studio'||target==='design lab'?'lab':target==='activity'?'tape':target==='xfiles'?'files':target==='xbrowser'?'browser':target as 'signal'|'piles'|'vault'|'terminal'|'lab'|'tape'|'floor'|'files'|'browser'|'settings'};
   }
   const search=value.match(/^(?:find|search)\s+(.+)$/i);
   if(search)return {type:'search',query:search[1].trim()};
