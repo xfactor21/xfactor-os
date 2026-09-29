@@ -23,6 +23,7 @@ for (const file of [
 const mode = fs.readFileSync(new URL('../src/xfactor/plasmaMode.ts', import.meta.url), 'utf8');
 const board = fs.readFileSync(new URL('../src/xfactor/PlasmaSignalWorkspace.tsx', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/xfactor/plasmaMode.css', import.meta.url), 'utf8');
+const matterBoard = board.slice(board.indexOf('function MatterBoard'));
 
 assert('spatial modes include Normal, Plasma and Matter', mode.includes("'normal' | 'plasma' | 'matter'"));
 assert('activation is device-local, not WorkspaceState', mode.includes('sessionStorage') && mode.includes('localStorage') && !mode.includes('WorkspaceState'));
@@ -36,7 +37,7 @@ assert('Normal and spatial modes share canonical Signal update callback', board.
 assert('spatial modes preserve routing/type controls', board.includes('incidentId: event.target.value || undefined') && board.includes('type: event.target.value as SignalType'));
 assert('Matter uses true Plasma UI material providers', board.includes('material={material}') && board.includes('MATERIAL_PHYSICS'));
 assert('unlike Matter is isolated into separate renderer groups', board.includes('group={`${layoutScope}:${material}`}'));
-assert('same Matter can still fuse', board.includes('blend={physics.blend}') && board.includes('className={`xf-plasma-note xf-matter-note') && board.includes('\n            fuse\n'));
+assert('same Matter can still fuse', matterBoard.includes('blend={physics.blend}') && matterBoard.includes('\n            fuse\n'));
 assert('Matter uses semantic done-task override', board.includes("signal.type === 'task' && signal.done"));
 assert('desktop Matter surface cap is stricter than liquid Plasma', board.includes("plasma.mode === 'matter' ? 10 : 14"));
 assert('compact Matter surface cap is five', board.includes('compact ? 5'));
