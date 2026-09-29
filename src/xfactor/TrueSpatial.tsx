@@ -16,6 +16,16 @@ const ROOM_MATERIAL: Record<Exclude<SpatialRoom, 'signal' | 'browser'>, Material
   lab: 'plasma',
 };
 
+const ROOM_BLEND: Record<Exclude<SpatialRoom, 'signal' | 'browser'>, number> = {
+  deck: 20,
+  piles: 11,
+  vault: 14,
+  tape: 9,
+  terminal: 7,
+  files: 10,
+  lab: 12,
+};
+
 const PlasmaSurface = Plasma as any;
 
 type SpatialContextValue={
@@ -61,52 +71,55 @@ export function SpatialRoomProvider({
   };
   const value=useMemo(()=>({mode:plasma.mode,room,reportJoin}),[plasma.mode,room,onFuse]);
 
-  if (plasma.mode === 'normal' || room === 'signal' || room === 'browser') {
+  // Signal owns its semantic multi-provider renderer; Browser intentionally has no Plasma.
+  if (room === 'signal' || room === 'browser') {
     return <SpatialContext.Provider value={value}>{children}</SpatialContext.Provider>;
   }
 
-  const material: MaterialName = plasma.mode === 'matter' ? ROOM_MATERIAL[room as Exclude<SpatialRoom,'signal'|'browser'>] : 'plasma';
+  const active = plasma.mode !== 'normal';
+  const roomKey = room as Exclude<SpatialRoom,'signal'|'browser'>;
+  const material: MaterialName = plasma.mode === 'matter' ? ROOM_MATERIAL[roomKey] : 'plasma';
   const matter = plasma.mode === 'matter';
-  const quality = document.documentElement.dataset.xfSpatialQuality === 'high' ? 1.08 : document.documentElement.dataset.xfSpatialQuality === 'performance' ? 0.72 : 0.9;
+  const quality = document.documentElement.dataset.xfSpatialQuality === 'high' ? 1.02 : document.documentElement.dataset.xfSpatialQuality === 'performance' ? 0.66 : 0.84;
+  const roomBlend = ROOM_BLEND[roomKey];
 
   return <SpatialContext.Provider value={value}>
     <PlasmaProvider
-      key={`${plasma.mode}:${room}:${plasma.look}`}
       mood={plasma.look === 'afterglow' ? 'tidal' : plasma.look === 'pink-riot' ? 'ember' : 'aurora'}
       theme="dark"
       material={material}
+      background="#07020a"
       tint={tintFor(plasma)}
-      opacity={matter ? 0.7 : 0.62}
-      frost={matter ? (material === 'crystal' ? 0.20 : 0.025) : 0.035}
-      blend={matter ? 18 : Math.max(34, plasma.blend)}
-      viscosity={matter ? 0.48 : 0.10}
-      stretch={matter ? 0.38 : 2.75}
-      flow={matter ? 0.06 : 0.74}
-      tension={matter ? 0.12 : 0.26}
-      refraction={matter ? 1.22 : 1.62}
-      dispersion={matter ? 1.12 : 1.46}
+      opacity={!active ? 0 : matter ? 0.78 : 0.86}
+      frost={!active ? 0 : matter ? (material === 'crystal' ? 0.18 : 0.02) : 0.025}
+      blend={!active ? roomBlend : matter ? Math.max(7, roomBlend - 2) : roomBlend}
+      viscosity={!active ? 0.5 : matter ? 0.46 : 0.06}
+      stretch={!active ? 0 : matter ? 0.42 : 4.4}
+      flow={!active ? 0 : matter ? 0.08 : 1.16}
+      tension={!active ? 0 : matter ? 0.14 : 0.36}
+      refraction={!active ? 1 : matter ? 1.3 : 2.02}
+      dispersion={!active ? 1 : matter ? 1.18 : 1.82}
       rimColor="iridescent"
-      rimWidth={matter ? 0.95 : 1.85}
-      highlight={matter ? 1.12 : 1.62}
-      edgeLine={matter ? 0.65 : 1.05}
-      shimmer={matter ? 0.42 : 1.45}
-      shimmerSpeed={matter ? 0.72 : 1.28}
-      glow={matter ? 0.95 : 1.55}
-      wash={matter ? 0.66 : 0.82}
-      grain={0.12}
+      rimWidth={!active ? 0 : matter ? 0.72 : 0.82}
+      highlight={!active ? 0 : matter ? 1.2 : 1.82}
+      edgeLine={!active ? 0 : matter ? 0.5 : 0.3}
+      shimmer={!active ? 0 : matter ? 0.62 : 2.05}
+      shimmerSpeed={matter ? 0.78 : 1.42}
+      glow={!active ? 0 : matter ? 1.12 : 2.0}
+      wash={!active ? 0 : matter ? 0.72 : 1.04}
+      grain={active ? 0.08 : 0}
       grid={24}
-      magnet={matter ? 34 : 46}
+      magnet={matter ? 30 : 38}
       quality={quality}
-      maxSurfaces={24}
+      maxSurfaces={16}
       pointerDrop={false}
-      pointerPull
+      pointerPull={active}
       ambientDrops={false}
       ground="clear"
-      formIn
-      formSpeed={1.8}
-      formOut
+      formIn={false}
+      formOut={false}
       freezeOnScroll
-      zIndex={18}
+      zIndex={active ? 8 : -40}
     >
       {children}
     </PlasmaProvider>
@@ -174,7 +187,7 @@ export function SpatialSurface({
       onSpatialMove?.(next);
     }:undefined}
     onJoinChange={free&&id?(joined:boolean)=>reportJoin(id,joined):undefined}
-    lean={mode === 'plasma' ? 12 : 4}
+    lean={mode === 'plasma' ? 18 : 5}
     radius={radius ?? (mode === 'plasma' ? 28 : 10)}
     padding={0}
     tint={tint}
