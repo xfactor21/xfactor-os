@@ -102,3 +102,55 @@
     radial-gradient(circle at 70% 30%,rgba(255,0,127,.04),transparent 34%),
     rgba(2,2,5,.08)!important;
 }
+
+/* M6 FINAL SPATIAL LAYERING — WebGL owns the body; DOM owns readable content. */
+.xf-root.xf-plasma-mode :is(.xf-shard,.xf-blackbox,.xf-feed,.pile-card,.asset-card,.tape-ledger article).xf-true-spatial,
+.xf-root.xf-matter-mode :is(.xf-shard,.xf-blackbox,.xf-feed,.pile-card,.asset-card,.tape-ledger article).xf-true-spatial{
+  background:none!important;
+  background-image:none!important;
+  background-color:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+}
+.xf-true-spatial>.xf-spatial-content{
+  position:relative!important;
+  z-index:24!important;
+  width:100%;
+  height:100%;
+  min-width:0;
+  color:inherit;
+  pointer-events:auto;
+}
+.xf-root.xf-plasma-mode .xf-true-spatial>.xf-spatial-content,
+.xf-root.xf-matter-mode .xf-true-spatial>.xf-spatial-content{
+  text-shadow:0 1px 2px #000,0 0 9px rgba(255,255,255,.06);
+}
+.xf-root.xf-plasma-mode .pile-grid,
+.xf-root.xf-matter-mode .pile-grid{
+  gap:28px;
+}
+.xf-root.xf-plasma-mode .tape-ledger,
+.xf-root.xf-matter-mode .tape-ledger{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  border-top:0;
+}
+.xf-root.xf-plasma-mode .tape-ledger .xf-true-spatial,
+.xf-root.xf-matter-mode .tape-ledger .xf-true-spatial{
+  min-height:54px;
+}
+.spatial-bundle-badge{
+  position:absolute!important;
+  z-index:30!important;
+  left:8px;
+  top:-10px;
+  padding:3px 7px;
+  border:1px solid color-mix(in srgb,var(--bundle-color,#ff2aa3) 70%,transparent);
+  background:#08070bea;
+  color:var(--bundle-color,#ff2aa3);
+  font:800 7px 'IBM Plex Mono',monospace;
+  letter-spacing:.08em;
+  box-shadow:0 0 14px color-mix(in srgb,var(--bundle-color,#ff2aa3) 28%,transparent);
+}
