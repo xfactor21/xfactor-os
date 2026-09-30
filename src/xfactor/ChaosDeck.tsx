@@ -331,7 +331,7 @@ export default function ChaosDeck() {
     <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={e=>void importBackup(e.target.files?.[0])}/>
     <input ref={fileRef} type="file" multiple hidden onChange={e=>void ingestFiles(e.target.files)}/>
     <header className="xf-topbar">
-      <div className="xf-brand"><img src="/xfactor-mask.jpeg"/><div><b>xFACTOR.OS</b><span>// CONTROLLED CHAOS SYSTEM <i>v{BUILD_VERSION}</i></span></div></div>
+      <div className="xf-brand"><img src="/xfactor-m6-icon.png"/><div><b>xFACTOR.OS</b><span>// CONTROLLED CHAOS SYSTEM <i>v{BUILD_VERSION}</i></span></div></div>
       <div className="xf-top-status"><button title="Signal strength is a live activity pulse for captured thoughts. Open Signal." onClick={()=>setView('signal')}><Radio size={13}/> SIGNAL {signalStrength}%</button><button title="Recorded workspace events. Open Tape for the full history." onClick={()=>setView('tape')}><Activity size={13}/> {ws.activity.length} EVENTS</button><button className="hot" title="Incidents above 80 heat. Open the Floor to inspect them." onClick={()=>setView('deck')}><Flame size={13}/> {visibleIncidents.filter(i=>i.heat>80).length} HOT</button></div>
       <div className="xf-spatial-zone"><small>SPATIAL ORGANIZER</small><GlobalSpatialToggle plasma={plasma}/></div>
       <button className="xf-account-btn" onClick={()=>setAccount(true)}>{authUser?authUser.email?.split('@')[0]:'LOCAL'}<span>{authUser?'SYNCED':supabaseConfigured?'SIGN IN':'OFFLINE'}</span></button>
