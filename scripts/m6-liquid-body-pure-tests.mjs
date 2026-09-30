@@ -37,7 +37,9 @@ assert('M6 removes DOM plate masking during drag/fusion', signalCss.includes('M6
 assert('M6 global content stays above material', globalCss.includes('M6 FINAL SPATIAL LAYERING') && globalCss.includes('.xf-spatial-content'));
 assert('M6 throw has lower threshold and longer travel', physics.includes('speed < 0.07') && physics.includes('strength = 430') && physics.includes('122 + speed * 148'));
 
-assert('room cards do not start as one giant fused blob', room.includes("piles: 11") && room.includes("tape: 9") && signal.includes("blend={compact ? 14 : 22}"));
+assert('room cards do not start as one giant fused blob', room.includes("piles: 5") && room.includes("tape: 6") && globalCss.includes('gap:28px') && signal.includes("blend={compact ? 14 : 22}"));
+assert('balanced spatial FX lowers shader budget by default', room.includes("settings.spatialFx === 'reduced' ? 7 : 10") && signal.includes("settings.spatialFx === 'reduced' ? 7 : 10"));
+assert('reduced spatial FX disables pointer pull', room.includes("settings.spatialFx !== 'reduced'") && signal.includes("settings.spatialFx !== 'reduced'"));
 assert('spatial transition formation animation is disabled', room.includes('formIn={false}') && room.includes('formOut={false}') && signal.includes('formIn={false}') && signal.includes('formOut={false}'));
 assert('transition lifecycle is staged outside the click handler', mode.includes('requestAnimationFrame') && mode.includes('transitioning') && mode.includes('targetMode'));
 assert('spatial controls lock while renderer recasts', toggle.includes('disabled={plasma.transitioning}') && globalCss.includes('M6 STABLE MATERIAL RECAST'));
