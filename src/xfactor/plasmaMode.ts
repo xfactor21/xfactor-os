@@ -229,5 +229,5 @@ export function usePlasmaMode(incidentId?: string): PlasmaController {
     setBlend,
     setMatterMaterial,
     resetMatterMap,
-  }), [activation.mode, activation.policy, scopeId, appearance, activate, deactivate, setMode, setPolicy, setLook, setFrost, setBlend, setMatterMaterial, resetMatterMap]);
+  }), [activation.mode, activation.policy, switching, scopeId, appearance, activate, deactivate, setMode, setPolicy, setLook, setFrost, setBlend, setMatterMaterial, resetMatterMap]);
 }
