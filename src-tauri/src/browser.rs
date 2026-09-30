@@ -83,7 +83,7 @@ fn validate_public_destination(url: &Url) -> Result<(), String> {
 
 fn client() -> Result<Client, String> {
   Client::builder()
-    .user_agent("xFactor.OS/0.6.1 xBrowser authorized-public-capture")
+    .user_agent("xFactor.OS/0.7.0 xBrowser authorized-public-capture")
     .redirect(reqwest::redirect::Policy::none())
     .build()
     .map_err(|e| format!("Could not initialize browser fetcher: {e}"))
