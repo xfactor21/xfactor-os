@@ -63,3 +63,20 @@ html[data-xf-motion="reduced"] *{animation-duration:.001ms!important;animation-i
 .vault-kind-tabs{display:flex;gap:5px;overflow:auto;margin:-2px 0 10px;padding:6px 2px}
 .vault-kind-tabs button{flex:0 0 auto;border:1px solid #302934;background:#0b090e;color:#7f7684;padding:6px 8px;font-size:8px;font-weight:850;letter-spacing:.07em}
 .vault-kind-tabs button.active{border-color:#ff2aa35e;background:#ff2aa318;color:#fff;box-shadow:0 0 16px #ff2aa31a}
+
+
+/* M6 WEBGL BODY AUTHORITY */
+/* Spatial mode DOM cards carry content only. The Plasma canvas owns every visible
+   material body. This selector intentionally outranks all legacy card gradients. */
+.xf-root.xf-plasma-mode .xf-main .xf-true-spatial.plasma-panel,
+.xf-root.xf-matter-mode .xf-main .xf-true-spatial.plasma-panel,
+.xf-studio-shell.xf-plasma-mode .xf-true-spatial.plasma-panel,
+.xf-studio-shell.xf-matter-mode .xf-true-spatial.plasma-panel{
+  background:none!important;
+  background-image:none!important;
+  background-color:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
