@@ -302,6 +302,9 @@ export default function ChaosDeck() {
     if(label==='Create pile') createPileFromSelection();
     if(label==='Backup workspace') exportBackup();
     if(label==='Restore workspace') importRef.current?.click();
+    if(label==='Save current layout') saveLayout();
+    if(label==='Account & sync') setAccount(true);
+    if(label==='Open command help') { setView('settings'); setNotice('COMMAND DECK // CTRL/CMD + K · TYPE AN ACTION OR ENTITY'); }
   }
   function runPaletteInput() {
     const parsed=parseCommand(paletteQuery);
@@ -315,12 +318,16 @@ export default function ChaosDeck() {
     const first=commands[0]; if(first)command(first.label);
   }
   const commands = [
-    {label:'New incident',hint:'CREATE',icon:Plus},{label:'Riot Mode',hint:'LAYOUT',icon:Shuffle},{label:'Stack It',hint:'LAYOUT',icon:Layers3},
-    {label:'Create pile',hint:'ORGANIZE',icon:FolderPlus},{label:'Signal',hint:'PLANNING',icon:Radio},{label:'Piles',hint:'PLANNING',icon:Boxes},{label:'Vault',hint:'PLANNING',icon:Archive},{label:'Tape',hint:'PLANNING',icon:History},
-    {label:'Files',hint:'DEV TOOLS',icon:FolderTree},{label:'Browser',hint:'DEV TOOLS',icon:Globe2},{label:'Design Lab',hint:'DEV TOOLS',icon:Hammer},{label:'Workbench',hint:'DEV TOOLS',icon:TerminalSquare},{label:'Settings',hint:'SYSTEM',icon:Settings},
+    {label:'Floor',hint:'PLAN',icon:Crosshair},{label:'Signal',hint:'PLAN',icon:Radio},{label:'Piles',hint:'PLAN',icon:Boxes},{label:'Vault',hint:'PLAN',icon:Archive},{label:'Tape',hint:'PLAN',icon:History},
+    {label:'New incident',hint:'ORGANIZE',icon:Plus},{label:'Create pile',hint:'ORGANIZE',icon:FolderPlus},{label:'Save current layout',hint:'ORGANIZE',icon:Save},{label:'Riot Mode',hint:'ORGANIZE',icon:Shuffle},{label:'Stack It',hint:'ORGANIZE',icon:Layers3},
+    {label:'Files',hint:'DEV TOOLS',icon:FolderTree},{label:'Browser',hint:'DEV TOOLS',icon:Globe2},{label:'Design Lab',hint:'DEV TOOLS',icon:Hammer},{label:'Workbench',hint:'DEV TOOLS',icon:TerminalSquare},
     {label:'Normal mode',hint:'SPATIAL',icon:Layers3},{label:'Plasma mode',hint:'SPATIAL',icon:Sparkles},{label:'Matter mode',hint:'SPATIAL',icon:Boxes},
-    {label:'Backup workspace',hint:'EXPORT',icon:Download},{label:'Restore workspace',hint:'IMPORT',icon:Upload},
-  ].filter(c=>c.label.toLowerCase().includes(paletteQuery.toLowerCase()));
+    {label:'Settings',hint:'SYSTEM',icon:Settings},{label:'Account & sync',hint:'SYSTEM',icon:Radio},{label:'Open command help',hint:'SYSTEM',icon:Command},
+    {label:'Backup workspace',hint:'DATA',icon:Download},{label:'Restore workspace',hint:'DATA',icon:Upload},
+  ].filter(c=>c.label.toLowerCase().includes(paletteQuery.toLowerCase())||c.hint.toLowerCase().includes(paletteQuery.toLowerCase()));
+  const commandGroups = ['PLAN','ORGANIZE','DEV TOOLS','SPATIAL','SYSTEM','DATA']
+    .map(group=>({group,items:commands.filter(command=>command.hint===group)}))
+    .filter(section=>section.items.length);
 
   if (studio) return <div className={`xf-studio-shell ${plasma.mode==='plasma'?'xf-plasma-mode':plasma.mode==='matter'?'xf-matter-mode':''} ${plasma.transitioning?'xf-spatial-transition':''}`}>{plasma.transitioning&&<div className="xf-spatial-transition-mask"><b>RECASTING MATERIAL</b><span>{plasma.mode.toUpperCase()} → {(plasma.targetMode??plasma.mode).toUpperCase()}</span><small>TEARING DOWN THE OLD FIELD BEFORE THE NEXT ONE FORMS</small></div>}<button className="xf-studio-exit" onClick={()=>setStudio(false)}><X size={15}/> EXIT LAB</button><Studio active plasma={plasma} onBundle={(firstId,secondId)=>linkBundle('studio',firstId,secondId)} bundleLabel={id=>bundleBadge(ws,'studio',id)}/></div>;
 
@@ -417,7 +424,7 @@ export default function ChaosDeck() {
     <div className="xf-hotwire"><Zap size={17}/><b>HOTWIRE</b><input value={capture} onChange={e=>setCapture(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCapture('spark')}} placeholder={chosen?`THROW A THOUGHT INTO ${chosen.name}...`:'THROW A THOUGHT INTO THE SYSTEM...'}/><button onClick={()=>addCapture('task')}>TASK</button><button onClick={()=>addCapture('note')}>NOTE</button><button onClick={()=>addCapture('link')}><Link2 size={11}/></button><button onClick={()=>addCapture('spark')}>BURN IT IN</button></div>
 
     {account&&<AccountPanel onClose={()=>setAccount(false)}/>}
-    {palette&&<div className="xf-palette-backdrop" onMouseDown={()=>setPalette(false)}><div className="xf-palette" onMouseDown={e=>e.stopPropagation()}><div className="palette-input"><Search size={18}/><input autoFocus value={paletteQuery} onChange={e=>setPaletteQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')runPaletteInput()}} placeholder="TYPE WHAT YOU WANT TO DO..."/><kbd>ESC</kbd></div>{commands.map(c=><button className="palette-row" key={c.label} onClick={()=>command(c.label)}><c.icon/>{c.label}<span>{c.hint}</span></button>)}{entityResults.length>0&&<div className="palette-divider">FOUND IN THE MESS</div>}{entityResults.map(r=><button className="palette-row entity" key={`${r.kind}-${r.id}`} onClick={()=>openEntity(r)}><Crosshair/>{r.label}<span>{r.kind}</span></button>)}<div className="palette-foot">TRY: “OPEN FILES”, “OPEN BROWSER”, “PLASMA MODE”, “NEW PROJECT MONSTER X”, “TASK SHIP THE BUILD”, “FIND AUDIO”</div></div></div>}
+    {palette&&<div className="xf-palette-backdrop" onMouseDown={()=>setPalette(false)}><div className="xf-palette" onMouseDown={e=>e.stopPropagation()}><div className="palette-input"><Search size={18}/><input autoFocus value={paletteQuery} onChange={e=>setPaletteQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')runPaletteInput()}} placeholder="TYPE WHAT YOU WANT TO DO..."/><kbd>ESC</kbd></div>{commandGroups.map(section=><div className="palette-group" key={section.group}><div className="palette-divider">{section.group}</div>{section.items.map(c=><button className="palette-row" key={c.label} onClick={()=>command(c.label)}><c.icon/>{c.label}<span>{c.hint}</span></button>)}</div>)}{entityResults.length>0&&<div className="palette-divider">FOUND IN THE MESS</div>}{entityResults.map(r=><button className="palette-row entity" key={`${r.kind}-${r.id}`} onClick={()=>openEntity(r)}><Crosshair/>{r.label}<span>{r.kind}</span></button>)}<div className="palette-foot">TRY: “OPEN FILES”, “OPEN BROWSER”, “PLASMA MODE”, “NEW PROJECT MONSTER X”, “TASK SHIP THE BUILD”, “FIND AUDIO”</div></div></div>}
   </div>;
 }
 
