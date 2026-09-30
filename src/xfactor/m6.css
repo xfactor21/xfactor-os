@@ -59,3 +59,9 @@ html[data-xf-tooltips="off"] [data-xf-tip]:hover:after{display:none}
 
 @media(max-width:1180px){.xf-brand{width:220px}.xf-top-status button{padding:6px 5px}.xf-build-version{display:none}.xf-rift-shell{grid-template-columns:190px 1fr}.xf-rift-inspector{grid-column:1/-1}.xf-browser-tools button{font-size:0}.xf-browser-tools button svg{margin:0}.xf-settings-grid{grid-template-columns:1fr}}
 @media(max-width:800px){.xf-top-status{display:none}.xf-global-spatial:before{display:none}.xf-command-fab{right:10px;bottom:60px}.xf-rift-shell,.xf-browser-body{grid-template-columns:1fr}.xf-browser-history{display:none}.xf-rift-map{max-height:260px}.xf-rift-inspector{grid-column:auto}}
+
+.dev-cockpit .dev-workbench-grid{grid-template-columns:var(--dev-explorer,220px) minmax(360px,1fr) var(--dev-preview,360px)!important}
+.dev-pane-resizers{display:flex;gap:9px;align-items:center;padding:5px 8px;border:1px solid #29242b;background:#08070a;color:#716872;font-size:7px}.dev-pane-resizers label{display:flex;align-items:center;gap:5px}.dev-pane-resizers input{width:82px;accent-color:#ff2aa3}
+.dev-cockpit.layout-preview .dev-explorer{order:1}.dev-cockpit.layout-preview .dev-preview-pane{order:2}.dev-cockpit.layout-preview .dev-code-pane{order:3}
+.dev-cockpit.layout-code .dev-preview-pane{opacity:.82}.dev-cockpit.layout-debug .dev-workbench-grid{max-height:520px}
+.dev-cockpit .dev-cockpit-dock{height:var(--dev-dock,250px)}
