@@ -77,6 +77,18 @@ export interface SavedLayout {
   createdAt: number;
 }
 
+export type BundleMemberKind = 'incident' | 'signal' | 'asset' | 'pile' | 'studio';
+export type BundleMaterial = 'plasma' | 'crystal' | 'metal' | 'wood' | 'stone' | 'cloud';
+
+export interface Bundle {
+  id: string;
+  name: string;
+  color: string;
+  material: BundleMaterial;
+  memberKeys: string[];
+  createdAt: number;
+}
+
 export interface WorkspaceState {
   schemaVersion: 2;
   /** Monotonic-enough wall-clock timestamp for whole-workspace conflict resolution. */
@@ -88,5 +100,6 @@ export interface WorkspaceState {
   activity: ActivityEvent[];
   positions: Record<string, Position>;
   savedLayouts: SavedLayout[];
+  bundles: Bundle[];
   selectedIncidentId?: string;
 }
