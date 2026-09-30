@@ -24,9 +24,12 @@ const globalCss = fs.readFileSync(new URL('../src/xfactor/spatialGlobal.css', im
 const physics = fs.readFileSync(new URL('../src/xfactor/spatialPhysics.ts', import.meta.url), 'utf8');
 const mode = fs.readFileSync(new URL('../src/xfactor/plasmaMode.ts', import.meta.url), 'utf8');
 const toggle = fs.readFileSync(new URL('../src/xfactor/GlobalSpatialToggle.tsx', import.meta.url), 'utf8');
+const indexHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const vite = fs.readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8');
+const chaos = fs.readFileSync(new URL('../src/xfactor/ChaosDeck.tsx', import.meta.url), 'utf8');
 
 assert('room Plasma has an explicit refracted body source', room.includes("background={matter ? '#05070a' : '#07020a'}"));
-assert('room Plasma body dominates its rim', room.includes('opacity={matter ? 0.84 : 0.86}') && room.includes('rimWidth={matter ? 0.9 : 0.82}') && room.includes('edgeLine={matter ? 0.62 : 0.34}'));
+assert('room Plasma body dominates its rim', (room.includes('opacity={matter ? 0.84 : 0.86}') || room.includes('opacity={prewarm ? 0 : matter ? 0.84 : 0.86}')) && room.includes('rimWidth={matter ? 0.9 : 0.82}') && room.includes('edgeLine={matter ? 0.62 : 0.34}'));
 assert('room Plasma is strongly fluid', room.includes('stretch={matter ? 0.72 : 4.35}') && room.includes('flow={matter ? 0.18 : 1.18}') && room.includes('tension={matter ? 0.1 : 0.36}'));
 assert('Signal Plasma has explicit refracted background', signal.includes('background="#07020a"'));
 assert('Signal body is high opacity and low rim', signal.includes('opacity={0.84}') && signal.includes('rimWidth={0.86}') && signal.includes('edgeLine={0.36}'));
@@ -44,5 +47,8 @@ assert('spatial transition formation animation is disabled', room.includes('form
 assert('transition lifecycle is staged outside the click handler', mode.includes('requestAnimationFrame') && mode.includes('transitioning') && mode.includes('targetMode'));
 assert('spatial controls lock while renderer recasts', toggle.includes('disabled={plasma.transitioning}') && globalCss.includes('M6 STABLE MATERIAL RECAST'));
 assert('Signal text is explicitly above the WebGL material', signalCss.includes('M6 SIGNAL CONTENT LAYER') && signalCss.includes('z-index:24!important'));
+assert('room renderer stays mounted in NORMAL for warm switching', !room.includes("plasma.mode === 'normal' || room === 'signal'") && room.includes("const prewarm = plasma.mode === 'normal'") && room.includes('opacity={prewarm ? 0'));
+assert('old lower-right version badge is removed', !indexHtml.includes('xfactor-build-badge'));
+assert('header version is sourced from package metadata', vite.includes('__XFACTOR_VERSION__: JSON.stringify(packageVersion)') && chaos.includes('const BUILD_VERSION = __XFACTOR_VERSION__'));
 
 console.log('\nM6 unmistakable liquid-body checks passed.');
