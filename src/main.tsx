@@ -12,12 +12,14 @@ import { installDrawProEnhancements } from './modules/studio/draw/drawProEnhance
 import { installXfactorTutorial } from './xfactor/tutorial'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
 import { startPlanetXAnalytics } from './services/planetxAnalytics'
+import { registerPwaRuntime } from './pwaRuntime'
 
 installIncidentUx()
 installIncidentContextUx()
 installDrawProEnhancements()
 installXfactorTutorial()
 startPlanetXAnalytics()
+registerPwaRuntime()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

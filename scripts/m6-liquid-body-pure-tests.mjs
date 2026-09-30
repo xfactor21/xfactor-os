@@ -38,6 +38,7 @@ assert('Signal surfaces are filled bodies', signal.includes('opacity={signal.don
 assert('Matter has explicit material body source', signal.includes('background="#06070a"'));
 assert('M6 removes DOM plate masking during drag/fusion', signalCss.includes('M6 LIQUID BODY') && signalCss.includes('[data-plasma-dragging]') && signalCss.includes('background:transparent!important'));
 assert('M6 global content stays above material', globalCss.includes('M6 FINAL SPATIAL LAYERING') && globalCss.includes('.xf-spatial-content'));
+assert('Plasma main does not trap readable content beneath the provider canvas', globalCss.includes('0.7 PREMIUM CONTENT PLANE') && !globalCss.includes('.xf-root.xf-plasma-mode .xf-main{filter:saturate(1.08)') && globalCss.includes('z-index:40!important'));
 assert('M6 throw has lower threshold and longer travel', physics.includes('speed < 0.07') && physics.includes('strength = 430') && physics.includes('122 + speed * 148'));
 
 assert('room cards do not start as one giant fused blob', room.includes("piles: 5") && room.includes("tape: 6") && globalCss.includes('gap:28px') && signal.includes("blend={compact ? 14 : 22}"));

@@ -7,6 +7,10 @@ on:
       - 'src/**'
       - 'public/**'
       - 'scripts/browser-smoke.mjs'
+      - 'scripts/workbench-browser-smoke.mjs'
+      - 'scripts/design-lab-browser-smoke.mjs'
+      - 'public/manifest.webmanifest'
+      - 'public/sw.js'
       - 'vercel.json'
       - '.github/workflows/hosted-smoke.yml'
   workflow_dispatch:
@@ -17,7 +21,11 @@ permissions:
 jobs:
   hosted:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [product, workbench, design-lab]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -39,7 +47,24 @@ jobs:
           done
           echo "Production URL did not become reachable in time"
           exit 1
-      - name: Run full browser smoke against hosted production
+      - name: Verify hosted PWA shell
+        if: matrix.shard == 'product'
+        run: |
+          curl -fsS https://xfactor-os-xfactor21s-projects.vercel.app/manifest.webmanifest | grep -q '"name": "xFactor.OS — Controlled Chaos"'
+          curl -fsSI https://xfactor-os-xfactor21s-projects.vercel.app/sw.js | grep -qi 'service-worker-allowed: /'
+          curl -fsSI https://xfactor-os-xfactor21s-projects.vercel.app/pwa-icon-512.png | grep -qi 'content-type: image/png'
+      - name: Product + spatial hosted acceptance
+        if: matrix.shard == 'product'
         env:
           XFACTOR_BASE_URL: https://xfactor-os-xfactor21s-projects.vercel.app
         run: node scripts/browser-smoke.mjs
+      - name: Workbench hosted acceptance
+        if: matrix.shard == 'workbench'
+        env:
+          XFACTOR_BASE_URL: https://xfactor-os-xfactor21s-projects.vercel.app
+        run: node scripts/workbench-browser-smoke.mjs
+      - name: Design Lab hosted acceptance
+        if: matrix.shard == 'design-lab'
+        env:
+          XFACTOR_BASE_URL: https://xfactor-os-xfactor21s-projects.vercel.app
+        run: node scripts/design-lab-browser-smoke.mjs
