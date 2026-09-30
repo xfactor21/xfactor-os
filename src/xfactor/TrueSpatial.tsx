@@ -70,10 +70,12 @@ export function SpatialRoomProvider({
   const value = { mode: plasma.mode, room };
 
   // Signal owns its specialized renderer. Files/Browser/Settings intentionally
-  // stay conventional. Every other room keeps ONE provider mounted even while
-  // NORMAL is active so switching to Plasma does not tear down/recreate the
-  // WebGL renderer and shader graph.
-  if (room === 'signal' || room === 'files' || room === 'browser' || room === 'settings') {
+  // stay conventional. Planning surfaces keep ONE provider warm in NORMAL so
+  // switching to Plasma does not tear down/recreate the WebGL shader graph.
+  // Workbench is the exception: in NORMAL, keep its CodeMirror/WebContainer
+  // runtime free from an invisible WebGL field; Plasma/Matter mounts it on demand.
+  const conventionalNormalRoom = room === 'terminal' && plasma.mode === 'normal';
+  if (room === 'signal' || room === 'files' || room === 'browser' || room === 'settings' || conventionalNormalRoom) {
     return <SpatialContext.Provider value={value}>{children}</SpatialContext.Provider>;
   }
 

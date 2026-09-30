@@ -48,6 +48,7 @@ assert('transition lifecycle is staged outside the click handler', mode.includes
 assert('spatial controls lock while renderer recasts', toggle.includes('disabled={plasma.transitioning}') && globalCss.includes('M6 STABLE MATERIAL RECAST'));
 assert('Signal text is explicitly above the WebGL material', signalCss.includes('M6 SIGNAL CONTENT LAYER') && signalCss.includes('z-index:24!important'));
 assert('room renderer stays mounted in NORMAL for warm switching', !room.includes("plasma.mode === 'normal' || room === 'signal'") && room.includes("const prewarm = plasma.mode === 'normal'") && room.includes('opacity={prewarm ? 0'));
+assert('normal Workbench avoids invisible prewarm WebGL', room.includes("const conventionalNormalRoom = room === 'terminal' && plasma.mode === 'normal'") && room.includes('|| conventionalNormalRoom'));
 assert('old lower-right version badge is removed', !indexHtml.includes('xfactor-build-badge'));
 assert('header version is sourced from package metadata', vite.includes('__XFACTOR_VERSION__: JSON.stringify(packageVersion)') && chaos.includes('const BUILD_VERSION = __XFACTOR_VERSION__'));
 
