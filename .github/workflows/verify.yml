@@ -41,5 +41,57 @@ jobs:
           exit 1
       - name: Tutorial browser acceptance
         run: node scripts/tutorial-smoke.mjs
-      - name: Browser runtime smoke
+      - name: Product + spatial browser acceptance
         run: node scripts/browser-smoke.mjs
+
+  workbench:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Install Chromium smoke runner
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.62.0
+          npx playwright install --with-deps chromium
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/xfactor-preview.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/xfactor-preview.log
+          exit 1
+      - name: Workbench runtime acceptance
+        run: node scripts/workbench-browser-smoke.mjs
+
+  design-lab:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Install Chromium smoke runner
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.62.0
+          npx playwright install --with-deps chromium
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/xfactor-preview.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/xfactor-preview.log
+          exit 1
+      - name: Design Lab 25-mode browser acceptance
+        run: node scripts/design-lab-browser-smoke.mjs

@@ -96,3 +96,16 @@
 .xf-root.xf-plasma-mode .xf-plasma-note textarea,
 .xf-root.xf-matter-mode .xf-plasma-note-head,
 .xf-root.xf-matter-mode .xf-plasma-note textarea{color:#fff!important}
+
+
+/* 0.7 PREMIUM SIGNAL CONTENT PLANE — Signal owns a separate PlasmaProvider. */
+.xf-root.xf-plasma-mode .xf-plasma-note,
+.xf-root.xf-matter-mode .xf-plasma-note{position:absolute;z-index:22!important}
+.xf-root.xf-plasma-mode .xf-plasma-note-inner,
+.xf-root.xf-matter-mode .xf-plasma-note-inner{
+  position:relative!important;z-index:40!important;isolation:isolate;color:#fff!important;
+  background:linear-gradient(180deg,rgba(2,2,6,.18),rgba(3,2,7,.04) 44%,rgba(2,2,6,.18))!important;
+  text-shadow:0 1px 2px rgba(0,0,0,.96),0 0 13px rgba(255,255,255,.09)
+}
+.xf-root.xf-plasma-mode .xf-plasma-note-inner>*,
+.xf-root.xf-matter-mode .xf-plasma-note-inner>*{position:relative;z-index:1}

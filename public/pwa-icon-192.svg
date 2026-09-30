@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 512 512" role="img" aria-label="xFactor.OS">
+<defs><linearGradient id="g" x1="72" y1="64" x2="438" y2="448" gradientUnits="userSpaceOnUse"><stop stop-color="#ff2aa3"/><stop offset=".52" stop-color="#9b5cff"/><stop offset="1" stop-color="#20d9ff"/></linearGradient><radialGradient id="bg" cx="0" cy="0" r="1" gradientTransform="translate(180 124) rotate(46) scale(430)"><stop stop-color="#2a0b2a"/><stop offset=".45" stop-color="#0b0711"/><stop offset="1" stop-color="#030305"/></radialGradient><filter id="glow" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="12" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect width="512" height="512" rx="116" fill="url(#bg)"/>
+<path d="M126 92L256 222L386 92L420 126L290 256L420 386L386 420L256 290L126 420L92 386L222 256L92 126Z" fill="url(#g)" filter="url(#glow)"/>
+<path d="M256 72V110M256 402V440M72 256H110M402 256H440" stroke="#20d9ff" stroke-width="8" stroke-linecap="round" opacity=".65"/>
+<rect x="22" y="22" width="468" height="468" rx="98" fill="none" stroke="#ff2aa3" stroke-opacity=".22" stroke-width="4"/>
+</svg>

@@ -10,13 +10,6 @@ const waitSpatialSettled = async () => {
   if (await mask.count()) await mask.waitFor({ state: 'detached', timeout: 20000 });
 };
 
-const studioModes = [
-  'draw', 'wireframe', 'animation', 'vector', 'diagram', 'moodboard', 'presentation', 'iconDesign',
-  'imageConverter', 'backgroundRemover', 'paletteGenerator', 'quickPhotoEditor', 'logoMaker', 'pixelArt',
-  'videoTrimmer', 'audioTrimmer', 'pdfMarkup', 'qrGenerator', 'memeGenerator', 'fontPairing',
-  'screenshotAnnotator', 'gifMaker', 'chartBuilder', 'printLayout', 'modelViewer',
-];
-
 const check = async (label, fn) => {
   try { await fn(); console.log(`PASS: ${label}`); }
   catch (error) { failures.push(`${label}: ${error?.message || error}`); console.error(`FAIL: ${label}`); }
@@ -67,12 +60,17 @@ await check('global Normal Plasma Matter control renders true spatial surfaces f
       const cs = getComputedStyle(surface);
       const canvasStyle = getComputedStyle(canvas);
       const contentStyle = getComputedStyle(content);
-      return { z: canvasStyle.zIndex, display: canvasStyle.display, background: cs.backgroundColor, backgroundImage: cs.backgroundImage, contentZ: contentStyle.zIndex };
+      const main = document.querySelector('.xf-root.xf-plasma-mode .xf-main');
+      const mainStyle = main instanceof HTMLElement ? getComputedStyle(main) : null;
+      return { z: canvasStyle.zIndex, display: canvasStyle.display, background: cs.backgroundColor, backgroundImage: cs.backgroundImage, surfaceZ: cs.zIndex, contentZ: contentStyle.zIndex, contentOpacity: contentStyle.opacity, contentVisibility: contentStyle.visibility, mainFilter: mainStyle?.filter ?? 'missing' };
     });
     if (!plasmaVisual) throw new Error('true Plasma renderer did not mount with readable content');
     if (plasmaVisual.z !== '8' || plasmaVisual.display === 'none') throw new Error('Plasma canvas is not on the M6 material layer');
     if (plasmaVisual.backgroundImage !== 'none' || plasmaVisual.background !== 'rgba(0, 0, 0, 0)') throw new Error('legacy card fill is still covering the WebGL body');
-    if (Number(plasmaVisual.contentZ) < 20) throw new Error('card content is not lifted above the material');
+    if (Number(plasmaVisual.contentZ) < 30) throw new Error('card content is not lifted above the material');
+    if (Number(plasmaVisual.surfaceZ) <= Number(plasmaVisual.z)) throw new Error('surface stacking plane is not above the Plasma canvas');
+    if (plasmaVisual.mainFilter !== 'none') throw new Error('main content creates a stacking context that can trap text under the Plasma canvas');
+    if (plasmaVisual.contentOpacity !== '1' || plasmaVisual.contentVisibility !== 'visible') throw new Error('Plasma content plane is visually suppressed');
 
     await page.getByRole('button', { name: /MATTER/i }).click();
     await page.locator('.xf-root.xf-matter-mode').waitFor();
@@ -266,32 +264,6 @@ await check('Incident Developer Workbench opens', async () => {
   await workbenchDock.getByRole('button', { name: /PROJECT SEARCH/ }).waitFor();
 });
 
-await check('Workbench edits a project file and updates preview', async () => {
-  await page.locator('.dev-file').filter({ hasText: 'main.js' }).locator('button').first().click();
-  const editor = page.locator('.dev-code-editor .cm-content');
-  await editor.waitFor();
-  await editor.click();
-  await page.keyboard.press('Control+A');
-  await page.keyboard.insertText("document.querySelector('#app').innerHTML = '<h1>WORKBENCH SMOKE</h1>';");
-  const preview = page.locator('.dev-preview-pane iframe').contentFrame();
-  await preview.getByText('WORKBENCH SMOKE').waitFor({ timeout: 5000 });
-  const persisted = await page.evaluate(() => {
-    const workspace = JSON.parse(localStorage.getItem('xfactor-os-workspace-v2') || '{}');
-    const id = workspace.selectedIncidentId;
-    if (!id) return false;
-    const files = JSON.parse(localStorage.getItem('xfactor-workbench-v1:' + id) || '[]');
-    return files.some(file => file.path === 'src/main.js' && file.content.includes('WORKBENCH SMOKE'));
-  });
-  if (!persisted) throw new Error('Incident-bound Workbench file did not persist');
-});
-
-await check('Workbench launches the project through WebContainer + Vite', async () => {
-  await page.getByRole('button', { name: /RUN PROJECT/i }).click();
-  await page.locator('.dev-status.running').waitFor({ timeout: 90000 });
-  const livePreview = page.locator('.dev-preview-pane iframe').contentFrame();
-  await livePreview.getByText('WORKBENCH SMOKE').waitFor({ timeout: 15000 });
-});
-
 for (const runtime of ['PYTHON', 'RUBY', 'PHP', 'GO', 'NODE.JS']) {
   await check(`Terminal ${runtime} runtime boots`, async () => {
     const chip = page.locator('#r-terminal .chip').filter({ hasText: runtime }).first();
@@ -308,38 +280,6 @@ await check('Design Lab surface opens', async () => {
   await page.getByRole('button', { name: /EXIT LAB/i }).waitFor();
 });
 
-await check('all 25 Design Lab modes mount in production browser', async () => {
-  await page.getByRole('button', { name: /EXIT LAB/i }).click();
-  await page.evaluate((modes) => {
-    const now = new Date().toISOString();
-    const boards = modes.map((mode, index) => ({
-      id: `browser-smoke-${index}-${mode}`,
-      name: `SMOKE ${mode}`,
-      mode,
-      createdAt: now,
-      updatedAt: now,
-    }));
-    localStorage.setItem('xfactor-studio-boards-v1', JSON.stringify(boards));
-  }, studioModes);
-  await page.reload({ waitUntil: 'networkidle' });
-
-  for (const mode of studioModes) {
-    await page.keyboard.press('Control+K');
-    const input = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
-    await input.fill('open lab');
-    await input.press('Enter');
-    await page.getByRole('button', { name: /EXIT LAB/i }).waitFor();
-
-    const boardName = `SMOKE ${mode}`;
-    await page.locator('.dpBoardCard').filter({ hasText: boardName }).click();
-    await page.locator('#r-studio .rh').filter({ hasText: boardName }).waitFor({ timeout: 15000 });
-    await page.locator('#r-studio > :nth-child(2)').waitFor({ state: 'attached', timeout: 15000 });
-    console.log(`PASS: Design Lab mode mounts: ${mode}`);
-
-    await page.getByRole('button', { name: /EXIT LAB/i }).click();
-    await page.getByText('xFACTOR.OS').first().waitFor();
-  }
-});
 
 await browser.close();
 if (failures.length) {
