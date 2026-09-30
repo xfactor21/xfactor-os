@@ -20,12 +20,16 @@
 .dev-layout-rack>strong{font:900 8px 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#ff70bc}
 .dev-view-presets{display:flex;gap:3px}.dev-view-presets button{border:1px solid #302a34;background:#111017;color:#77707f;padding:6px 8px;font:800 7px 'IBM Plex Mono',monospace;letter-spacing:.07em}.dev-view-presets button.active{border-color:#20d9ff55;background:#20d9ff12;color:#e9fbff;box-shadow:0 0 14px #20d9ff16}
 .dev-layout-rack label{display:flex;align-items:center;gap:5px;color:#716a75;font:800 7px 'IBM Plex Mono',monospace;letter-spacing:.05em}.dev-layout-rack input[type=range]{width:92px;accent-color:#ff2aa3}.dev-layout-rack label span{min-width:42px;color:#aaa2ad}
-.dev-cockpit .dev-workbench-grid{grid-template-columns:var(--dev-explorer-w,220px) minmax(360px,1fr) var(--dev-preview-w,360px)}
-.dev-cockpit .dev-workbench-grid.view-code-focus{grid-template-columns:minmax(160px,var(--dev-explorer-w,220px)) minmax(620px,2.4fr) minmax(220px,.55fr)}
-.dev-cockpit .dev-workbench-grid.view-preview-focus{grid-template-columns:minmax(150px,180px) minmax(300px,.7fr) minmax(520px,2fr)}
+.dev-cockpit .dev-workbench-grid{grid-template-columns:var(--dev-explorer-w,220px) 8px minmax(360px,1fr) 8px var(--dev-preview-w,360px)}
+.dev-cockpit .dev-workbench-grid.view-code-focus{grid-template-columns:minmax(160px,var(--dev-explorer-w,220px)) 8px minmax(620px,2.4fr) 8px minmax(220px,.55fr)}
+.dev-cockpit .dev-workbench-grid.view-preview-focus{grid-template-columns:minmax(150px,180px) 8px minmax(300px,.7fr) 8px minmax(520px,2fr)}
+.dev-pane-splitter{position:relative;z-index:40;cursor:col-resize;background:#08080b;border-left:1px solid #211c23;border-right:1px solid #211c23;touch-action:none;user-select:none;outline:none}
+.dev-pane-splitter span{position:absolute;left:50%;top:50%;width:3px;height:54px;transform:translate(-50%,-50%);border-radius:3px;background:linear-gradient(#ff2aa300,#ff2aa38c,#20d9ff73,#20d9ff00);opacity:.46;transition:opacity .15s ease,box-shadow .15s ease}
+.dev-pane-splitter:hover span,.dev-pane-splitter:focus-visible span{opacity:1;box-shadow:0 0 16px #ff2aa34a}
+html.dev-resizing,html.dev-resizing *{cursor:col-resize!important;user-select:none!important}
 .dev-cockpit .dev-workbench-grid.view-code-focus .dev-preview-pane{opacity:.82}
 .dev-cockpit .dev-workbench-grid.view-preview-focus .dev-explorer{opacity:.78}
-@media(max-width:1180px){.dev-layout-rack label{display:none}.dev-cockpit .dev-workbench-grid,.dev-cockpit .dev-workbench-grid.view-code-focus,.dev-cockpit .dev-workbench-grid.view-preview-focus{grid-template-columns:190px 1fr}}
+@media(max-width:1180px){.dev-layout-rack label{display:none}.dev-pane-splitter{display:none}.dev-cockpit .dev-workbench-grid,.dev-cockpit .dev-workbench-grid.view-code-focus,.dev-cockpit .dev-workbench-grid.view-preview-focus{grid-template-columns:190px 1fr}}
 @media(max-width:760px){.dev-layout-rack{align-items:flex-start;flex-direction:column}.dev-cockpit .dev-workbench-grid,.dev-cockpit .dev-workbench-grid.view-code-focus,.dev-cockpit .dev-workbench-grid.view-preview-focus{display:flex}}
 
 /* M6.1 pane-level spatial Workbench: each major region is material, independently movable, never fusible. */
