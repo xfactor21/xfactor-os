@@ -29,3 +29,161 @@
 .dev-m2-beacon>strong{font-size:9px;letter-spacing:.12em;color:#fff}.dev-m2-beacon>span{font-size:7px;letter-spacing:.08em;color:#857e89;border:1px solid #29252d;padding:4px 6px}.dev-m2-beacon>button{margin-left:auto;border:1px solid #ff2aa34a;background:#ff2aa315;color:#fff;padding:6px 8px;font-size:8px;font-weight:900;letter-spacing:.08em}
 
 @media(max-width:900px){.xf-global-spatial-options{display:none}.xf-global-spatial-modes button{padding:6px 5px;font-size:7px}.xf-global-spatial-modes svg{display:none}}
+
+/* M5 TRUE SPATIAL RENDERER — WebGL bodies, not CSS outlines. */
+.xf-root.xf-plasma-mode .xf-true-spatial,
+.xf-root.xf-matter-mode .xf-true-spatial{
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+}
+.xf-true-spatial{z-index:22!important}
+.xf-true-spatial:not(.xf-shard){position:relative}
+.xf-true-spatial.selected{z-index:24!important}
+.xf-root.xf-plasma-mode .tape,
+.xf-root.xf-matter-mode .tape{z-index:23}
+.xf-root.xf-plasma-mode .xf-shard:after,
+.xf-root.xf-matter-mode .xf-shard:after{opacity:.18}
+.xf-root.xf-plasma-mode .xf-shard,
+.xf-root.xf-matter-mode .xf-shard{backdrop-filter:none!important}
+.xf-root.xf-plasma-mode :is(.xf-blackbox,.xf-feed,.pile-card,.asset-card,.tape-ledger article),
+.xf-root.xf-matter-mode :is(.xf-blackbox,.xf-feed,.pile-card,.asset-card,.tape-ledger article){
+  backdrop-filter:none!important;
+}
+.xf-root.xf-plasma-mode .dev-spatial-shell,
+.xf-root.xf-matter-mode .dev-spatial-shell{
+  min-height:640px;
+  padding:8px;
+}
+.xf-root.xf-plasma-mode .dev-spatial-shell>.dev-workbench,
+.xf-root.xf-matter-mode .dev-spatial-shell>.dev-workbench{
+  background:rgba(5,5,9,.38)!important;
+  border-color:rgba(255,255,255,.035)!important;
+  box-shadow:none!important;
+}
+.xf-root.xf-plasma-mode .xf-floor,
+.xf-root.xf-matter-mode .xf-floor{
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px),
+    linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+    radial-gradient(circle at 70% 30%,rgba(255,0,127,.055),transparent 30%),
+    rgba(3,3,6,.22)!important;
+}
+.xf-root.xf-plasma-mode .xf-true-spatial:hover{
+  filter:saturate(1.18) brightness(1.06);
+}
+.xf-root.xf-matter-mode .xf-true-spatial:hover{
+  filter:brightness(1.06);
+}
+
+
+/* M6 TRUE BODY — keep legacy DOM content readable while the WebGL material supplies the card body. */
+.xf-root.xf-plasma-mode .xf-true-spatial,
+.xf-root.xf-matter-mode .xf-true-spatial{
+  isolation:isolate;
+}
+.xf-root.xf-plasma-mode .xf-true-spatial>*,
+.xf-root.xf-matter-mode .xf-true-spatial>*{
+  position:relative;
+  z-index:1;
+}
+.xf-root.xf-plasma-mode .xf-true-spatial{
+  background:rgba(0,0,0,0)!important;
+  border-color:rgba(255,255,255,.012)!important;
+  box-shadow:none!important;
+}
+.xf-root.xf-plasma-mode .xf-true-spatial:hover{
+  filter:saturate(1.32) brightness(1.1);
+}
+.xf-root.xf-plasma-mode .xf-floor{
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px),
+    linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px),
+    radial-gradient(circle at 70% 30%,rgba(255,0,127,.04),transparent 34%),
+    rgba(2,2,5,.08)!important;
+}
+
+/* M6 FINAL SPATIAL LAYERING — WebGL owns the body; DOM owns readable content. */
+.xf-root.xf-plasma-mode :is(.xf-shard,.xf-blackbox,.xf-feed,.pile-card,.asset-card,.tape-ledger article).xf-true-spatial,
+.xf-root.xf-matter-mode :is(.xf-shard,.xf-blackbox,.xf-feed,.pile-card,.asset-card,.tape-ledger article).xf-true-spatial{
+  background:none!important;
+  background-image:none!important;
+  background-color:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+}
+.xf-true-spatial>.xf-spatial-content{
+  position:relative!important;
+  z-index:24!important;
+  width:100%;
+  height:100%;
+  min-width:0;
+  color:inherit;
+  pointer-events:auto;
+}
+.xf-root.xf-plasma-mode .xf-true-spatial>.xf-spatial-content,
+.xf-root.xf-matter-mode .xf-true-spatial>.xf-spatial-content{
+  text-shadow:0 1px 2px #000,0 0 9px rgba(255,255,255,.06);
+}
+.xf-root.xf-plasma-mode .pile-grid,
+.xf-root.xf-matter-mode .pile-grid{
+  gap:28px;
+}
+.xf-root.xf-plasma-mode .tape-ledger,
+.xf-root.xf-matter-mode .tape-ledger{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  border-top:0;
+}
+.xf-root.xf-plasma-mode .tape-ledger .xf-true-spatial,
+.xf-root.xf-matter-mode .tape-ledger .xf-true-spatial{
+  min-height:54px;
+}
+.spatial-bundle-badge{
+  position:absolute!important;
+  z-index:30!important;
+  left:8px;
+  top:-10px;
+  padding:3px 7px;
+  border:1px solid color-mix(in srgb,var(--bundle-color,#ff2aa3) 70%,transparent);
+  background:#08070bea;
+  color:var(--bundle-color,#ff2aa3);
+  font:800 7px 'IBM Plex Mono',monospace;
+  letter-spacing:.08em;
+  box-shadow:0 0 14px color-mix(in srgb,var(--bundle-color,#ff2aa3) 28%,transparent);
+}
+
+
+/* M6 STABLE MATERIAL RECAST — old/new WebGL fields never visibly overlap. */
+.xf-spatial-transition canvas{visibility:hidden!important}
+.xf-root.xf-spatial-transition .xf-main,
+.xf-studio-shell.xf-spatial-transition #r-studio{
+  filter:blur(1.5px) brightness(.42) saturate(.7);
+  pointer-events:none;
+}
+.xf-spatial-transition-mask{
+  position:fixed;
+  inset:58px 0 42px 62px;
+  z-index:9990;
+  display:grid;
+  place-content:center;
+  justify-items:center;
+  gap:7px;
+  pointer-events:none;
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.014) 1px,transparent 1px),
+    linear-gradient(rgba(255,255,255,.014) 1px,transparent 1px),
+    radial-gradient(circle at 44% 45%,rgba(255,42,163,.16),transparent 28%),
+    radial-gradient(circle at 58% 48%,rgba(32,217,255,.10),transparent 32%),
+    rgba(3,3,6,.90);
+  background-size:28px 28px,28px 28px,auto,auto,auto;
+  backdrop-filter:blur(10px);
+}
+.xf-spatial-transition-mask b{font:900 17px 'Archivo Black',sans-serif;letter-spacing:.05em;color:#fff}
+.xf-spatial-transition-mask span{font:900 10px 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#ff65bd}
+.xf-spatial-transition-mask small{font:800 7px 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#6f6873}
+.xf-global-spatial.recasting .xf-global-spatial-modes button{opacity:.5;cursor:wait}
+.xf-spatial-recast{color:#ff89ca;font:900 7px 'IBM Plex Mono',monospace;letter-spacing:.09em;white-space:nowrap}
+@media(max-width:760px){.xf-spatial-transition-mask{left:0;inset-block:58px 42px}}

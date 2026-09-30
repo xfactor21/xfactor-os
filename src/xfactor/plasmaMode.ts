@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export type PlasmaPolicy = 'session' | '30m' | 'remember';
 export type PlasmaLook = 'neon-x' | 'pink-riot' | 'afterglow';
@@ -19,6 +19,8 @@ export interface PlasmaController extends PlasmaAppearance {
   mode: SpatialMode;
   policy: PlasmaPolicy;
   scopeId: string;
+  transitioning: boolean;
+  targetMode?: SpatialMode;
   activate: (policy?: PlasmaPolicy, mode?: Exclude<SpatialMode, 'normal'>) => void;
   deactivate: () => void;
   setMode: (mode: SpatialMode) => void;
@@ -117,10 +119,23 @@ export function usePlasmaMode(incidentId?: string): PlasmaController {
   const scopeId = safeScope(incidentId);
   const [activation, setActivation] = useState(() => readActivation(scopeId));
   const [appearance, setAppearance] = useState<PlasmaAppearance>(readAppearance);
+  const [transitioning, setTransitioning] = useState(false);
+  const [targetMode, setTargetMode] = useState<SpatialMode>();
+  const transitionTimers = useRef<number[]>([]);
 
   useEffect(() => {
     setActivation(readActivation(scopeId));
   }, [scopeId]);
+
+  useEffect(() => () => {
+    transitionTimers.current.forEach(timer => window.clearTimeout(timer));
+    transitionTimers.current = [];
+  }, []);
+
+  const scheduleTransition = useCallback((fn: () => void, delay: number) => {
+    const timer = window.setTimeout(fn, delay);
+    transitionTimers.current.push(timer);
+  }, []);
 
   useEffect(() => {
     try { localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearance)); } catch { /* device-local enhancement only */ }
@@ -171,9 +186,42 @@ export function usePlasmaMode(incidentId?: string): PlasmaController {
   }, [scopeId]);
 
   const setMode = useCallback((mode: SpatialMode) => {
-    if (mode === 'normal') { deactivate(); return; }
-    activate(undefined, mode);
-  }, [activate, deactivate]);
+    if (mode === activation.mode && !transitioning) return;
+    transitionTimers.current.forEach(timer => window.clearTimeout(timer));
+    transitionTimers.current = [];
+    setTransitioning(true);
+    setTargetMode(mode);
+
+    const finish = () => {
+      setTransitioning(false);
+      setTargetMode(undefined);
+    };
+
+    // Paint a stable recast state before destroying or compiling WebGL fields.
+    // Plasma -> Matter intentionally passes through NORMAL for one short frame
+    // so old/new canvases never overlap or fight for the GPU in the click event.
+    scheduleTransition(() => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          if (mode === 'normal') {
+            deactivate();
+            scheduleTransition(finish, 180);
+            return;
+          }
+          if (activation.mode !== 'normal') {
+            deactivate();
+            scheduleTransition(() => {
+              activate(undefined, mode);
+              scheduleTransition(finish, 280);
+            }, 120);
+            return;
+          }
+          activate(undefined, mode);
+          scheduleTransition(finish, 280);
+        });
+      });
+    }, 16);
+  }, [activation.mode, transitioning, activate, deactivate, scheduleTransition]);
 
   const setPolicy = useCallback((policy: PlasmaPolicy) => {
     if (activation.mode !== 'normal') activate(policy, activation.mode);
@@ -194,6 +242,8 @@ export function usePlasmaMode(incidentId?: string): PlasmaController {
     mode: activation.mode,
     policy: activation.policy,
     scopeId,
+    transitioning,
+    targetMode,
     look: appearance.look,
     frost: appearance.frost,
     blend: appearance.blend,
@@ -207,5 +257,5 @@ export function usePlasmaMode(incidentId?: string): PlasmaController {
     setBlend,
     setMatterMaterial,
     resetMatterMap,
-  }), [activation.mode, activation.policy, scopeId, appearance, activate, deactivate, setMode, setPolicy, setLook, setFrost, setBlend, setMatterMaterial, resetMatterMap]);
+  }), [activation.mode, activation.policy, scopeId, transitioning, targetMode, appearance, activate, deactivate, setMode, setPolicy, setLook, setFrost, setBlend, setMatterMaterial, resetMatterMap]);
 }

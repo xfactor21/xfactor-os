@@ -1,3 +1,5 @@
+> **Current engineering milestone:** xFactor.OS **0.6.0 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
+
 # xFactor.OS — Truthful Build Matrix
 
 Version: **0.5.0**

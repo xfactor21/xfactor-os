@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   ExternalLink,
   FileCode2,
@@ -18,6 +18,8 @@ import CodeEditor, { type EditorLanguage } from '../design-system/CodeEditor';
 import TerminalRoom from '../modules/terminal';
 import GitPanel from './GitPanel';
 import { isTauri } from '../lib/platform';
+import { loadM6Settings, saveM6Settings, type WorkbenchViewMode } from './m6Settings';
+import { SpatialSurface } from './TrueSpatial';
 import {
   chooseProjectFolder,
   collectProjectMirrorFiles,
@@ -48,6 +50,7 @@ type WorkbenchFile = { path: string; content: string };
 type LocalBuffer = { content: string; savedContent: string };
 type DevStatus = 'idle' | 'booting' | 'installing' | 'starting' | 'running' | 'error';
 type WorkspaceMode = 'sandbox' | 'local';
+type DockView = 'terminal' | 'problems' | 'git' | 'search';
 
 const STARTER_FILES: WorkbenchFile[] = [
   {
@@ -238,6 +241,11 @@ export default function DeveloperWorkbench({
   const [searchHits, setSearchHits] = useState<ProjectSearchHit[]>([]);
   const [searchBusy, setSearchBusy] = useState(false);
   const [searchMeta, setSearchMeta] = useState('');
+  const [dockView, setDockView] = useState<DockView>('terminal');
+  const [workbenchView,setWorkbenchView] = useState<WorkbenchViewMode>(()=>loadM6Settings().workbenchView);
+  const [explorerWidth,setExplorerWidth] = useState(()=>Number(localStorage.getItem('xfactor-workbench-explorer-width')||220));
+  const [previewWidth,setPreviewWidth] = useState(()=>Number(localStorage.getItem('xfactor-workbench-preview-width')||360));
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const wcRef = useRef<Awaited<ReturnType<typeof getWebContainer>> | null>(null);
   const mountedKeyRef = useRef<string | undefined>(undefined);
   const devProcessRef = useRef<{ kill(): void } | null>(null);
@@ -261,6 +269,7 @@ export default function DeveloperWorkbench({
     setSearchQuery('');
     setSearchHits([]);
     setSearchMeta('');
+    setDockView('terminal');
     const first = nextSandbox.find((file) => file.path === 'src/main.js')?.path ?? nextSandbox[0]?.path ?? 'index.html';
     setActivePath(first);
     setTabs([first]);
@@ -298,6 +307,49 @@ export default function DeveloperWorkbench({
     serverOffRef.current?.();
     devProcessRef.current?.kill();
   }, []);
+
+  useEffect(() => {
+    const onSettings=(event:Event)=>{
+      const next=(event as CustomEvent<ReturnType<typeof loadM6Settings>>).detail ?? loadM6Settings();
+      setWorkbenchView(next.workbenchView);
+    };
+    window.addEventListener('xfactor:m6-settings',onSettings as EventListener);
+    return()=>window.removeEventListener('xfactor:m6-settings',onSettings as EventListener);
+  }, []);
+
+  function setViewPreset(next:WorkbenchViewMode){
+    setWorkbenchView(next);
+    saveM6Settings({...loadM6Settings(),workbenchView:next});
+  }
+  function changeExplorerWidth(next:number){
+    const value=Math.max(160,Math.min(360,next));setExplorerWidth(value);localStorage.setItem('xfactor-workbench-explorer-width',String(value));
+  }
+  function changePreviewWidth(next:number){
+    const value=Math.max(260,Math.min(640,next));setPreviewWidth(value);localStorage.setItem('xfactor-workbench-preview-width',String(value));
+  }
+
+  useEffect(() => {
+    if (!active) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const command = event.ctrlKey || event.metaKey;
+      if (!command) return;
+      if (event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        if (mode === 'local') void saveActiveLocal();
+      }
+      if (event.shiftKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        setDockView('search');
+        window.setTimeout(() => searchInputRef.current?.focus(), 0);
+      }
+      if (event.key === '`') {
+        event.preventDefault();
+        setDockView('terminal');
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [active, mode, activePath, localBuffers, binding]);
 
   const activeSandboxFile = useMemo(
     () => sandboxFiles.find((file) => file.path === activePath) ?? sandboxFiles[0],
@@ -355,6 +407,7 @@ export default function DeveloperWorkbench({
     try {
       const result = await searchProjectText(binding.rootPath, projectScan.entries, searchQuery);
       setSearchHits(result.hits);
+      setDockView('search');
       setSearchMeta(`${result.hits.length} HITS · ${result.scannedFiles} FILES${result.skippedSensitive ? ` · ${result.skippedSensitive} SENSITIVE SKIPPED` : ''}${result.truncated ? ' · TRUNCATED' : ''}`);
     } catch (error) {
       setDevError(error instanceof Error ? error.message : String(error));
@@ -378,6 +431,7 @@ export default function DeveloperWorkbench({
       setProjectScan(undefined);
       setTabs([]);
       setActivePath('');
+      setDockView('terminal');
     } catch (error) {
       setDevError(error instanceof Error ? error.message : String(error));
     }
@@ -656,49 +710,84 @@ export default function DeveloperWorkbench({
 
   const editorValue = activeContent ?? '';
   const editorKey = `${mode}:${binding?.rootPath ?? key}:${activePath}`;
+  const diskConnected = mode === 'local' && Boolean(binding);
+  const projectFileCount = mode === 'local' ? projectScan?.fileCount ?? 0 : sandboxFiles.length;
+  const cockpitState = diskConnected ? 'REAL PROJECT CONNECTED' : 'INCIDENT SANDBOX';
+  const runtimeState = previewUrl ? 'LIVE PREVIEW' : devStatus === 'idle' ? 'READY' : devStatus.toUpperCase();
 
   return (
-    <section className={`dev-workbench ${active ? 'active' : ''} mode-${mode}`}>
-      <div className="dev-workbench-head">
-        <div className="dev-project-context">
-          <span>ACTIVE INCIDENT //</span>
-          <b>{projectName || 'SCRATCH PROJECT'}</b>
+    <section className={`dev-workbench dev-cockpit ${active ? 'active' : ''} mode-${mode}`}>
+      <header className="dev-cockpit-head">
+        <div className="dev-cockpit-title">
+          <span>BUILD // PROJECT COCKPIT</span>
+          <h2>{projectName || 'SCRATCH PROJECT'}</h2>
           <div className="dev-project-meta">
             {projectStatus && <i>{projectStatus}</i>}
             {projectPriority && <i>{projectPriority}</i>}
             <i>{taskCount} TASKS</i>
             <i>{openSignals} OPEN SIGNALS</i>
             <i>{assetCount} ASSETS</i>
-            <i className={mode === 'local' ? 'local-binding' : ''}>{mode === 'local' ? 'DISK PROJECT' : 'INCIDENT SANDBOX'}</i>
+            <i className={diskConnected ? 'local-binding' : ''}>{cockpitState}</i>
             {dirtyCount > 0 && <i className="dirty-badge">{dirtyCount} UNSAVED</i>}
           </div>
           {nextMove && <p><strong>NEXT //</strong> {nextMove}</p>}
-          {binding && <p className="dev-binding-name"><strong>BOUND //</strong> {binding.name}</p>}
         </div>
-        <div className="dev-workbench-actions">
-          <span className={`dev-status ${devStatus}`}>{devStatus === 'running' ? '● LIVE' : devStatus.toUpperCase()}</span>
-          {isTauri() && projectId && mode === 'sandbox' && <button onClick={() => void bindFolder()}><FolderOpen size={13}/> OPEN FOLDER</button>}
-          {mode === 'local' && <button onClick={() => void refreshLocalTree()}><FolderSync size={13}/> REFRESH</button>}
-          {mode === 'local' && <button onClick={() => void saveAllLocal()} disabled={dirtyCount === 0}><Save size={13}/> SAVE ALL</button>}
+        <div className="dev-cockpit-runtime">
+          <small>RUNTIME</small>
+          <b className={`dev-status ${devStatus}`}>{runtimeState}</b>
+          {activePath && <span>{activePath}</span>}
+        </div>
+      </header>
+
+      <section className={`dev-project-connection ${diskConnected ? 'connected' : 'sandbox'}`}>
+        <div className="dev-connection-copy">
+          <small>PROJECT SOURCE //</small>
+          <b>{diskConnected ? binding?.name : 'NO DISK PROJECT ATTACHED'}</b>
+          {diskConnected ? <p>{binding?.rootPath}</p> : <p>The Workbench is usable now, but binding a real folder unlocks disk-backed editing, project search, Git, Problems and your actual app runtime.</p>}
+        </div>
+        <div className="dev-connection-stats">
+          <span><b>{projectFileCount}</b><small>FILES</small></span>
+          <span><b>{tabs.length}</b><small>OPEN</small></span>
+          <span><b>{problems.length}</b><small>PROBLEMS</small></span>
+          <span><b>{dirtyCount}</b><small>UNSAVED</small></span>
+        </div>
+        <div className="dev-connection-actions">
+          {isTauri() && mode === 'sandbox' && <button className="primary" disabled={!projectId} onClick={() => void bindFolder()}><FolderOpen size={14}/> {projectId ? 'OPEN REAL PROJECT' : 'SELECT INCIDENT FIRST'}</button>}
+          {!isTauri() && mode === 'sandbox' && <div className="dev-desktop-hint">DESKTOP APP // OPEN REAL PROJECT ENABLED THERE</div>}
+          {mode === 'local' && <button onClick={() => void refreshLocalTree()}><FolderSync size={13}/> RESCAN</button>}
           {mode === 'local' && <button onClick={detachFolder}><X size={13}/> DETACH</button>}
-          <button onClick={() => void createFile()}><Plus size={13}/> FILE</button>
-          {mode === 'sandbox' && <button onClick={resetStarter}><RefreshCw size={13}/> RESET</button>}
-          {runScripts.length > 1 && <select value={selectedScript ?? ''} onChange={(event) => setSelectedScript(event.target.value)}>{runScripts.map((script) => <option key={script}>{script}</option>)}</select>}
-          <button className="run" onClick={() => void runDev()} disabled={devStatus === 'booting' || devStatus === 'installing' || devStatus === 'starting'}>
-            <Play size={13}/> {devStatus === 'installing' ? 'INSTALLING' : devStatus === 'starting' ? 'STARTING' : 'RUN DEV'}
-          </button>
-          {previewUrl && <button onClick={() => window.open(previewUrl, '_blank', 'noopener,noreferrer')}><ExternalLink size={13}/> OPEN</button>}
         </div>
+      </section>
+
+      <div className="dev-layout-rack">
+        <strong>LAYOUT //</strong>
+        <div className="dev-view-presets">
+          <button className={workbenchView==='cockpit'?'active':''} onClick={()=>setViewPreset('cockpit')}>COCKPIT</button>
+          <button className={workbenchView==='code-focus'?'active':''} onClick={()=>setViewPreset('code-focus')}>CODE FOCUS</button>
+          <button className={workbenchView==='preview-focus'?'active':''} onClick={()=>setViewPreset('preview-focus')}>PREVIEW FOCUS</button>
+        </div>
+        <label>EXPLORER <input type="range" min="160" max="360" step="10" value={explorerWidth} onChange={event=>changeExplorerWidth(Number(event.target.value))}/><span>{explorerWidth}px</span></label>
+        <label>PREVIEW <input type="range" min="260" max="640" step="10" value={previewWidth} onChange={event=>changePreviewWidth(Number(event.target.value))}/><span>{previewWidth}px</span></label>
       </div>
 
-      <div className="dev-m2-beacon"><strong>WORKBENCH M2 //</strong><span>REAL FOLDER</span><span>FILE TREE</span><span>SEARCH</span><span>PROBLEMS</span><span>GIT</span><span>LIVE PREVIEW</span><span>TERMINAL</span>{isTauri() && mode === 'sandbox' && <button disabled={!projectId} title={!projectId ? 'Select or create an Incident first.' : 'Bind a real project folder to this Incident.'} onClick={() => void bindFolder()}><FolderOpen size={12}/> {projectId ? 'OPEN REAL PROJECT' : 'SELECT INCIDENT FIRST'}</button>}</div>
-
-      {mode === 'local' && binding && <div className="dev-workbench-secondary">
-        <div className="dev-project-search"><Search size={13}/><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void runProjectSearch(); }} placeholder="SEARCH THIS PROJECT..."/><button disabled={searchBusy || !searchQuery.trim()} onClick={() => void runProjectSearch()}>{searchBusy ? 'SEARCHING' : 'SEARCH'}</button></div>
-        {searchMeta && <small>{searchMeta}</small>}
-      </div>}
-
-      {mode === 'local' && searchHits.length > 0 && <div className="dev-search-results">{searchHits.slice(0, 80).map((hit, index) => <button key={`${hit.path}:${hit.line}:${hit.column}:${index}`} onClick={() => openFile(hit.path)}><b>{hit.path}</b><span>{hit.line}:{hit.column}</span><p>{hit.preview}</p></button>)}</div>}
+      <div className="dev-cockpit-toolbar">
+        <div className="dev-cockpit-tools">
+          <button onClick={() => void createFile()}><Plus size={13}/> NEW FILE</button>
+          {mode === 'local' && <button onClick={() => void saveAllLocal()} disabled={dirtyCount === 0}><Save size={13}/> SAVE ALL</button>}
+          {mode === 'sandbox' && <button onClick={resetStarter}><RefreshCw size={13}/> RESET SANDBOX</button>}
+          {runScripts.length > 1 && <select value={selectedScript ?? ''} onChange={(event) => setSelectedScript(event.target.value)}>{runScripts.map((script) => <option key={script}>{script}</option>)}</select>}
+          <button className="run" onClick={() => void runDev()} disabled={devStatus === 'booting' || devStatus === 'installing' || devStatus === 'starting'}>
+            <Play size={13}/> {devStatus === 'installing' ? 'INSTALLING' : devStatus === 'starting' ? 'STARTING' : 'RUN PROJECT'}
+          </button>
+          {previewUrl && <button onClick={() => window.open(previewUrl, '_blank', 'noopener,noreferrer')}><ExternalLink size={13}/> OPEN LIVE</button>}
+        </div>
+        <div className="dev-cockpit-jump">
+          <button onClick={() => setDockView('terminal')}><TerminalSquare size={12}/> TERMINAL</button>
+          <button onClick={() => setDockView('problems')}><AlertTriangle size={12}/> PROBLEMS {problems.length ? `· ${problems.length}` : ''}</button>
+          <button onClick={() => setDockView('git')}>GIT</button>
+          <button onClick={() => { setDockView('search'); window.setTimeout(() => searchInputRef.current?.focus(), 0); }}><Search size={12}/> SEARCH</button>
+        </div>
+      </div>
 
       {mode === 'local' && scanError && <div className="dev-binding-error">
         <b>LOCAL PROJECT ACCESS NEEDS ATTENTION</b>
@@ -706,9 +795,9 @@ export default function DeveloperWorkbench({
         <button onClick={() => void bindFolder()}>REBIND FOLDER</button>
       </div>}
 
-      <div className="dev-workbench-grid">
-        <aside className="dev-explorer">
-          <div className="dev-pane-title"><FolderOpen size={13}/> {mode === 'local' ? binding?.name ?? 'LOCAL PROJECT' : 'PROJECT'}</div>
+      <div className={`dev-workbench-grid view-${workbenchView}`} style={{'--dev-explorer-w':`${explorerWidth}px`,'--dev-preview-w':`${previewWidth}px`} as CSSProperties}>
+        <SpatialSurface as="aside" className="dev-explorer dev-spatial-pane" group="workbench-panes" fuse={false} spatialId={`workbench:${projectId ?? 'scratch'}:explorer`} spatialDraggable>
+          <div className="dev-pane-title"><FolderOpen size={13}/> {mode === 'local' ? binding?.name ?? 'LOCAL PROJECT' : 'PROJECT'}<span>{projectFileCount}</span></div>
           {mode === 'local' ? (
             projectScan ? <ProjectTree
               entries={projectScan.entries}
@@ -735,11 +824,11 @@ export default function DeveloperWorkbench({
           <div className="dev-explorer-note">
             {mode === 'local'
               ? <>{projectScan?.fileCount ?? 0} FILES · {projectScan?.directoryCount ?? 0} DIRS<br/>DISK IS AUTHORITATIVE{projectScan?.truncated ? <><br/>TREE TRUNCATED FOR SAFETY</> : null}</>
-              : <>AUTO-SAVED LOCALLY<br/>NODE ROOT: /workspace</>}
+              : <>INCIDENT SANDBOX<br/>AUTO-SAVED LOCALLY<br/>NODE ROOT: /workspace</>}
           </div>
-        </aside>
+        </SpatialSurface>
 
-        <section className="dev-code-pane">
+        <SpatialSurface as="section" className="dev-code-pane dev-spatial-pane" group="workbench-panes" fuse={false} spatialId={`workbench:${projectId ?? 'scratch'}:editor`} spatialDraggable>
           <div className="dev-tabs">
             {tabs.map((tab) => {
               const dirty = mode === 'local' && Boolean(localBuffers[tab] && localBuffers[tab].content !== localBuffers[tab].savedContent);
@@ -749,21 +838,23 @@ export default function DeveloperWorkbench({
             })}
           </div>
           {activePath && activeContent !== undefined ? <>
-            {mode === 'local' && <div className="dev-editor-filebar"><span>{activePath}</span><button onClick={() => void saveActiveLocal()} disabled={!activeDirty}><Save size={11}/> SAVE</button></div>}
-            <CodeEditor
-              className="dev-code-editor"
-              value={editorValue}
-              resetKey={editorKey}
-              language={languageFor(activePath)}
-              onChange={updateActive}
-            />
+            <div className="dev-editor-filebar"><span>{activePath}</span><small>{languageFor(activePath).toUpperCase()}</small>{mode === 'local' && <button onClick={() => void saveActiveLocal()} disabled={!activeDirty}><Save size={11}/> SAVE</button>}</div>
+            <div className="dev-code-editor-wrap" data-plasma-nodrag>
+              <CodeEditor
+                className="dev-code-editor"
+                value={editorValue}
+                resetKey={editorKey}
+                language={languageFor(activePath)}
+                onChange={updateActive}
+              />
+            </div>
           </> : <div className="dev-no-file">{mode === 'local' ? 'OPEN A TEXT FILE FROM THE PROJECT TREE' : 'CREATE OR OPEN A FILE'}</div>}
-        </section>
+        </SpatialSurface>
 
-        <section className="dev-preview-pane">
-          <div className="dev-pane-title"><Play size={13}/> {previewUrl ? 'LIVE DEV SERVER' : mode === 'local' ? 'RUN PROJECT FOR PREVIEW' : 'STATIC PREVIEW'}</div>
+        <SpatialSurface as="section" className="dev-preview-pane dev-spatial-pane" group="workbench-panes" fuse={false} spatialId={`workbench:${projectId ?? 'scratch'}:preview`} spatialDraggable>
+          <div className="dev-pane-title"><Play size={13}/> {previewUrl ? 'LIVE DEV SERVER' : mode === 'local' ? 'PROJECT PREVIEW' : 'STATIC PREVIEW'}<span>{previewUrl ? 'LIVE' : 'IDLE'}</span></div>
           {mode === 'local' && !previewUrl
-            ? <div className="dev-local-preview-empty"><b>REAL PROJECT MODE</b><p>Run the detected npm script to mirror this approved folder into the shared WebContainer and attach the live server here.</p><small>Likely secrets are excluded from the mirror by default.</small></div>
+            ? <div className="dev-local-preview-empty"><b>YOUR APP RUNS HERE.</b><p>Hit RUN PROJECT. xFactor.OS mirrors the approved project into its shared runtime, launches the detected package script, and keeps the preview beside the code.</p><small>LIKELY SECRET FILES STAY OUT OF THE MIRROR BY DEFAULT.</small></div>
             : <iframe
               title="Workbench preview"
               sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"
@@ -772,18 +863,36 @@ export default function DeveloperWorkbench({
             />}
           {devError && <div className="dev-error">{devError}</div>}
           {logs.length > 0 && <pre className="dev-process-log">{logs.join('').slice(-7000)}</pre>}
-        </section>
+        </SpatialSurface>
       </div>
 
-      {problems.length > 0 && <section className="dev-problems-panel">
-        <div className="dev-problems-head"><AlertTriangle size={13}/><b>PROBLEMS</b><span>{problems.length}</span></div>
-        <div className="dev-problems-list">{problems.slice(0, 80).map((problem) => <button key={problem.id} onClick={() => { if (problem.file) openFile(problem.file); }} disabled={!problem.file}><i className={problem.severity}/><b>{problem.code ?? problem.source.toUpperCase()}</b><span>{problem.file ? `${problem.file}${problem.line ? `:${problem.line}${problem.column ? `:${problem.column}` : ''}` : ''}` : 'PROCESS'}</span><p>{problem.message}</p></button>)}</div>
-      </section>}
+      <SpatialSurface as="section" className="dev-cockpit-dock dev-spatial-pane" group="workbench-panes" fuse={false} spatialId={`workbench:${projectId ?? 'scratch'}:dock`} spatialDraggable>
+        <div className="dev-dock-tabs">
+          <button className={dockView === 'terminal' ? 'active' : ''} onClick={() => setDockView('terminal')}><TerminalSquare size={12}/> TERMINAL</button>
+          <button className={dockView === 'problems' ? 'active' : ''} onClick={() => setDockView('problems')}><AlertTriangle size={12}/> PROBLEMS <i>{problems.length}</i></button>
+          <button className={dockView === 'git' ? 'active' : ''} onClick={() => setDockView('git')}>SOURCE CONTROL</button>
+          <button className={dockView === 'search' ? 'active' : ''} onClick={() => setDockView('search')}><Search size={12}/> PROJECT SEARCH {searchHits.length ? <i>{searchHits.length}</i> : null}</button>
+          <span>CTRL/⌘+S SAVE · CTRL/⌘+SHIFT+F SEARCH · CTRL/⌘+` TERMINAL</span>
+        </div>
 
-      {mode === 'local' && binding && <GitPanel rootPath={binding.rootPath}/>} 
+        {dockView === 'terminal' && <div data-plasma-nodrag className="dev-dock-content terminal"><TerminalRoom active={active} compact /></div>}
 
-      <div className="dev-terminal-title"><TerminalSquare size={13}/> SHARED RUNTIME / TERMINAL</div>
-      <TerminalRoom active={active} compact />
+        {dockView === 'problems' && <div data-plasma-nodrag className="dev-dock-content">
+          {problems.length > 0 ? <div className="dev-problems-list">{problems.slice(0, 80).map((problem) => <button key={problem.id} onClick={() => { if (problem.file) openFile(problem.file); }} disabled={!problem.file}><i className={problem.severity}/><b>{problem.code ?? problem.source.toUpperCase()}</b><span>{problem.file ? `${problem.file}${problem.line ? `:${problem.line}${problem.column ? `:${problem.column}` : ''}` : ''}` : 'PROCESS'}</span><p>{problem.message}</p></button>)}</div> : <div className="dev-dock-empty">NO PARSED PROBLEMS. BUILD/RUNTIME OUTPUT WILL APPEAR HERE WHEN SOMETHING BREAKS.</div>}
+        </div>}
+
+        {dockView === 'git' && <div data-plasma-nodrag className="dev-dock-content">
+          {mode === 'local' && binding ? <GitPanel rootPath={binding.rootPath}/> : <div className="dev-dock-empty"><b>SOURCE CONTROL NEEDS A REAL PROJECT.</b><span>Bind a desktop folder to inspect diffs, stage, unstage and commit without leaving this Incident.</span>{isTauri() && projectId && <button onClick={() => void bindFolder()}><FolderOpen size={12}/> OPEN REAL PROJECT</button>}</div>}
+        </div>}
+
+        {dockView === 'search' && <div data-plasma-nodrag className="dev-dock-content search">
+          {mode === 'local' && binding ? <>
+            <div className="dev-project-search"><Search size={13}/><input ref={searchInputRef} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void runProjectSearch(); }} placeholder="SEARCH ACROSS THIS PROJECT..."/><button disabled={searchBusy || !searchQuery.trim()} onClick={() => void runProjectSearch()}>{searchBusy ? 'SEARCHING' : 'SEARCH'}</button></div>
+            {searchMeta && <small className="dev-search-meta">{searchMeta}</small>}
+            {searchHits.length > 0 ? <div className="dev-search-results">{searchHits.slice(0, 80).map((hit, index) => <button key={`${hit.path}:${hit.line}:${hit.column}:${index}`} onClick={() => openFile(hit.path)}><b>{hit.path}</b><span>{hit.line}:{hit.column}</span><p>{hit.preview}</p></button>)}</div> : <div className="dev-dock-empty">SEARCH FILE CONTENT ACROSS THE BOUND PROJECT. LIKELY SECRET FILES ARE SKIPPED BY DEFAULT.</div>}
+          </> : <div className="dev-dock-empty"><b>PROJECT SEARCH NEEDS A REAL PROJECT.</b><span>Bind a desktop folder and search the actual codebase from here.</span>{isTauri() && projectId && <button onClick={() => void bindFolder()}><FolderOpen size={12}/> OPEN REAL PROJECT</button>}</div>}
+        </div>}
+      </SpatialSurface>
     </section>
   );
 }

@@ -1,4 +1,4 @@
-import type { ActivityEvent, Asset, AssetSource, Incident, IncidentPriority, IncidentStatus, Pile, Position, SavedLayout, Signal, SignalType, WorkspaceState } from './domain';
+import type { ActivityEvent, Asset, AssetSource, Incident, IncidentPriority, IncidentStatus, Pile, Position, SavedLayout, Signal, SignalType, SpatialBundle, SpatialEntityKind, WorkspaceState } from './domain';
 
 export const WORKSPACE_STORAGE_KEY = 'xfactor-os-workspace-v2';
 const KEY = WORKSPACE_STORAGE_KEY;
@@ -29,6 +29,7 @@ export function freshWorkspace(): WorkspaceState {
     activity:[],
     positions:{},
     savedLayouts:[],
+    spatialBundles:[],
     selectedIncidentId:undefined,
   };
 }
@@ -132,6 +133,29 @@ function normalizeLayout(value: unknown): SavedLayout | null {
   return { id:value.id, name:text(value.name,'SAVED LAYOUT').slice(0,240), positions, createdAt:finite(value.createdAt,now()) };
 }
 
+const spatialKind = (value: unknown): SpatialEntityKind | null => value === 'incident' || value === 'signal' || value === 'asset' || value === 'studio' ? value : null;
+function normalizeSpatialBundle(value: unknown): SpatialBundle | null {
+  if (!isRecord(value) || typeof value.id !== 'string' || !value.id) return null;
+  const members = Array.isArray(value.members) ? value.members.flatMap(member => {
+    if (!isRecord(member) || typeof member.id !== 'string' || !member.id) return [];
+    const kind = spatialKind(member.kind);
+    return kind ? [{kind,id:member.id}] : [];
+  }).slice(0,300) : [];
+  if (members.length < 2) return null;
+  const material = value.material === 'crystal' || value.material === 'metal' || value.material === 'wood' || value.material === 'stone' || value.material === 'cloud' ? value.material : 'plasma';
+  const createdAt = finite(value.createdAt, now());
+  return {
+    id:value.id,
+    name:text(value.name,'SPATIAL BUNDLE').slice(0,240),
+    color:/^#[0-9a-f]{6}$/i.test(text(value.color)) ? text(value.color) : '#ff2aa3',
+    material,
+    members,
+    pileId:typeof value.pileId === 'string' ? value.pileId : undefined,
+    createdAt,
+    updatedAt:finite(value.updatedAt,createdAt),
+  };
+}
+
 /** Return the newest meaningful timestamp represented by the workspace.
  * The explicit workspace clock covers mutations such as pile collapse or floor movement
  * that do not naturally update an entity timestamp. Legacy schema-v2 payloads still
@@ -145,6 +169,7 @@ export function workspaceClock(state: WorkspaceState): number {
     ...state.assets.flatMap(item => [item.createdAt, item.updatedAt]),
     ...state.activity.map(item => item.createdAt),
     ...state.savedLayouts.map(item => item.createdAt),
+    ...state.spatialBundles.flatMap(item => [item.createdAt,item.updatedAt]),
   );
 }
 
@@ -163,6 +188,11 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
   if (isRecord(value.positions)) for (const [id,pos] of Object.entries(value.positions)) if (incidentIds.has(id)) { const clean=normalizePosition(pos); if(clean) positions[id]=clean; }
   const separatedPositions = separateIdenticalPositions(cleanIncidents,positions);
   const savedLayouts = (Array.isArray(value.savedLayouts) ? value.savedLayouts : []).map(normalizeLayout).filter((v): v is SavedLayout => Boolean(v));
+  const spatialBundles = (Array.isArray(value.spatialBundles) ? value.spatialBundles : []).map(normalizeSpatialBundle).filter((v): v is SpatialBundle => Boolean(v)).map(bundle => ({
+    ...bundle,
+    members: bundle.members.filter(member => member.kind === 'incident' ? incidentIds.has(member.id) : member.kind === 'signal' ? signals.some(signal => signal.id === member.id) : member.kind === 'asset' ? assets.some(asset => asset.id === member.id) : true),
+    pileId: bundle.pileId && pileIds.has(bundle.pileId) ? bundle.pileId : undefined,
+  })).filter(bundle => bundle.members.length >= 2);
   const updatedAt = Math.max(
     0, finite(value.updatedAt, 0),
     ...cleanIncidents.flatMap(item => [item.createdAt, item.updatedAt]),
@@ -171,6 +201,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
     ...assets.flatMap(item => [item.createdAt, item.updatedAt]),
     ...activity.map(item => item.createdAt),
     ...savedLayouts.map(item => item.createdAt),
+    ...spatialBundles.flatMap(item => [item.createdAt,item.updatedAt]),
   );
   return {
     schemaVersion:2,
@@ -182,6 +213,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
     activity:activity.slice(0,5000),
     positions:separatedPositions,
     savedLayouts:savedLayouts.slice(0,50),
+    spatialBundles:spatialBundles.slice(0,200),
     selectedIncidentId:typeof value.selectedIncidentId === 'string' && incidentIds.has(value.selectedIncidentId) ? value.selectedIncidentId : undefined,
   };
 }

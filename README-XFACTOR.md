@@ -1,3 +1,5 @@
+> **Current engineering milestone:** xFactor.OS **0.6.0 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
+
 # xFactor.OS — Controlled Chaos System
 
 > **The studio after an explosion — except every piece knows exactly where it belongs.**

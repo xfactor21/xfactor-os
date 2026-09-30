@@ -38,9 +38,9 @@ assert('Matter uses true Plasma UI material providers', board.includes('material
 assert('unlike Matter is isolated into separate renderer groups', board.includes('group={`${layoutScope}:${material}`}'));
 assert('same Matter can still fuse', board.includes('blend={physics.blend}') && !board.includes('fuse={false}'));
 assert('Matter uses semantic done-task override', board.includes("signal.type === 'task' && signal.done"));
-assert('desktop Matter surface cap is stricter than liquid Plasma', board.includes("plasma.mode === 'matter' ? 10 : 14"));
+assert('desktop Matter surface cap is stricter than liquid Plasma', board.includes("spatialFx === 'full' ? 14") && board.includes("spatialFx === 'full' ? 10"));
 assert('compact Matter surface cap is five', board.includes('compact ? 5'));
-assert('Matter renderer quality is reduced for multi-pass safety', board.includes('quality={compact ? 0.48 : 0.78}'));
+assert('Matter renderer quality remains below liquid Plasma for multi-pass safety', board.includes('matterQuality') && board.includes("spatialFx === 'full' ? 0.9"));
 assert('Matter disables pointer droplets across multiple render passes', board.includes('pointerDrop={false}'));
 assert('shell receives distinct Matter styling', css.includes('.xf-root.xf-matter-mode'));
 assert('Matter mapping UI exposes all six supported materials', board.includes("'plasma', 'crystal', 'metal', 'wood', 'stone', 'cloud'"));

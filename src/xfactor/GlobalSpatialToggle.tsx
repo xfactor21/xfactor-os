@@ -16,13 +16,14 @@ const POLICY_LABEL: Record<PlasmaPolicy, string> = {
 export default function GlobalSpatialToggle({ plasma }: { plasma: PlasmaController }) {
   const setMode = (mode: SpatialMode) => plasma.setMode(mode);
 
-  return <div className="xf-global-spatial" aria-label="Global spatial display mode">
+  return <div className={`xf-global-spatial ${plasma.transitioning ? "recasting" : ""}`} aria-label="Global spatial display mode" aria-busy={plasma.transitioning}>
     <div className="xf-global-spatial-modes" role="group" aria-label="Normal, Plasma, or Matter mode">
-      <button className={plasma.mode === 'normal' ? 'active normal' : 'normal'} onClick={() => setMode('normal')}>NORMAL</button>
-      <button className={plasma.mode === 'plasma' ? 'active plasma' : 'plasma'} onClick={() => setMode('plasma')}><Sparkles size={11}/> PLASMA</button>
-      <button className={plasma.mode === 'matter' ? 'active matter' : 'matter'} onClick={() => setMode('matter')}>◆ MATTER</button>
+      <button disabled={plasma.transitioning} className={plasma.mode === 'normal' ? 'active normal' : 'normal'} onClick={() => setMode('normal')}>NORMAL</button>
+      <button disabled={plasma.transitioning} className={plasma.mode === 'plasma' ? 'active plasma' : 'plasma'} onClick={() => setMode('plasma')}><Sparkles size={11}/> PLASMA</button>
+      <button disabled={plasma.transitioning} className={plasma.mode === 'matter' ? 'active matter' : 'matter'} onClick={() => setMode('matter')}>◆ MATTER</button>
     </div>
-    {plasma.mode !== 'normal' && <div className="xf-global-spatial-options">
+    {plasma.transitioning && <span className="xf-spatial-recast">RECASTING → {(plasma.targetMode ?? plasma.mode).toUpperCase()}</span>}
+    {!plasma.transitioning && plasma.mode !== 'normal' && <div className="xf-global-spatial-options">
       <select aria-label="Spatial look" value={plasma.look} onChange={event => plasma.setLook(event.target.value as PlasmaLook)}>
         {(Object.keys(LOOK_LABEL) as PlasmaLook[]).map(look => <option key={look} value={look}>{LOOK_LABEL[look]}</option>)}
       </select>

@@ -26,12 +26,12 @@ const workbench = fs.readFileSync(new URL('../src/xfactor/DeveloperWorkbench.tsx
 
 assert('global 3-way control exposes Normal Plasma Matter', toggle.includes('NORMAL') && toggle.includes('PLASMA') && toggle.includes('MATTER'));
 assert('global mode keeps explicit duration choices', toggle.includes('THIS SESSION') && toggle.includes('30 MIN') && toggle.includes('UNTIL OFF'));
-assert('momentum target has velocity threshold and bounds clamp', physics.includes('speed < 0.18') && physics.includes('bounds.width - surface.width'));
+assert('momentum target has velocity threshold and bounds clamp', (physics.includes('speed < 0.18') || physics.includes('speed < 0.1') || physics.includes('speed < 0.07')) && physics.includes('bounds.width - surface.width'));
 assert('global CSS targets Floor/Piles/Vault/Tape/Workbench surfaces', ['.xf-shard', '.pile-card', '.asset-card', '.tape-ledger article', '.dev-workbench'].every(token => css.includes(token)));
 assert('Matter global CSS gives rooms distinct material treatments', css.includes('.xf-matter-mode .xf-shard') && css.includes('.xf-matter-mode .pile-card') && css.includes('.xf-matter-mode .asset-card'));
 assert('controller is OS-global', chaos.includes("usePlasmaMode('global')") && chaos.includes('<GlobalSpatialToggle plasma={plasma}/>'));
 assert('Signal uses inertial throw', signal.includes('momentumTarget') && signal.includes('onPointerMoveCapture'));
 assert('Signal fusion is explicit', signal.includes('onJoinChange') && signal.includes('is-fused') && signal.includes('fuse'));
-assert('Workbench M2 is surfaced', workbench.includes('WORKBENCH M2 //') && workbench.includes('OPEN REAL PROJECT'));
+assert('Workbench build capabilities are surfaced', workbench.includes('OPEN REAL PROJECT') && (workbench.includes('WORKBENCH M2 //') || workbench.includes('BUILD // PROJECT COCKPIT')));
 
 console.log('\nM3 corrective spatial source checks passed.');

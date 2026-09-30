@@ -4,6 +4,7 @@ import { Plasma, PlasmaProvider, type Offset } from '@cruxgarden/plasma-ui';
 import type { Incident, Signal, SignalType } from './domain';
 import type { MatterMaterial, MatterSlot, PlasmaController, PlasmaLook, PlasmaPolicy } from './plasmaMode';
 import { beginMomentum, joinedAny, momentumTarget, sampleMomentum, type PointerMomentum } from './spatialPhysics';
+import { loadM6Settings } from './m6Settings';
 import './plasmaMode.css';
 
 interface PlasmaSignalWorkspaceProps {
@@ -15,6 +16,7 @@ interface PlasmaSignalWorkspaceProps {
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
   plasma: PlasmaController;
+  onBundle?: (firstId: string, secondId: string) => void;
 }
 
 type Layout = Record<string, Offset>;
@@ -160,6 +162,7 @@ function LiquidBoard({
   onLayout,
   onUpdate,
   onDelete,
+  onBundle,
 }: {
   signals: Signal[];
   incidents: Incident[];
@@ -171,9 +174,14 @@ function LiquidBoard({
   onLayout: (id: string, next: Offset) => void;
   onUpdate: (id: string, changes: Partial<Signal>) => void;
   onDelete: (signal: Signal) => void;
+  onBundle?: (firstId: string, secondId: string) => void;
 }) {
   const momentum = useRef(new Map<string, PointerMomentum>());
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
+  const settings = loadM6Settings();
+  const quality = compact ? 0.62 : settings.spatialFx === 'full' ? 1.08 : settings.spatialFx === 'reduced' ? 0.58 : 0.82;
+  const maxSurfaces = compact ? 6 : settings.spatialFx === 'full' ? 14 : settings.spatialFx === 'reduced' ? 7 : 10;
+  const pointerPull = settings.spatialFx !== 'reduced' && !settings.reduceMotion;
   const rememberPointer = (id: string, event: ReactPointerEvent) => {
     const previous = momentum.current.get(id);
     momentum.current.set(id, previous ? sampleMomentum(previous, event.clientX, event.clientY) : beginMomentum(event.clientX, event.clientY));
@@ -189,27 +197,36 @@ function LiquidBoard({
     mood={plasma.look === 'afterglow' ? 'tidal' : plasma.look === 'pink-riot' ? 'ember' : 'aurora'}
     theme="dark"
     tint={plasma.look === 'afterglow' ? '#8b5cf6' : '#ff2aa3'}
-    opacity={0.21}
-    frost={Math.max(0.08, plasma.frost * 0.58)}
-    blend={Math.max(plasma.blend, compact ? 30 : 46)}
-    viscosity={0.16}
-    stretch={1.9}
-    refraction={1.32}
-    dispersion={1.42}
+    background="#07020a"
+    opacity={0.84}
+    frost={Math.max(0.01, plasma.frost * 0.09)}
+    blend={compact ? 14 : 22}
+    viscosity={0.055}
+    stretch={4.8}
+    flow={1.28}
+    tension={0.38}
+    refraction={2.12}
+    dispersion={1.9}
     rimColor="iridescent"
-    rimWidth={1.9}
-    highlight={1.65}
-    shimmer={1.55}
-    shimmerSpeed={1.3}
-    glow={1.75}
-    wash={0.35}
-    grain={0.26}
+    rimWidth={0.86}
+    highlight={2.0}
+    edgeLine={0.36}
+    shimmer={2.25}
+    shimmerSpeed={1.6}
+    glow={2.3}
+    wash={1.12}
+    grain={0.06}
     grid={24}
-    magnet={58}
-    quality={compact ? 0.68 : 1}
-    maxSurfaces={compact ? 7 : 16}
+    magnet={compact ? 22 : 30}
+    quality={quality}
+    maxSurfaces={maxSurfaces}
     pointerDrop={false}
+    pointerPull={pointerPull}
     ambientDrops={false}
+    ground="clear"
+    zIndex={8}
+    formIn={false}
+    formOut={false}
   >
     {signals.map((signal, index) => {
       const fallback = homeLayout(signals)[signal.id] ?? { x: 18 + (index % 3) * 282, y: 18 + Math.floor(index / 3) * 192 };
@@ -226,12 +243,23 @@ function LiquidBoard({
         onPointerDownCapture={event => momentum.current.set(signal.id, beginMomentum(event.clientX, event.clientY))}
         onPointerMoveCapture={event => rememberPointer(signal.id, event)}
         onDragEnd={next => settle(signal.id, next)}
-        onJoinChange={joined => setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; })}
+        onJoinChange={joined => {
+          setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; });
+          if (joinedAny(joined) && onBundle) {
+            const currentOffset = layout[signal.id] ?? fallback;
+            const nearest = signals.filter(other => other.id !== signal.id).map(other => {
+              const otherOffset = layout[other.id] ?? homeLayout(signals)[other.id] ?? {x:18,y:18};
+              return {id:other.id,distance:Math.hypot(otherOffset.x-currentOffset.x,otherOffset.y-currentOffset.y)};
+            }).sort((a,b)=>a.distance-b.distance)[0];
+            if (nearest && nearest.distance < 330) onBundle(signal.id,nearest.id);
+          }
+        }}
         tint={typeTint[plasma.look][signal.type]}
-        opacity={signal.done ? 0.13 : 0.28}
-        frost={signal.type === 'note' ? Math.min(0.58, plasma.frost * 0.5 + 0.08) : Math.max(0.05, plasma.frost * 0.4)}
-        elevation={signal.pinned ? 0.78 : 0.48}
-        radius={signal.type === 'spark' ? 32 : 24}
+        opacity={signal.done ? 0.58 : 0.9}
+        frost={signal.type === 'note' ? Math.min(0.09, plasma.frost * 0.08 + 0.01) : 0.01}
+        elevation={signal.pinned ? 0.86 : 0.62}
+        lean={18}
+        radius={signal.type === 'spark' ? 38 : 30}
         padding={16}
         style={{ width: 258, height: 170, position: 'absolute', left: 0, top: 0 }}
       >
@@ -266,6 +294,10 @@ function MatterBoard({
 }) {
   const momentum = useRef(new Map<string, PointerMomentum>());
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
+  const settings = loadM6Settings();
+  const matterQuality = compact ? 0.5 : settings.spatialFx === 'full' ? 0.9 : settings.spatialFx === 'reduced' ? 0.5 : 0.72;
+  const matterBudget = compact ? 5 : settings.spatialFx === 'full' ? 10 : settings.spatialFx === 'reduced' ? 6 : 8;
+  const matterPointerPull = settings.spatialFx !== 'reduced' && !settings.reduceMotion;
   const rememberPointer = (id: string, event: ReactPointerEvent) => {
     const previous = momentum.current.get(id);
     momentum.current.set(id, previous ? sampleMomentum(previous, event.clientX, event.clientY) : beginMomentum(event.clientX, event.clientY));
@@ -304,8 +336,9 @@ function MatterBoard({
         theme="dark"
         material={material}
         tint={plasma.look === 'afterglow' ? '#8b5cf6' : '#ff2aa3'}
-        opacity={0.1}
-        frost={material === 'plasma' || material === 'crystal' ? plasma.frost : 0}
+        background="#06070a"
+        opacity={material === 'crystal' ? 0.66 : material === 'cloud' ? 0.62 : 0.9}
+        frost={material === 'plasma' || material === 'crystal' ? Math.min(0.26, plasma.frost * 0.3) : 0}
         blend={physics.blend}
         viscosity={physics.viscosity}
         stretch={physics.stretch}
@@ -322,16 +355,19 @@ function MatterBoard({
         rimColor="iridescent"
         rimWidth={material === 'metal' || material === 'stone' ? 0.7 : 1.1}
         highlight={material === 'metal' || material === 'crystal' ? 1.25 : 0.9}
-        shimmer={material === 'plasma' || material === 'crystal' ? 0.9 : 0.25}
-        glow={material === 'cloud' ? 0.6 : 0.85}
-        wash={0.45}
-        grain={material === 'stone' || material === 'wood' ? 0.85 : 0.25}
+        shimmer={material === 'plasma' || material === 'crystal' ? 1.2 : 0.4}
+        glow={material === 'cloud' ? 1.0 : 1.18}
+        wash={0.72}
+        grain={material === 'stone' || material === 'wood' ? 0.62 : 0.16}
         grid={24}
-        magnet={40}
-        quality={compact ? 0.48 : 0.78}
-        maxSurfaces={Math.max(1, Math.min(materialSignals.length, compact ? 5 : 10))}
+        magnet={48}
+        quality={matterQuality}
+        maxSurfaces={Math.max(1, Math.min(materialSignals.length, matterBudget))}
         pointerDrop={false}
+        pointerPull={matterPointerPull}
         ambientDrops={false}
+        ground="clear"
+        zIndex={18}
       >
         {materialSignals.map(signal => {
           const offset = layout[signal.id] ?? { x: 18, y: 18 };
@@ -349,8 +385,8 @@ function MatterBoard({
             onDragEnd={next => settle(signal.id, next)}
             onJoinChange={joined => setJoinedIds(current => { const next = new Set(current); if (joinedAny(joined)) next.add(signal.id); else next.delete(signal.id); return next; })}
             tint={typeTint[plasma.look][signal.type]}
-            opacity={signal.done ? 0.06 : material === 'metal' || material === 'stone' || material === 'wood' ? 0.2 : 0.13}
-            frost={material === 'crystal' ? Math.min(0.85, plasma.frost + 0.15) : material === 'plasma' ? plasma.frost : 0}
+            opacity={signal.done ? 0.58 : material === 'metal' ? 0.94 : material === 'stone' ? 0.96 : material === 'wood' ? 0.92 : material === 'crystal' ? 0.7 : material === 'cloud' ? 0.66 : 0.9}
+            frost={material === 'crystal' ? Math.min(0.28, plasma.frost * 0.32 + 0.03) : material === 'plasma' ? Math.min(0.18, plasma.frost * 0.22) : 0}
             elevation={signal.pinned ? 0.74 : material === 'cloud' ? 0.12 : 0.42}
             radius={physics.radius}
             padding={16}
@@ -373,6 +409,7 @@ export default function PlasmaSignalWorkspace({
   onUpdate,
   onDelete,
   plasma,
+  onBundle,
 }: PlasmaSignalWorkspaceProps) {
   const stage = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<Layout>({});
@@ -385,7 +422,10 @@ export default function PlasmaSignalWorkspace({
     return true;
   }), [signals, query, plasma.active, scope, selectedIncidentId]);
 
-  const visibleSignals = useMemo(() => filtered.slice(0, compact ? 5 : plasma.mode === 'matter' ? 10 : 14), [filtered, compact, plasma.mode]);
+  const settings = loadM6Settings();
+  const plasmaCap = compact ? 5 : settings.spatialFx === 'full' ? 14 : settings.spatialFx === 'reduced' ? 7 : 10;
+  const matterCap = compact ? 5 : settings.spatialFx === 'full' ? 10 : settings.spatialFx === 'reduced' ? 6 : 8;
+  const visibleSignals = useMemo(() => filtered.slice(0, plasma.mode === 'matter' ? matterCap : plasmaCap), [filtered, matterCap, plasmaCap, plasma.mode]);
   // Global mode; spatial arrangements still belong to the Incident being viewed.
   const layoutScope = scope === 'all' ? 'all-signals' : selectedIncidentId ?? 'unrouted';
   const spatialMode = plasma.mode === 'matter' ? 'matter' : 'plasma';
@@ -450,7 +490,7 @@ export default function PlasmaSignalWorkspace({
 
       <div ref={stage} className={`xf-plasma-stage ${plasma.mode === 'matter' ? 'xf-matter-stage' : ''}`}>
         <div className="xf-plasma-hint">{plasma.mode === 'matter' ? 'LIKE MATTER FUSES // UNLIKE MATTER STAYS DISTINCT // ALL OF IT STILL SNAPS TO THE GRID' : 'DRAG UNTIL THEY TOUCH // PROXIMITY IS TEMPORARY ORGANIZATION'}</div>
-        {plasma.mode === 'plasma' ? <LiquidBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete}/> : <MatterBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete}/>} 
+        {plasma.mode === 'plasma' ? <LiquidBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete} onBundle={onBundle}/> : <MatterBoard signals={visibleSignals} incidents={incidents} compact={compact} layout={layout} layoutScope={layoutScope} stage={stage} plasma={plasma} onLayout={(id, next) => setLayout(current => ({ ...current, [id]: next }))} onUpdate={onUpdate} onDelete={onDelete}/>} 
         {filtered.length > visibleSignals.length && <div className="xf-plasma-overflow">SHOWING {visibleSignals.length} OF {filtered.length} // FILTER TO REDUCE GPU LOAD</div>}
       </div>
     </>}

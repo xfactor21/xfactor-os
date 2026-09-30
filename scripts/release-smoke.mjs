@@ -123,6 +123,7 @@ for (const file of [
   'public/gowasm/wasm_exec.js',
   'public/gowasm/xos-go.wasm',
   'public/xfactor-mask.jpeg',
+  'public/xfactor-m6-icon.png',
   'src-tauri/icons/32x32.png',
   'src-tauri/icons/128x128.png',
   'src-tauri/icons/128x128@2x.png',

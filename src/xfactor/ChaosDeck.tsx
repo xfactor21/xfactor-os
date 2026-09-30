@@ -3,13 +3,19 @@ import {
   Activity, Archive, Boxes, Command, Crosshair, Download, ExternalLink, FileJson, FileText, Flame,
   FolderMinus, FolderPlus, Grip, Hammer, History, Image, Layers3, Link2, Music, Pin, Plus, Radio,
   RotateCcw, Save, Search, Shuffle, Sparkles, Star, TerminalSquare, Trash2, Upload, Video, X, Zap,
-  Check, Code2, Eye, EyeOff, SlidersHorizontal, ArrowRightLeft
+  Check, Code2, Eye, EyeOff, SlidersHorizontal, ArrowRightLeft, FolderTree, Globe2, Settings
 } from 'lucide-react';
 import Studio from '../modules/studio';
 import { loadBoards } from '../modules/studio/boards';
 import DeveloperWorkbench from './DeveloperWorkbench';
+import FileExplorerRoom from './FileExplorerRoom';
+import BrowserRoom from './BrowserRoom';
+import SettingsRoom from './SettingsRoom';
+import { applyM6Settings, loadM6Settings, type M6Settings } from './m6Settings';
 import PlasmaSignalWorkspace from './PlasmaSignalWorkspace';
 import GlobalSpatialToggle from './GlobalSpatialToggle';
+import { SpatialRoomProvider, SpatialSurface } from './TrueSpatial';
+import { bundleBadge, linkSpatialEntities } from './spatialBundles';
 import { usePlasmaMode } from './plasmaMode';
 import './spatialGlobal.css';
 import type { Asset, Incident, IncidentPriority, IncidentStatus, Signal, SignalType, WorkspaceState } from './domain';
@@ -24,7 +30,8 @@ import { useAuthStore } from '../stores/authStore';
 import { supabaseConfigured } from '../lib/supabase';
 import './xfactor.css';
 
-type View = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'terminal';
+type View = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'files' | 'browser' | 'terminal' | 'settings';
+const BUILD_VERSION = '0.6.0';
 type DragState = { id: string; ox: number; oy: number; rect: DOMRect };
 
 const assetIcon = (kind: string) => kind === 'image' ? Image : kind === 'audio' ? Music : kind === 'video' ? Video : kind === 'code' ? Code2 : kind === 'studio' ? Hammer : FileText;
@@ -59,6 +66,7 @@ export default function ChaosDeck() {
   const [persistenceError, setPersistenceError] = useState(false);
   const [cloudError, setCloudError] = useState(false);
   const [notice,setNotice]=useState<string>();
+  const [m6Settings,setM6Settings]=useState<M6Settings>(loadM6Settings);
   const drag = useRef<DragState | null>(null);
   const floorRef = useRef<HTMLDivElement>(null);
   const importRef=useRef<HTMLInputElement>(null);
@@ -70,6 +78,12 @@ export default function ChaosDeck() {
   const initAuth = useAuthStore(s => s.init);
 
   useEffect(() => { setPersistenceError(!saveWorkspace(ws)); }, [ws]);
+  useEffect(() => {
+    applyM6Settings(m6Settings);
+    const onSettings=(event:Event)=>setM6Settings((event as CustomEvent<M6Settings>).detail ?? loadM6Settings());
+    window.addEventListener('xfactor:m6-settings',onSettings as EventListener);
+    return()=>window.removeEventListener('xfactor:m6-settings',onSettings as EventListener);
+  }, []);
   useEffect(() => { if(!notice)return; const t=window.setTimeout(()=>setNotice(undefined),2600);return()=>window.clearTimeout(t); },[notice]);
   useEffect(() => {
     const id=ws.selectedIncidentId;
@@ -221,6 +235,10 @@ export default function ChaosDeck() {
     if(!textOverride)setCapture('');
   }
   function updateSignal(id:string,changes:Partial<Signal>){patch(p=>({...p,signals:p.signals.map(s=>s.id===id?{...s,...changes,updatedAt:Date.now()}:s)}));}
+  function linkBundle(kind:'incident'|'signal'|'asset'|'studio',firstId:string,secondId:string){
+    patch(p=>linkSpatialEntities(p,kind,firstId,secondId));
+    setNotice('PLASMA BUNDLE CREATED');
+  }
   function createPileFromSelection() {
     if(!selectedIds.length)return;
     const pile=newPile(selectedIds.length>1?'SELECTED DAMAGE':'NEW PILE');
@@ -274,6 +292,12 @@ export default function ChaosDeck() {
     if(label==='Tape') setView('tape');
     if(label==='Floor') setView('deck');
     if(label==='Terminal'||label==='Workbench') setView('terminal');
+    if(label==='Files') setView('files');
+    if(label==='Browser') setView('browser');
+    if(label==='Settings') setView('settings');
+    if(label==='Normal mode') plasma.setMode('normal');
+    if(label==='Plasma mode') plasma.setMode('plasma');
+    if(label==='Matter mode') plasma.setMode('matter');
     if(label==='Create pile') createPileFromSelection();
     if(label==='Backup workspace') exportBackup();
     if(label==='Restore workspace') importRef.current?.click();
@@ -291,23 +315,25 @@ export default function ChaosDeck() {
   }
   const commands = [
     {label:'New incident',hint:'CREATE',icon:Plus},{label:'Riot Mode',hint:'LAYOUT',icon:Shuffle},{label:'Stack It',hint:'LAYOUT',icon:Layers3},
-    {label:'Create pile',hint:'ORGANIZE',icon:FolderPlus},{label:'Signal',hint:'OPEN',icon:Radio},{label:'Piles',hint:'OPEN',icon:Boxes},{label:'Vault',hint:'OPEN',icon:Archive},{label:'Tape',hint:'OPEN',icon:History},{label:'Workbench',hint:'BUILD',icon:TerminalSquare},{label:'Design Lab',hint:'OPEN',icon:Hammer},
+    {label:'Create pile',hint:'ORGANIZE',icon:FolderPlus},{label:'Signal',hint:'PLANNING',icon:Radio},{label:'Piles',hint:'PLANNING',icon:Boxes},{label:'Vault',hint:'PLANNING',icon:Archive},{label:'Tape',hint:'PLANNING',icon:History},
+    {label:'Files',hint:'DEV TOOLS',icon:FolderTree},{label:'Browser',hint:'DEV TOOLS',icon:Globe2},{label:'Design Lab',hint:'DEV TOOLS',icon:Hammer},{label:'Workbench',hint:'DEV TOOLS',icon:TerminalSquare},{label:'Settings',hint:'SYSTEM',icon:Settings},
+    {label:'Normal mode',hint:'SPATIAL',icon:Layers3},{label:'Plasma mode',hint:'SPATIAL',icon:Sparkles},{label:'Matter mode',hint:'SPATIAL',icon:Boxes},
     {label:'Backup workspace',hint:'EXPORT',icon:Download},{label:'Restore workspace',hint:'IMPORT',icon:Upload},
   ].filter(c=>c.label.toLowerCase().includes(paletteQuery.toLowerCase()));
 
-  if (studio) return <div className="xf-studio-shell"><button className="xf-studio-exit" onClick={()=>setStudio(false)}><X size={15}/> EXIT LAB</button><Studio active /></div>;
+  if (studio) return <div className={`xf-studio-shell ${plasma.mode==='plasma'?'xf-plasma-mode':plasma.mode==='matter'?'xf-matter-mode':''} ${plasma.transitioning?'xf-spatial-transition':''}`}>{plasma.transitioning&&<div className="xf-spatial-transition-mask"><b>RECASTING MATERIAL</b><span>{plasma.mode.toUpperCase()} → {(plasma.targetMode??plasma.mode).toUpperCase()}</span><small>TEARING DOWN THE OLD FIELD BEFORE THE NEXT ONE FORMS</small></div>}<button className="xf-studio-exit" onClick={()=>setStudio(false)}><X size={15}/> EXIT LAB</button><Studio active plasma={plasma} onBundle={(firstId,secondId)=>linkBundle('studio',firstId,secondId)} bundleLabel={id=>bundleBadge(ws,'studio',id)}/></div>;
 
-  return <div className={`xf-root ${plasma.mode === 'plasma' ? `xf-plasma-mode plasma-${plasma.look}` : plasma.mode === 'matter' ? `xf-matter-mode matter-${plasma.look}` : ''}`}>
-    <div className="xf-noise"/><div className="xf-scan"/>
+  return <div className={`xf-root ${plasma.mode === 'plasma' ? `xf-plasma-mode plasma-${plasma.look}` : plasma.mode === 'matter' ? `xf-matter-mode matter-${plasma.look}` : ''} ${plasma.transitioning ? 'xf-spatial-transition' : ''}`}>
+    <div className="xf-noise"/><div className="xf-scan"/>{plasma.transitioning&&<div className="xf-spatial-transition-mask"><b>RECASTING MATERIAL</b><span>{plasma.mode.toUpperCase()} → {(plasma.targetMode??plasma.mode).toUpperCase()}</span><small>ONE FIELD OUT · ONE FIELD IN · NO OVERLAPPING CANVASES</small></div>}
     {persistenceError&&<div className="xf-system-alert fatal">LOCAL STORAGE IS UNAVAILABLE — WORKSPACE METADATA MAY NOT SURVIVE A RELOAD.</div>}
     {cloudError&&<div className="xf-system-alert">CLOUD SYNC IS OFFLINE — LOCAL WORK CONTINUES SAFELY.</div>}
     {notice&&<div className="xf-toast">{notice}</div>}
     <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={e=>void importBackup(e.target.files?.[0])}/>
     <input ref={fileRef} type="file" multiple hidden onChange={e=>void ingestFiles(e.target.files)}/>
     <header className="xf-topbar">
-      <div className="xf-brand"><img src="/xfactor-mask.jpeg"/><div><b>xFACTOR.OS</b><span>// CONTROLLED CHAOS SYSTEM</span></div></div>
-      <div className="xf-top-status"><span><Radio size={12}/> SIGNAL {signalStrength}%</span><span><Activity size={12}/> {ws.activity.length} EVENTS</span><span className="hot"><Flame size={12}/> {visibleIncidents.filter(i=>i.heat>80).length} HOT</span></div>
-      <GlobalSpatialToggle plasma={plasma}/>
+      <div className="xf-brand"><img src="/xfactor-m6-icon.png"/><div><b>xFACTOR.OS</b><span>// CONTROLLED CHAOS SYSTEM <i>v{BUILD_VERSION}</i></span></div></div>
+      <div className="xf-top-status"><button title="Signal strength is a live activity pulse for captured thoughts. Open Signal." onClick={()=>setView('signal')}><Radio size={13}/> SIGNAL {signalStrength}%</button><button title="Recorded workspace events. Open Tape for the full history." onClick={()=>setView('tape')}><Activity size={13}/> {ws.activity.length} EVENTS</button><button className="hot" title="Incidents above 80 heat. Open the Floor to inspect them." onClick={()=>setView('deck')}><Flame size={13}/> {visibleIncidents.filter(i=>i.heat>80).length} HOT</button></div>
+      <div className="xf-spatial-zone"><small>SPATIAL ORGANIZER</small><GlobalSpatialToggle plasma={plasma}/></div>
       <button className="xf-account-btn" onClick={()=>setAccount(true)}>{authUser?authUser.email?.split('@')[0]:'LOCAL'}<span>{authUser?'SYNCED':supabaseConfigured?'SIGN IN':'OFFLINE'}</span></button>
       <button className="xf-command" onClick={()=>setPalette(true)}><Command size={14}/> COMMAND <kbd>CTRL K</kbd></button>
     </header>
@@ -316,13 +342,18 @@ export default function ChaosDeck() {
       <button className={`rail-x ${view==='deck'?'active':''}`} onClick={()=>setView('deck')}><span>×</span><small>FLOOR</small></button>
       <button className={`rail-x ${view==='piles'?'active':''}`} onClick={()=>setView('piles')}><Boxes/><small>PILES</small></button>
       <button className={`rail-x ${view==='signal'?'active':''}`} onClick={()=>setView('signal')}><Radio/><small>SIGNAL</small></button>
-      <button className="rail-x" onClick={()=>setStudio(true)}><Hammer/><small>LAB</small></button>
-      <button className={`rail-x ${view==='vault'?'active':''}`} onClick={()=>setView('vault')}><Archive/><small>VAULT</small></button>
-      <button className={`rail-x ${view==='tape'?'active':''}`} onClick={()=>setView('tape')}><History/><small>TAPE</small></button>
-      <div className="rail-grow"/><button className={`rail-x ${view==='terminal'?'active':''}`} onClick={()=>setView('terminal')}><TerminalSquare/><small>BUILD</small></button><div className="rail-mark">X<br/><i>21</i></div>
+      <button className={`rail-x ${view==='vault'?'active':''}`} title="Vault: files, references, code, captures, and offline browser material." onClick={()=>setView('vault')}><Archive/><small>VAULT</small></button>
+      <button className={`rail-x ${view==='tape'?'active':''}`} title="Tape: append-only operational history." onClick={()=>setView('tape')}><History/><small>TAPE</small></button>
+      <div className="rail-grow"/>
+      <div className="rail-dev-label">DEV</div>
+      <button className={`rail-x ${view==='files'?'active':''}`} title="Experimental local file explorer." onClick={()=>setView('files')}><FolderTree/><small>FILES</small></button>
+      <button className={`rail-x ${view==='browser'?'active':''}`} title="Research browser, bookmarks, capture, and Vault tools." onClick={()=>setView('browser')}><Globe2/><small>BROWSER</small></button>
+      <button className="rail-x" title="Design Lab projects and creative tools." onClick={()=>setStudio(true)}><Hammer/><small>LAB</small></button>
+      <button className={`rail-x ${view==='terminal'?'active':''}`} title="Project Cockpit: code, preview, terminal, Git, search, and problems." onClick={()=>setView('terminal')}><TerminalSquare/><small>BUILD</small></button>
+      <button className={`rail-x ${view==='settings'?'active':''}`} title="xFactor.OS system settings." onClick={()=>setView('settings')}><Settings/><small>SETTINGS</small></button>
     </aside>
 
-    <main className="xf-main">
+    <SpatialRoomProvider plasma={plasma} room={view}><main className="xf-main">
       {view==='deck' && <>
         <section className="xf-floor-panel">
           <div className="xf-section-head"><div><span className="kicker">THE FLOOR //</span><h1>EVERYTHING, EVERYWHERE.</h1><p>The studio after an explosion — except every piece knows exactly where it belongs.</p></div>
@@ -332,9 +363,9 @@ export default function ChaosDeck() {
           <div className="xf-floor" ref={floorRef} onPointerMove={pointerMove} onPointerUp={()=>drag.current=null} onPointerCancel={()=>drag.current=null}>
             <div className="tape tape-a">DO NOT CLEAN THIS UP</div><div className="tape tape-b">SYSTEM ≠ ORDER</div>
             {visibleIncidents.length===0 && <div className="xf-first-run"><span>FIRST IMPACT //</span><h2>YOUR FLOOR IS EMPTY.</h2><p>Throw in a project, obsession, experiment, or problem. It becomes an Incident you can drag, pile, capture into, and tear apart without losing the underlying structure.</p><button onClick={()=>addIncident()}><Plus size={14}/> THROW IN YOUR FIRST INCIDENT</button><small>HOTWIRE captures thoughts instantly. CTRL/CMD + K opens the Command Deck.</small></div>}
-            {visibleIncidents.map(s=>{const pos=ws.positions[s.id]??{x:20,y:20,rotation:0};const tasks=ws.signals.filter(sig=>sig.incidentId===s.id&&sig.type==='task');const open=tasks.filter(t=>!t.done).length;const done=tasks.filter(t=>t.done).length;return <article key={s.id} className={`xf-shard ${selectedIds.includes(s.id)?'selected':''} status-${s.status.toLowerCase()} priority-${s.priority.toLowerCase()}`} style={{left:`${pos.x}%`,top:`${pos.y}%`,transform:`rotate(${pos.rotation}deg)`}} onPointerDown={e=>pointerDown(e,s.id)}>
-              <div className="shard-pin"/><div className="shard-top"><span>{s.kind}</span><Grip size={15}/></div><h2>{s.name}</h2><p>{s.tagline}</p><div className="shard-meter"><i style={{width:`${s.heat}%`}}/></div><footer><b>{s.status}</b><span>{open} OPEN</span><span>{done} DONE</span>{s.pileIds.length>0&&<span>{s.pileIds.length} PILE</span>}</footer>
-            </article>})}
+            {visibleIncidents.map(s=>{const pos=ws.positions[s.id]??{x:20,y:20,rotation:0};const tasks=ws.signals.filter(sig=>sig.incidentId===s.id&&sig.type==='task');const open=tasks.filter(t=>!t.done).length;const done=tasks.filter(t=>t.done).length;const bundle=bundleBadge(ws,'incident',s.id);return <SpatialSurface as="article" group="floor-incidents" spatialId={s.id} spatialDraggable={plasma.active} onSpatialJoin={other=>linkBundle('incident',s.id,other)} key={s.id} className={`xf-shard ${selectedIds.includes(s.id)?'selected':''} status-${s.status.toLowerCase()} priority-${s.priority.toLowerCase()}`} style={{left:`${pos.x}%`,top:`${pos.y}%`,transform:plasma.mode==='normal'?`rotate(${pos.rotation}deg)`:undefined}} onPointerDown={plasma.active?undefined:e=>pointerDown(e,s.id)}>
+              {bundle&&<span className="spatial-bundle-badge" style={{'--bundle-color':bundle.color} as React.CSSProperties}>{bundle.name}</span>}<div className="shard-pin"/><div className="shard-top"><span>{s.kind}</span><Grip size={15}/></div><h2>{s.name}</h2><p>{s.tagline}</p><div className="shard-meter"><i style={{width:`${s.heat}%`}}/></div><footer><b>{s.status}</b><span>{open} OPEN</span><span>{done} DONE</span>{s.pileIds.length>0&&<span>{s.pileIds.length} PILE</span>}</footer>
+            </SpatialSurface>})}
             <svg className="xf-scribble" viewBox="0 0 1000 600" preserveAspectRatio="none"><path d="M74 380 C190 250 248 520 420 365 S690 210 895 360"/><path d="M520 80 C580 170 480 230 640 270"/></svg>
           </div>
         </section>
@@ -342,7 +373,7 @@ export default function ChaosDeck() {
       </>}
 
       {view==='piles' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">PILES //</span><h1>ORGANIZED DISORGANIZATION.</h1><p>Collections can overlap. Membership never replaces the underlying Incident.</p></div><button className="xf-big-action" onClick={createPileFromSelection}><FolderPlus size={15}/> PILE SELECTED ({selectedIds.length})</button></div>
-        <div className="pile-grid">{ws.piles.length===0?<Empty label="NO PILES YET" detail="Shift-click multiple incidents on The Floor, then pile them together."/>:ws.piles.map(p=><article className="pile-card" key={p.id}><div className="pile-stamp">{p.stamp}</div><div className="pile-head"><h2 contentEditable suppressContentEditableWarning onBlur={e=>patch(w=>({...w,piles:w.piles.map(x=>x.id===p.id?{...x,name:e.currentTarget.textContent||x.name}:x)}))}>{p.name}</h2><button onClick={()=>removePile(p.id)}><Trash2 size={13}/></button></div><div className="pile-count">{ws.incidents.filter(i=>i.pileIds.includes(p.id)&&!i.archived).length} INCIDENTS</div><button className="pile-toggle" onClick={()=>togglePile(p.id)}>{p.collapsed?'EXPLODE PILE':'COLLAPSE PILE'}</button>{!p.collapsed&&<div className="pile-members">{ws.incidents.filter(i=>i.pileIds.includes(p.id)&&!i.archived).map(i=><div className="pile-member" key={i.id}><button onClick={()=>{selectIncident(i.id);setView('deck')}}>{i.name}</button><button title="Remove from pile" onClick={()=>toggleIncidentPile(i.id,p.id)}><FolderMinus size={12}/></button></div>)}</div>}</article>)}</div>
+        <div className="pile-grid">{ws.piles.length===0?<Empty label="NO PILES YET" detail="Shift-click multiple incidents on The Floor, then pile them together."/>:ws.piles.map(p=><SpatialSurface as="article" group="pile-cards" spatialId={p.id} spatialDraggable={plasma.active} className="pile-card" key={p.id}><div className="pile-stamp">{p.stamp}</div><div className="pile-head"><h2 contentEditable suppressContentEditableWarning onBlur={e=>patch(w=>({...w,piles:w.piles.map(x=>x.id===p.id?{...x,name:e.currentTarget.textContent||x.name}:x)}))}>{p.name}</h2><button onClick={()=>removePile(p.id)}><Trash2 size={13}/></button></div><div className="pile-count">{ws.incidents.filter(i=>i.pileIds.includes(p.id)&&!i.archived).length} INCIDENTS</div><button className="pile-toggle" onClick={()=>togglePile(p.id)}>{p.collapsed?'EXPLODE PILE':'COLLAPSE PILE'}</button>{!p.collapsed&&<div className="pile-members">{ws.incidents.filter(i=>i.pileIds.includes(p.id)&&!i.archived).map(i=><div className="pile-member" key={i.id}><button onClick={()=>{selectIncident(i.id);setView('deck')}}>{i.name}</button><button title="Remove from pile" onClick={()=>toggleIncidentPile(i.id,p.id)}><FolderMinus size={12}/></button></div>)}</div>}</SpatialSurface>)}</div>
       </section>}
 
       {view==='signal' && <PlasmaSignalWorkspace
@@ -354,13 +385,20 @@ export default function ChaosDeck() {
       onUpdate={updateSignal}
       onDelete={signal=>patch(p=>({...p,signals:p.signals.filter(x=>x.id!==signal.id),activity:[event('signal','Removed signal',signal.incidentId),...p.activity]}))}
       plasma={plasma}
+      onBundle={(firstId,secondId)=>linkBundle('signal',firstId,secondId)}
     />}
 
-{view==='vault' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">BLACK VAULT //</span><h1>BURY IT WITH COORDINATES.</h1><p>Files, links, Design Lab documents, and references stay attached to the work that made them matter.</p></div><div className="xf-floor-actions"><button onClick={()=>fileRef.current?.click()}><Upload size={14}/> IMPORT FILES</button><button onClick={()=>setVaultArchived(v=>!v)}>{vaultArchived?<Eye size={14}/>:<EyeOff size={14}/>} {vaultArchived?'ACTIVE':'ARCHIVED'}</button></div></div><div className="vault-search"><Search size={14}/><input value={vaultQuery} onChange={e=>setVaultQuery(e.target.value)} placeholder="SEARCH THE VAULT..."/></div><div className="vault-add"><Archive size={15}/><input value={assetDraft} onChange={e=>setAssetDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addAssetDraft()}} placeholder="PASTE A URL OR NAME A REFERENCE..."/><button onClick={addAssetDraft}>VAULT IT</button></div><div className="vault-grid">{ws.assets.filter(a=>a.archived===vaultArchived).filter(a=>!vaultQuery||`${a.name} ${a.kind} ${a.tags.join(' ')}`.toLowerCase().includes(vaultQuery.toLowerCase())).length===0?<Empty label={vaultArchived?'NO ARCHIVED ASSETS':'VAULT IS EMPTY'} detail="Import files, paste a URL, or create something in Design Lab."/>:ws.assets.filter(a=>a.archived===vaultArchived).filter(a=>!vaultQuery||`${a.name} ${a.kind} ${a.tags.join(' ')}`.toLowerCase().includes(vaultQuery.toLowerCase())).map(a=><AssetCard key={a.id} asset={a} incidentName={ws.incidents.find(i=>i.id===a.incidentId)?.name} onPatch={changes=>patch(p=>({...p,assets:p.assets.map(x=>x.id===a.id?{...x,...changes,updatedAt:Date.now()}:x)}))} onDelete={()=>void deleteAsset(a)} onStudio={()=>setStudio(true)}/>)}</div></section>}
+{view==='vault' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">BLACK VAULT //</span><h1>BURY IT WITH COORDINATES.</h1><p>Files, links, Design Lab documents, and references stay attached to the work that made them matter.</p></div><div className="xf-floor-actions"><button onClick={()=>fileRef.current?.click()}><Upload size={14}/> IMPORT FILES</button><button onClick={()=>setVaultArchived(v=>!v)}>{vaultArchived?<Eye size={14}/>:<EyeOff size={14}/>} {vaultArchived?'ACTIVE':'ARCHIVED'}</button></div></div><div className="vault-search"><Search size={14}/><input value={vaultQuery} onChange={e=>setVaultQuery(e.target.value)} placeholder="SEARCH THE VAULT..."/></div><div className="vault-add"><Archive size={15}/><input value={assetDraft} onChange={e=>setAssetDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addAssetDraft()}} placeholder="PASTE A URL OR NAME A REFERENCE..."/><button onClick={addAssetDraft}>VAULT IT</button></div><div className="vault-grid">{ws.assets.filter(a=>a.archived===vaultArchived).filter(a=>!vaultQuery||`${a.name} ${a.kind} ${a.tags.join(' ')}`.toLowerCase().includes(vaultQuery.toLowerCase())).length===0?<Empty label={vaultArchived?'NO ARCHIVED ASSETS':'VAULT IS EMPTY'} detail="Import files, paste a URL, or create something in Design Lab."/>:ws.assets.filter(a=>a.archived===vaultArchived).filter(a=>!vaultQuery||`${a.name} ${a.kind} ${a.tags.join(' ')}`.toLowerCase().includes(vaultQuery.toLowerCase())).map(a=><AssetCard key={a.id} spatial={plasma.active} onBundle={other=>linkBundle('asset',a.id,other)} asset={a} incidentName={ws.incidents.find(i=>i.id===a.incidentId)?.name} onPatch={changes=>patch(p=>({...p,assets:p.assets.map(x=>x.id===a.id?{...x,...changes,updatedAt:Date.now()}:x)}))} onDelete={()=>void deleteAsset(a)} onStudio={()=>setStudio(true)}/>)}</div></section>}
 
-      {view==='tape' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">TAPE //</span><h1>THE MESS HAS A MEMORY.</h1><p>Append-only operational history. Nothing here controls the data; it tells you what happened to it.</p></div><div className="xf-floor-actions"><button onClick={exportBackup}><Download size={14}/> BACKUP WORKSPACE</button><button onClick={()=>importRef.current?.click()}><Upload size={14}/> RESTORE BACKUP</button></div></div><div className="tape-ledger">{ws.activity.length===0?<Empty label="NO TAPE YET" detail="Your actions will start leaving a trail here."/>:ws.activity.map(a=><article key={a.id}><span>{relative(a.createdAt)} AGO</span><b>{a.type.toUpperCase()}</b><p>{a.label}</p><small>{a.incidentId?ws.incidents.find(i=>i.id===a.incidentId)?.name??'FORMER INCIDENT':'SYSTEM'}</small></article>)}</div></section>}
+      {view==='tape' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">TAPE //</span><h1>THE MESS HAS A MEMORY.</h1><p>Append-only operational history. Nothing here controls the data; it tells you what happened to it.</p></div><div className="xf-floor-actions"><button onClick={exportBackup}><Download size={14}/> BACKUP WORKSPACE</button><button onClick={()=>importRef.current?.click()}><Upload size={14}/> RESTORE BACKUP</button></div></div><div className="tape-ledger">{ws.activity.length===0?<Empty label="NO TAPE YET" detail="Your actions will start leaving a trail here."/>:ws.activity.map(a=><SpatialSurface as="article" group="tape-ledger" spatialId={a.id} spatialDraggable={plasma.active} key={a.id}><span>{relative(a.createdAt)} AGO</span><b>{a.type.toUpperCase()}</b><p>{a.label}</p><small>{a.incidentId?ws.incidents.find(i=>i.id===a.incidentId)?.name??'FORMER INCIDENT':'SYSTEM'}</small></SpatialSurface>)}</div></section>}
 
-      {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">WORKBENCH //</span><h1>BUILD THE INCIDENT.</h1><p>Code, run, preview and debug without dropping the project context. The active Incident owns this Workbench; the shared runtime keeps the project and terminal in the same environment.</p></div></div><DeveloperWorkbench
+      {view==='files' && <FileExplorerRoom/>}
+
+      {view==='browser' && <BrowserRoom onVaultReference={(name,url,kind='link',tags=[])=>{const asset=newAsset(name,kind,url,chosen?.id,'reference');asset.tags=tags;patch(p=>({...p,assets:[asset,...p.assets],activity:[event('asset','Browser reference vaulted',chosen?.id),...p.activity]}));setNotice('SAVED TO VAULT')}} onVaultBlob={async(name,blob,kind,tags=[])=>{const id=crypto.randomUUID(),blobKey='file-'+id;await putAssetBlob(blobKey,blob);const asset=newAsset(name,kind,undefined,chosen?.id,'file');asset.id=id;asset.blobKey=blobKey;asset.mime=blob.type;asset.size=blob.size;asset.tags=tags;patch(p=>({...p,assets:[asset,...p.assets],activity:[event('asset','Browser capture vaulted',chosen?.id),...p.activity]}));setNotice('CAPTURE SAVED TO VAULT')}} onOpenVault={()=>setView('vault')}/>}
+
+      {view==='settings' && <SettingsRoom/>}
+
+      {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">WORKBENCH //</span><h1>BUILD THE INCIDENT.</h1><p>Code, run, preview and debug without dropping the project context. The active Incident owns this Workbench; the shared runtime keeps the project and terminal in the same environment.</p></div></div><div className="dev-spatial-shell"><DeveloperWorkbench
   active
   projectId={chosen?.id}
   projectName={chosen?.name}
@@ -370,22 +408,24 @@ export default function ChaosDeck() {
   openSignals={chosen ? ws.signals.filter(signal => signal.incidentId === chosen.id && !signal.done).length : 0}
   taskCount={chosen ? ws.signals.filter(signal => signal.incidentId === chosen.id && signal.type === 'task' && !signal.done).length : 0}
   assetCount={chosen ? ws.assets.filter(asset => asset.incidentId === chosen.id && !asset.archived).length : 0}
-/></section>}
-    </main>
+/></div></section>}
+    </main></SpatialRoomProvider>
 
-    <div className="xf-hotwire"><Zap size={15}/><b>HOTWIRE</b><input value={capture} onChange={e=>setCapture(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCapture('spark')}} placeholder={chosen?`THROW A THOUGHT INTO ${chosen.name}...`:'THROW A THOUGHT INTO THE SYSTEM...'}/><button onClick={()=>addCapture('task')}>TASK</button><button onClick={()=>addCapture('note')}>NOTE</button><button onClick={()=>addCapture('link')}><Link2 size={11}/></button><button onClick={()=>addCapture('spark')}>BURN IT IN</button></div>
+    {m6Settings.commandFab&&<button className={`xf-command-fab ${palette?'active':''}`} title="Open the Command Deck (Ctrl/Cmd + K)" aria-label="Open Command Deck" onClick={()=>{setPalette(v=>!v);setPaletteQuery('')}}><Command size={22}/><span>{palette?'CLOSE':'COMMAND'}</span></button>}
+
+    <div className="xf-hotwire"><Zap size={17}/><b>HOTWIRE</b><input value={capture} onChange={e=>setCapture(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCapture('spark')}} placeholder={chosen?`THROW A THOUGHT INTO ${chosen.name}...`:'THROW A THOUGHT INTO THE SYSTEM...'}/><button onClick={()=>addCapture('task')}>TASK</button><button onClick={()=>addCapture('note')}>NOTE</button><button onClick={()=>addCapture('link')}><Link2 size={11}/></button><button onClick={()=>addCapture('spark')}>BURN IT IN</button></div>
 
     {account&&<AccountPanel onClose={()=>setAccount(false)}/>}
-    {palette&&<div className="xf-palette-backdrop" onMouseDown={()=>setPalette(false)}><div className="xf-palette" onMouseDown={e=>e.stopPropagation()}><div className="palette-input"><Search size={18}/><input autoFocus value={paletteQuery} onChange={e=>setPaletteQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')runPaletteInput()}} placeholder="TYPE WHAT YOU WANT TO DO..."/><kbd>ESC</kbd></div>{commands.map(c=><button className="palette-row" key={c.label} onClick={()=>command(c.label)}><c.icon/>{c.label}<span>{c.hint}</span></button>)}{entityResults.length>0&&<div className="palette-divider">FOUND IN THE MESS</div>}{entityResults.map(r=><button className="palette-row entity" key={`${r.kind}-${r.id}`} onClick={()=>openEntity(r)}><Crosshair/>{r.label}<span>{r.kind}</span></button>)}<div className="palette-foot">TRY: “NEW PROJECT MONSTER X”, “TASK SHIP THE BUILD”, “OPEN VAULT”, “FIND AUDIO”</div></div></div>}
+    {palette&&<div className="xf-palette-backdrop" onMouseDown={()=>setPalette(false)}><div className="xf-palette" onMouseDown={e=>e.stopPropagation()}><div className="palette-input"><Search size={18}/><input autoFocus value={paletteQuery} onChange={e=>setPaletteQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')runPaletteInput()}} placeholder="TYPE WHAT YOU WANT TO DO..."/><kbd>ESC</kbd></div>{commands.map(c=><button className="palette-row" key={c.label} onClick={()=>command(c.label)}><c.icon/>{c.label}<span>{c.hint}</span></button>)}{entityResults.length>0&&<div className="palette-divider">FOUND IN THE MESS</div>}{entityResults.map(r=><button className="palette-row entity" key={`${r.kind}-${r.id}`} onClick={()=>openEntity(r)}><Crosshair/>{r.label}<span>{r.kind}</span></button>)}<div className="palette-foot">TRY: “OPEN FILES”, “OPEN BROWSER”, “PLASMA MODE”, “NEW PROJECT MONSTER X”, “TASK SHIP THE BUILD”, “FIND AUDIO”</div></div></div>}
   </div>;
 }
 
 function Blackbox({chosen,ws,onChange,onArchive,onDelete,onSignal,onAddSignal,onToggleRelation}:{chosen?:Incident;ws:WorkspaceState;onChange:(id:string,c:Partial<Incident>)=>void;onArchive:(id:string)=>void;onDelete:(id:string)=>void;onSignal:(id:string,c:Partial<Signal>)=>void;onAddSignal:(type:SignalType,text:string)=>void;onToggleRelation:(a:string,b:string)=>void}) {
   const [draft,setDraft]=useState('');
-  if(!chosen)return <div className="xf-blackbox"><Empty label="NO INCIDENT SELECTED" detail="Throw something onto the Floor."/></div>;
+  if(!chosen)return <SpatialSurface className="xf-blackbox" group="deck-lower"><Empty label="NO INCIDENT SELECTED" detail="Throw something onto the Floor."/></SpatialSurface>;
   const signals=ws.signals.filter(s=>s.incidentId===chosen.id); const tasks=signals.filter(s=>s.type==='task');const open=tasks.filter(s=>!s.done).length;const done=tasks.filter(s=>s.done).length;const activity=ws.activity.filter(a=>a.incidentId===chosen.id).slice(0,6);
   const next=chosen.nextMove||tasks.find(s=>!s.done)?.text||'Ship one thing that makes the project impossible to ignore.';
-  return <div className="xf-blackbox"><div className="panel-title"><Crosshair size={15}/> BLACKBOX // CURRENT INCIDENT <span>{chosen.status}</span></div><div className="incident-title"><div><input className="blackbox-kind" value={chosen.kind} onChange={e=>onChange(chosen.id,{kind:e.target.value})}/><input className="blackbox-name" value={chosen.name} onChange={e=>onChange(chosen.id,{name:e.target.value})}/></div><div className="blackbox-actions"><button title="Archive incident" onClick={()=>onArchive(chosen.id)}><Archive size={14}/></button><button title="Delete permanently" onClick={()=>{if(confirm(`Permanently delete ${chosen.name}? Signals and assets will be unassigned.`))onDelete(chosen.id)}}><Trash2 size={14}/></button></div></div>
+  return <SpatialSurface className="xf-blackbox" group="deck-lower"><div className="panel-title"><Crosshair size={15}/> BLACKBOX // CURRENT INCIDENT <span>{chosen.status}</span></div><div className="incident-title"><div><input className="blackbox-kind" value={chosen.kind} onChange={e=>onChange(chosen.id,{kind:e.target.value})}/><input className="blackbox-name" value={chosen.name} onChange={e=>onChange(chosen.id,{name:e.target.value})}/></div><div className="blackbox-actions"><button title="Archive incident" onClick={()=>onArchive(chosen.id)}><Archive size={14}/></button><button title="Delete permanently" onClick={()=>{if(confirm(`Permanently delete ${chosen.name}? Signals and assets will be unassigned.`))onDelete(chosen.id)}}><Trash2 size={14}/></button></div></div>
     <textarea className="blackbox-tagline" value={chosen.tagline} onChange={e=>onChange(chosen.id,{tagline:e.target.value})}/><textarea className="blackbox-description" value={chosen.description} onChange={e=>onChange(chosen.id,{description:e.target.value})} placeholder="WHAT IS THIS? WHY DOES IT EXIST?"/>
     <div className="incident-stats"><div><b>{chosen.heat}%</b><span>HEAT</span></div><div><b>{open}</b><span>OPEN LOOPS</span></div><div><b>{done}</b><span>BODIES BURIED</span></div></div>
     <div className="blackbox-controls"><label>STATUS<select value={chosen.status} onChange={e=>onChange(chosen.id,{status:e.target.value as IncidentStatus})}>{statusOrder.map(s=><option key={s}>{s}</option>)}</select></label><label>PRIORITY<select value={chosen.priority} onChange={e=>onChange(chosen.id,{priority:e.target.value as IncidentPriority})}>{priorityOrder.map(s=><option key={s}>{s}</option>)}</select></label><label>HEAT<input type="range" min="0" max="100" value={chosen.heat} onChange={e=>onChange(chosen.id,{heat:Number(e.target.value)})}/></label></div>
@@ -394,18 +434,18 @@ function Blackbox({chosen,ws,onChange,onArchive,onDelete,onSignal,onAddSignal,on
     <div className="blackbox-capture"><input value={draft} onChange={e=>setDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&draft.trim()){onAddSignal('task',draft.trim());setDraft('')}}} placeholder="ADD AN OPEN LOOP..."/><button onClick={()=>{if(draft.trim()){onAddSignal('task',draft.trim());setDraft('')}}}><Plus size={12}/> LOOP</button></div>
     {tasks.length>0&&<div className="blackbox-loops">{tasks.slice(0,6).map(t=><button className={t.done?'done':''} key={t.id} onClick={()=>onSignal(t.id,{done:!t.done})}>{t.done?<Check size={11}/>:<span/>}{t.text}</button>)}</div>}
     <div className="blackbox-relations"><small>RELATED DAMAGE</small><div>{ws.incidents.filter(i=>i.id!==chosen.id&&!i.archived).slice(0,12).map(i=><button className={chosen.relatedIncidentIds.includes(i.id)?'active':''} key={i.id} onClick={()=>onToggleRelation(chosen.id,i.id)}><ArrowRightLeft size={10}/>{i.name}</button>)}</div></div>
-    {activity.length>0&&<div className="blackbox-tape">{activity.map(a=><span key={a.id}>{relative(a.createdAt)} AGO // {a.label}</span>)}</div>}</div>;
+    {activity.length>0&&<div className="blackbox-tape">{activity.map(a=><span key={a.id}>{relative(a.createdAt)} AGO // {a.label}</span>)}</div>}</SpatialSurface>;
 }
 
-function SignalMini({ws}:{ws:WorkspaceState}) { return <div className="xf-feed"><div className="panel-title"><Radio size={15}/> SIGNAL LEAK <span>{ws.signals.length} CAPTURES</span></div><div className="feed-list">{ws.signals.slice(0,8).map(c=><div className={`feed-item ${c.type}`} key={c.id}><i/><div><small>{c.type.toUpperCase()} // {relative(c.createdAt)} AGO</small><p>{c.text}</p></div></div>)}{ws.signals.length===0&&<Empty label="NO LEAK" detail="Hotwire is waiting."/>}</div></div>; }
+function SignalMini({ws}:{ws:WorkspaceState}) { return <SpatialSurface className="xf-feed" group="deck-lower"><div className="panel-title"><Radio size={15}/> SIGNAL LEAK <span>{ws.signals.length} CAPTURES</span></div><div className="feed-list">{ws.signals.slice(0,8).map(c=><div className={`feed-item ${c.type}`} key={c.id}><i/><div><small>{c.type.toUpperCase()} // {relative(c.createdAt)} AGO</small><p>{c.text}</p></div></div>)}{ws.signals.length===0&&<Empty label="NO LEAK" detail="Hotwire is waiting."/>}</div></SpatialSurface>; }
 
-function AssetCard({asset,incidentName,onPatch,onDelete,onStudio}:{asset:Asset;incidentName?:string;onPatch:(changes:Partial<Asset>)=>void;onDelete:()=>void;onStudio:()=>void}){
+function AssetCard({asset,incidentName,onPatch,onDelete,onStudio,spatial,onBundle}:{asset:Asset;incidentName?:string;onPatch:(changes:Partial<Asset>)=>void;onDelete:()=>void;onStudio:()=>void;spatial:boolean;onBundle:(otherId:string)=>void}){
   const I=assetIcon(asset.kind);const [blobUrl,setBlobUrl]=useState<string>();
   useEffect(()=>{let current:string|undefined; if(!asset.blobKey)return;void getAssetBlob(asset.blobKey).then(blob=>{if(!blob)return;current=URL.createObjectURL(blob);setBlobUrl(current)}).catch(()=>{});return()=>{if(current)URL.revokeObjectURL(current)}},[asset.blobKey]);
   const href=asset.source==='file'?blobUrl:asset.source==='studio'?undefined:safeUrl(asset.uri);
   function open(){if(asset.source==='studio'){onStudio();return;}if(href)window.open(href,'_blank','noopener,noreferrer');}
   function save(){if(!blobUrl)return;const a=document.createElement('a');a.href=blobUrl;a.download=asset.name;a.click();}
-  return <article className={`asset-card source-${asset.source}`}><div className="asset-preview">{asset.kind==='image'&&blobUrl?<img src={blobUrl} alt=""/>:asset.kind==='audio'&&blobUrl?<audio controls src={blobUrl}/>:asset.kind==='video'&&blobUrl?<video controls src={blobUrl}/>:<I/>}</div><small>{asset.kind.toUpperCase()} · {asset.source.toUpperCase()}</small><h3>{asset.name}</h3><p>{incidentName??'UNASSIGNED'}{asset.size?` · ${(asset.size/1024/1024).toFixed(asset.size>1024*1024?1:2)} MB`:''}</p><div className="asset-actions"><button title="Favorite" onClick={()=>onPatch({favorite:!asset.favorite})}><Star size={13} fill={asset.favorite?'currentColor':'none'}/></button>{(href||asset.source==='studio')&&<button title="Open" onClick={open}><ExternalLink size={13}/></button>}{blobUrl&&<button title="Download" onClick={save}><Download size={13}/></button>}<button title={asset.archived?'Restore':'Archive'} onClick={()=>onPatch({archived:!asset.archived})}><Archive size={13}/></button><button title="Delete" onClick={onDelete}><Trash2 size={13}/></button></div></article>;
+  return <SpatialSurface as="article" group="vault-assets" spatialId={asset.id} spatialDraggable={spatial} onSpatialJoin={onBundle} className={`asset-card source-${asset.source}`}><div className="asset-preview">{asset.kind==='image'&&blobUrl?<img src={blobUrl} alt=""/>:asset.kind==='audio'&&blobUrl?<audio controls src={blobUrl}/>:asset.kind==='video'&&blobUrl?<video controls src={blobUrl}/>:<I/>}</div><small>{asset.kind.toUpperCase()} · {asset.source.toUpperCase()}</small><h3>{asset.name}</h3><p>{incidentName??'UNASSIGNED'}{asset.size?` · ${(asset.size/1024/1024).toFixed(asset.size>1024*1024?1:2)} MB`:''}</p><div className="asset-actions"><button title="Favorite" onClick={()=>onPatch({favorite:!asset.favorite})}><Star size={13} fill={asset.favorite?'currentColor':'none'}/></button>{(href||asset.source==='studio')&&<button title="Open" onClick={open}><ExternalLink size={13}/></button>}{blobUrl&&<button title="Download" onClick={save}><Download size={13}/></button>}<button title={asset.archived?'Restore':'Archive'} onClick={()=>onPatch({archived:!asset.archived})}><Archive size={13}/></button><button title="Delete" onClick={onDelete}><Trash2 size={13}/></button></div></SpatialSurface>;
 }
 
 function Empty({label,detail}:{label:string;detail:string}) { return <div className="xf-empty"><Sparkles size={22}/><b>{label}</b><p>{detail}</p></div>; }
