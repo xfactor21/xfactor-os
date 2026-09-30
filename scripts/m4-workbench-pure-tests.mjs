@@ -31,4 +31,7 @@ assert('old vertical M2 beacon is suppressed', css.includes('.dev-cockpit .dev-m
 assert('M6 Workbench exposes three adaptive view presets', source.includes("'cockpit'") && source.includes("'code-focus'") && source.includes("'preview-focus'") && source.includes('dev-view-presets'));
 assert('M6 Workbench persists user sizing', source.includes('xfactor-workbench-explorer-width') && source.includes('xfactor-workbench-preview-width'));
 assert('M6 Workbench grid responds to view presets', css.includes('.view-code-focus') && css.includes('.view-preview-focus') && css.includes('--dev-explorer-w'));
+assert('M6 Workbench panes are independent non-fusing spatial surfaces', source.includes('workbench-panes') && source.includes('fuse={false}') && source.includes('dev-spatial-pane'));
+assert('M6 Workbench keeps editor interactions out of drag capture', source.includes('dev-code-editor-wrap') && source.includes('data-plasma-nodrag'));
+assert('M6 Workbench uses container-aware pane adaptation', css.includes('container-type:inline-size') && css.includes('@container workbench-pane'));
 console.log('\nWorkbench M4 Project Cockpit source checks passed.');
