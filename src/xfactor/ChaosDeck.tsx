@@ -398,7 +398,7 @@ export default function ChaosDeck() {
 
       {view==='settings' && <SettingsRoom/>}
 
-      {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">WORKBENCH //</span><h1>BUILD THE INCIDENT.</h1><p>Code, run, preview and debug without dropping the project context. The active Incident owns this Workbench; the shared runtime keeps the project and terminal in the same environment.</p></div></div><SpatialSurface className="dev-spatial-shell" group="workbench-shell" fuse={false}><DeveloperWorkbench
+      {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">WORKBENCH //</span><h1>BUILD THE INCIDENT.</h1><p>Code, run, preview and debug without dropping the project context. The active Incident owns this Workbench; the shared runtime keeps the project and terminal in the same environment.</p></div></div><div className="dev-spatial-shell"><DeveloperWorkbench
   active
   projectId={chosen?.id}
   projectName={chosen?.name}
@@ -408,7 +408,7 @@ export default function ChaosDeck() {
   openSignals={chosen ? ws.signals.filter(signal => signal.incidentId === chosen.id && !signal.done).length : 0}
   taskCount={chosen ? ws.signals.filter(signal => signal.incidentId === chosen.id && signal.type === 'task' && !signal.done).length : 0}
   assetCount={chosen ? ws.assets.filter(asset => asset.incidentId === chosen.id && !asset.archived).length : 0}
-/></SpatialSurface></section>}
+/></div></section>}
     </main></SpatialRoomProvider>
 
     {m6Settings.commandFab&&<button className={`xf-command-fab ${palette?'active':''}`} title="Open the Command Deck (Ctrl/Cmd + K)" aria-label="Open Command Deck" onClick={()=>{setPalette(v=>!v);setPaletteQuery('')}}><Command size={22}/><span>{palette?'CLOSE':'COMMAND'}</span></button>}
