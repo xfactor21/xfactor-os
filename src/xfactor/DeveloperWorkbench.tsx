@@ -19,6 +19,7 @@ import TerminalRoom from '../modules/terminal';
 import GitPanel from './GitPanel';
 import { isTauri } from '../lib/platform';
 import { loadM6Settings, saveM6Settings, type WorkbenchViewMode } from './m6Settings';
+import { SpatialSurface } from './TrueSpatial';
 import {
   chooseProjectFolder,
   collectProjectMirrorFiles,
@@ -795,7 +796,7 @@ export default function DeveloperWorkbench({
       </div>}
 
       <div className={`dev-workbench-grid view-${workbenchView}`} style={{'--dev-explorer-w':`${explorerWidth}px`,'--dev-preview-w':`${previewWidth}px`} as CSSProperties}>
-        <aside className="dev-explorer">
+        <SpatialSurface as="aside" className="dev-explorer dev-spatial-pane" group="workbench-panes" fuse={false} spatialId={`workbench:${projectId ?? 'scratch'}:explorer`} spatialDraggable>
           <div className="dev-pane-title"><FolderOpen size={13}/> {mode === 'local' ? binding?.name ?? 'LOCAL PROJECT' : 'PROJECT'}<span>{projectFileCount}</span></div>
           {mode === 'local' ? (
             projectScan ? <ProjectTree
@@ -825,9 +826,9 @@ export default function DeveloperWorkbench({
               ? <>{projectScan?.fileCount ?? 0} FILES · {projectScan?.directoryCount ?? 0} DIRS<br/>DISK IS AUTHORITATIVE{projectScan?.truncated ? <><br/>TREE TRUNCATED FOR SAFETY</> : null}</>
               : <>INCIDENT SANDBOX<br/>AUTO-SAVED LOCALLY<br/>NODE ROOT: /workspace</>}
           </div>
-        </aside>
+        </SpatialSurface>
 
-        <section className="dev-code-pane">
+        <SpatialSurface as="section" className="dev-code-pane dev-spatial-pane" group="workbench-panes" fuse={false} spatialId={`workbench:${projectId ?? 'scratch'}:editor`} spatialDraggable>
           <div className="dev-tabs">
             {tabs.map((tab) => {
               const dirty = mode === 'local' && Boolean(localBuffers[tab] && localBuffers[tab].content !== localBuffers[tab].savedContent);
@@ -838,17 +839,19 @@ export default function DeveloperWorkbench({
           </div>
           {activePath && activeContent !== undefined ? <>
             <div className="dev-editor-filebar"><span>{activePath}</span><small>{languageFor(activePath).toUpperCase()}</small>{mode === 'local' && <button onClick={() => void saveActiveLocal()} disabled={!activeDirty}><Save size={11}/> SAVE</button>}</div>
-            <CodeEditor
-              className="dev-code-editor"
-              value={editorValue}
-              resetKey={editorKey}
-              language={languageFor(activePath)}
-              onChange={updateActive}
-            />
+            <div className="dev-code-editor-wrap" data-plasma-nodrag>
+              <CodeEditor
+                className="dev-code-editor"
+                value={editorValue}
+                resetKey={editorKey}
+                language={languageFor(activePath)}
+                onChange={updateActive}
+              />
+            </div>
           </> : <div className="dev-no-file">{mode === 'local' ? 'OPEN A TEXT FILE FROM THE PROJECT TREE' : 'CREATE OR OPEN A FILE'}</div>}
-        </section>
+        </SpatialSurface>
 
-        <section className="dev-preview-pane">
+        <SpatialSurface as="section" className="dev-preview-pane dev-spatial-pane" group="workbench-panes" fuse={false} spatialId={`workbench:${projectId ?? 'scratch'}:preview`} spatialDraggable>
           <div className="dev-pane-title"><Play size={13}/> {previewUrl ? 'LIVE DEV SERVER' : mode === 'local' ? 'PROJECT PREVIEW' : 'STATIC PREVIEW'}<span>{previewUrl ? 'LIVE' : 'IDLE'}</span></div>
           {mode === 'local' && !previewUrl
             ? <div className="dev-local-preview-empty"><b>YOUR APP RUNS HERE.</b><p>Hit RUN PROJECT. xFactor.OS mirrors the approved project into its shared runtime, launches the detected package script, and keeps the preview beside the code.</p><small>LIKELY SECRET FILES STAY OUT OF THE MIRROR BY DEFAULT.</small></div>
@@ -860,10 +863,10 @@ export default function DeveloperWorkbench({
             />}
           {devError && <div className="dev-error">{devError}</div>}
           {logs.length > 0 && <pre className="dev-process-log">{logs.join('').slice(-7000)}</pre>}
-        </section>
+        </SpatialSurface>
       </div>
 
-      <section className="dev-cockpit-dock">
+      <SpatialSurface as="section" className="dev-cockpit-dock dev-spatial-pane" group="workbench-panes" fuse={false} spatialId={`workbench:${projectId ?? 'scratch'}:dock`} spatialDraggable>
         <div className="dev-dock-tabs">
           <button className={dockView === 'terminal' ? 'active' : ''} onClick={() => setDockView('terminal')}><TerminalSquare size={12}/> TERMINAL</button>
           <button className={dockView === 'problems' ? 'active' : ''} onClick={() => setDockView('problems')}><AlertTriangle size={12}/> PROBLEMS <i>{problems.length}</i></button>
@@ -889,7 +892,7 @@ export default function DeveloperWorkbench({
             {searchHits.length > 0 ? <div className="dev-search-results">{searchHits.slice(0, 80).map((hit, index) => <button key={`${hit.path}:${hit.line}:${hit.column}:${index}`} onClick={() => openFile(hit.path)}><b>{hit.path}</b><span>{hit.line}:{hit.column}</span><p>{hit.preview}</p></button>)}</div> : <div className="dev-dock-empty">SEARCH FILE CONTENT ACROSS THE BOUND PROJECT. LIKELY SECRET FILES ARE SKIPPED BY DEFAULT.</div>}
           </> : <div className="dev-dock-empty"><b>PROJECT SEARCH NEEDS A REAL PROJECT.</b><span>Bind a desktop folder and search the actual codebase from here.</span>{isTauri() && projectId && <button onClick={() => void bindFolder()}><FolderOpen size={12}/> OPEN REAL PROJECT</button>}</div>}
         </div>}
-      </section>
+      </SpatialSurface>
     </section>
   );
 }
