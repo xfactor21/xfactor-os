@@ -30,8 +30,9 @@ import { useAuthStore } from '../stores/authStore';
 import { supabaseConfigured } from '../lib/supabase';
 import './xfactor.css';
 
+declare const __XFACTOR_VERSION__: string;
 type View = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'files' | 'browser' | 'terminal' | 'settings';
-const BUILD_VERSION = '0.6.0';
+const BUILD_VERSION = __XFACTOR_VERSION__;
 type DragState = { id: string; ox: number; oy: number; rect: DOMRect };
 
 const assetIcon = (kind: string) => kind === 'image' ? Image : kind === 'audio' ? Music : kind === 'video' ? Video : kind === 'code' ? Code2 : kind === 'studio' ? Hammer : FileText;
