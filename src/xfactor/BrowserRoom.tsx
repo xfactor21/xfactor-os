@@ -6,6 +6,8 @@ import { isTauri } from '../lib/platform';
 
 type Bookmark = { id: string; url: string; title: string; createdAt: number };
 type MediaHit = { url: string; kind: 'image'|'audio'|'video'|'style'|'script' };
+type DesktopHtml = { text: string; finalUrl: string; contentType: string };
+type DesktopAsset = { bytes: number[]; finalUrl: string; contentType: string };
 
 const BOOKMARK_KEY = 'xfactor-m6-browser-bookmarks-v1';
 
@@ -40,6 +42,11 @@ export default function BrowserRoom({
   const [media,setMedia]=useState<MediaHit[]>([]);
   const [panel,setPanel]=useState<'tools'|'bookmarks'|'source'>('tools');
 
+  async function invokeDesktop<T>(command:string,args:Record<string,unknown>):Promise<T>{
+    const {invoke}=await import('@tauri-apps/api/core');
+    return invoke<T>(command,args);
+  }
+
   const canBack=historyIndex>0, canForward=historyIndex<history.length-1;
   const host=useMemo(()=>{try{return new URL(current).host}catch{return current}},[current]);
 
@@ -65,6 +72,10 @@ export default function BrowserRoom({
   function forward(){if(!canForward)return;const i=historyIndex+1;setHistoryIndex(i);setCurrent(history[i]);setAddress(history[i]);}
 
   async function fetchHtml(url=current) {
+    if(isTauri()){
+      const result=await invokeDesktop<DesktopHtml>('browser_fetch_html',{url});
+      return {text:result.text,finalUrl:result.finalUrl};
+    }
     const response=await fetch(url,{credentials:'omit',redirect:'follow'});
     if(!response.ok)throw new Error('HTTP '+response.status);
     const type=response.headers.get('content-type')||'';
@@ -146,9 +157,17 @@ export default function BrowserRoom({
   async function vaultMedia(hit:MediaHit){
     const kind:AssetKind=hit.kind==='image'?'image':hit.kind==='video'?'video':hit.kind==='audio'?'audio':hit.kind==='script'||hit.kind==='style'?'code':'link';
     try {
-      const r=await fetch(hit.url,{credentials:'omit'});if(!r.ok)throw new Error('HTTP '+r.status);
-      const blob=await r.blob();if(blob.size>30_000_000)throw new Error('Asset exceeds 30 MB capture cap.');
-      await onVaultBlob(filenameFromUrl(hit.url,'asset-'+Date.now()),blob,kind,['browser-asset']);
+      let blob:Blob;
+      let finalUrl=hit.url;
+      if(isTauri()){
+        const result=await invokeDesktop<DesktopAsset>('browser_fetch_asset',{url:hit.url});
+        blob=new Blob([new Uint8Array(result.bytes)],{type:result.contentType||'application/octet-stream'});
+        finalUrl=result.finalUrl||hit.url;
+      }else{
+        const r=await fetch(hit.url,{credentials:'omit'});if(!r.ok)throw new Error('HTTP '+r.status);
+        blob=await r.blob();if(blob.size>12_000_000)throw new Error('Asset exceeds 12 MB capture cap.');
+      }
+      await onVaultBlob(filenameFromUrl(finalUrl,'asset-'+Date.now()),blob,kind,['browser-asset']);
       setStatus('ASSET SAVED TO VAULT');
     } catch { onVaultReference(filenameFromUrl(hit.url),hit.url,kind,['browser-asset','remote-reference']);setStatus('REMOTE ASSET SAVED AS VAULT REFERENCE'); }
   }
@@ -163,7 +182,7 @@ export default function BrowserRoom({
       <button className="m6-browser-isolated" onClick={()=>void openIsolated()}><ExternalLink size={15}/> {isTauri()?'OPEN ISOLATED':'OPEN TAB'}</button>
     </div>
 
-    <div className="m6-browser-status"><b>{host}</b><span>{status}</span><small>{isTauri()?'REMOTE SITES OPEN IN A NON-PRIVILEGED CHILD WEBVIEW · ':''}CAPTURE ONLY USES DIRECTLY ACCESSIBLE HTTP(S) CONTENT · NO AUTH/DRM BYPASS</small></div>
+    <div className="m6-browser-status"><b>{host}</b><span>{status}</span><small>{isTauri()?'REMOTE SITES OPEN IN A NON-PRIVILEGED CHILD WEBVIEW · ':''}DESKTOP CAPTURE USES A BOUNDED PUBLIC-NETWORK FETCHER · NO LOCAL NETWORK / AUTH / DRM BYPASS</small></div>
 
     <div className="m6-browser-layout">
       <section className="m6-browser-frame"><iframe key={current} title="xFactor browser" src={current} sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-downloads"/></section>
