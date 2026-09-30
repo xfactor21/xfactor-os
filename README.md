@@ -1,4 +1,4 @@
-> **Current engineering milestone:** xFactor.OS **0.6.0 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
+> **Current engineering milestone:** xFactor.OS **0.6.1 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
 
 # xFactor.OS
 
@@ -6,7 +6,7 @@
 
 xFactor.OS is a local-first controlled-chaos operating workspace for builders, creators, developers, and people whose real work refuses to fit inside a tidy dashboard.
 
-## What 0.6.0 M6 actually contains
+## What 0.6.1 M6 actually contains
 
 The product entry path includes a persistent spatial Floor, editable Incidents, overlapping Piles, Signal/Hotwire capture and routing, Blackbox context, Tape history, Black Vault, backup/restore, Command Deck, optional Supabase metadata sync, the 25-tool Design Lab, multi-runtime Terminal, the M6 Spatial Organizer (Normal/Plasma/Matter + durable bundles), Project Cockpit/Workbench, scoped desktop Files explorer, bounded research Browser, and device-local Settings.
 
@@ -39,7 +39,7 @@ VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
 
-Apply `supabase/migrations/20260815_xfactor_workspace.sql` before live testing. Binary Vault file blobs remain local to the device in 0.6.0; links, file metadata, Studio documents, Incidents, Signal, Piles, layouts, and Tape metadata are in the workspace envelope.
+Apply `supabase/migrations/20260815_xfactor_workspace.sql` before live testing. Binary Vault file blobs remain local to the device in 0.6.1; links, file metadata, Studio documents, Incidents, Signal, Piles, layouts, and Tape metadata are in the workspace envelope.
 
 ## Desktop
 
