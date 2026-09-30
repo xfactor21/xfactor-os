@@ -8,9 +8,11 @@ function assert(name, condition) {
 const capability = JSON.parse(fs.readFileSync('src-tauri/capabilities/default.json', 'utf8'));
 const permissions = new Set(capability.permissions ?? []);
 const windows = capability.windows ?? [];
+const webviews = capability.webviews ?? [];
 
-assert('capability applies only to main workspace window', windows.length === 1 && windows[0] === 'main');
-assert('capture-widget receives no shared privileged capability', !windows.includes('capture-widget'));
+assert('privileged capability is scoped to trusted main webview only', windows.length === 0 && webviews.length === 1 && webviews[0] === 'main');
+assert('capture-widget receives no shared privileged capability', !windows.includes('capture-widget') && !webviews.includes('capture-widget'));
+assert('remote xBrowser child receives no privileged capability', !webviews.includes('xf-browser-surface'));
 assert('main retains native open dialog', permissions.has('dialog:allow-open'));
 assert('main retains native save dialog', permissions.has('dialog:allow-save'));
 assert('main allows isolated browser webview creation', permissions.has('core:webview:allow-create-webview-window'));
@@ -31,6 +33,16 @@ assert('desktop browser backend blocks loopback/private/link-local networks', br
 assert('desktop browser backend revalidates redirect destinations', browserBackend.includes('Policy::none()') && browserBackend.includes('validate_public_destination(&current)'));
 assert('desktop browser backend caps HTML and asset bytes', browserBackend.includes('MAX_HTML_BYTES') && browserBackend.includes('MAX_ASSET_BYTES') && browserBackend.includes('read_bounded'));
 assert('browser capture commands are explicitly registered', tauriLib.includes('browser::browser_fetch_html') && tauriLib.includes('browser::browser_fetch_asset'));
+const nativeBrowser = fs.readFileSync('src-tauri/src/native_browser.rs', 'utf8');
+assert('native child xBrowser commands are explicitly registered', tauriLib.includes('native_browser::browser_surface_open') && tauriLib.includes('native_browser::browser_surface_close'));
+assert('native xBrowser uses Tauri child-webview API', nativeBrowser.includes('WebviewBuilder::new(LABEL') && nativeBrowser.includes('host.add_child(builder'));
+assert('native xBrowser navigation is http(s) only', nativeBrowser.includes('xBrowser navigation accepts only http(s) URLs.'));
+const cargoText = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+assert('Tauri unstable multiwebview feature is enabled', cargoText.includes('"unstable"'));
+const browserRoom = fs.readFileSync('src/xfactor/BrowserRoom.tsx', 'utf8');
+const nativeSurface = fs.readFileSync('src/xfactor/NativeBrowserSurface.tsx', 'utf8');
+assert('Browser room selects native surface on desktop', browserRoom.includes('<NativeBrowserSurface') && nativeSurface.includes("'browser_surface_open'"));
+assert('web fallback states frame limitations truthfully', browserRoom.includes('SOME SITES BLOCK EMBEDDING'));
 assert('no broad Tauri HTTP plugin permission is granted', ![...permissions].some(permission => String(permission).startsWith('http:')));
 
 const widget = fs.readFileSync('src/components/CaptureWidget.tsx', 'utf8');

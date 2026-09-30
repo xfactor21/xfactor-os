@@ -1,5 +1,6 @@
 mod git;
 mod browser;
+mod native_browser;
 
 use tauri::Manager;
 
@@ -44,6 +45,13 @@ pub fn run() {
       git::git_commit,
       browser::browser_fetch_html,
       browser::browser_fetch_asset,
+      native_browser::browser_surface_open,
+      native_browser::browser_surface_navigate,
+      native_browser::browser_surface_set_bounds,
+      native_browser::browser_surface_reload,
+      native_browser::browser_surface_back,
+      native_browser::browser_surface_forward,
+      native_browser::browser_surface_close,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

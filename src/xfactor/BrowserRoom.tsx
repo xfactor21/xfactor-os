@@ -3,6 +3,7 @@ import { Archive, ArrowLeft, ArrowRight, BookMarked, Code2, Download, ExternalLi
 import type { AssetKind } from './domain';
 import { loadM6Settings } from './m6Settings';
 import { isTauri } from '../lib/platform';
+import NativeBrowserSurface, { nativeBrowserBack, nativeBrowserForward, nativeBrowserNavigate, nativeBrowserReload } from './NativeBrowserSurface';
 
 type Bookmark = { id: string; url: string; title: string; createdAt: number };
 type MediaHit = { url: string; kind: 'image'|'audio'|'video'|'style'|'script' };
@@ -41,6 +42,8 @@ export default function BrowserRoom({
   const [selector,setSelector]=useState('');
   const [media,setMedia]=useState<MediaHit[]>([]);
   const [panel,setPanel]=useState<'tools'|'bookmarks'|'source'>('tools');
+  const [webReloadKey,setWebReloadKey]=useState(0);
+  const nativeBrowser=isTauri();
 
   async function invokeDesktop<T>(command:string,args:Record<string,unknown>):Promise<T>{
     const {invoke}=await import('@tauri-apps/api/core');
@@ -53,7 +56,11 @@ export default function BrowserRoom({
   function navigate(raw=address) {
     const url=normalizeUrl(raw);
     const next=[...history.slice(0,historyIndex+1),url];
-    setHistory(next);setHistoryIndex(next.length-1);setCurrent(url);setAddress(url);setStatus('NAVIGATED');
+    setHistory(next);setHistoryIndex(next.length-1);setCurrent(url);setAddress(url);
+    if(nativeBrowser){
+      setStatus('NAVIGATING NATIVE WEBVIEW...');
+      void nativeBrowserNavigate(url).catch(err=>setStatus('NAVIGATION BLOCKED: '+(err instanceof Error?err.message:String(err))));
+    }else setStatus('WEB PREVIEW NAVIGATED');
   }
 
   async function openIsolated(raw=current) {
@@ -68,8 +75,22 @@ export default function BrowserRoom({
       setStatus('WEBVIEW OPEN FAILED: '+(err instanceof Error?err.message:String(err)));
     }
   }
-  function back(){if(!canBack)return;const i=historyIndex-1;setHistoryIndex(i);setCurrent(history[i]);setAddress(history[i]);}
-  function forward(){if(!canForward)return;const i=historyIndex+1;setHistoryIndex(i);setCurrent(history[i]);setAddress(history[i]);}
+  function back(){
+    if(nativeBrowser){void nativeBrowserBack();return;}
+    if(!canBack)return;const i=historyIndex-1;setHistoryIndex(i);setCurrent(history[i]);setAddress(history[i]);
+  }
+  function forward(){
+    if(nativeBrowser){void nativeBrowserForward();return;}
+    if(!canForward)return;const i=historyIndex+1;setHistoryIndex(i);setCurrent(history[i]);setAddress(history[i]);
+  }
+  function reloadPage(){
+    if(nativeBrowser){void nativeBrowserReload();return;}
+    setWebReloadKey(value=>value+1);
+  }
+  function syncNativeNavigation(url:string){
+    const normalized=normalizeUrl(url);
+    setCurrent(normalized);setAddress(normalized);
+  }
 
   async function fetchHtml(url=current) {
     if(isTauri()){
@@ -176,16 +197,20 @@ export default function BrowserRoom({
     <div className="xf-section-head"><div><span className="kicker">BROWSER //</span><h1>STEAL THE USEFUL PARTS.</h1><p>An xFactor research browser: browse, bookmark, capture accessible page source, archive bounded same-origin projects, and throw useful fragments straight into the Vault.</p></div><button className="xf-big-action" onClick={onOpenVault}><Archive size={15}/> OFFLINE VAULT</button></div>
 
     <div className="m6-browser-chrome">
-      <div className="m6-browser-nav"><button disabled={!canBack} onClick={back}><ArrowLeft/></button><button disabled={!canForward} onClick={forward}><ArrowRight/></button><button onClick={()=>setCurrent(current)}><RefreshCw/></button></div>
+      <div className="m6-browser-nav"><button disabled={!nativeBrowser&&!canBack} onClick={back}><ArrowLeft/></button><button disabled={!nativeBrowser&&!canForward} onClick={forward}><ArrowRight/></button><button onClick={reloadPage}><RefreshCw/></button></div>
       <div className="m6-address"><Globe2/><input value={address} onChange={e=>setAddress(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')navigate()}}/><button onClick={()=>navigate()}>GO</button></div>
       <button className="m6-bookmark" onClick={bookmark}><Star size={15}/> SAVE SITE</button>
       <button className="m6-browser-isolated" onClick={()=>void openIsolated()}><ExternalLink size={15}/> {isTauri()?'OPEN ISOLATED':'OPEN TAB'}</button>
     </div>
 
-    <div className="m6-browser-status"><b>{host}</b><span>{status}</span><small>{isTauri()?'REMOTE SITES OPEN IN A NON-PRIVILEGED CHILD WEBVIEW · ':''}DESKTOP CAPTURE USES A BOUNDED PUBLIC-NETWORK FETCHER · NO LOCAL NETWORK / AUTH / DRM BYPASS</small></div>
+    <div className="m6-browser-status"><b>{host}</b><span>{status}</span><small>{nativeBrowser?'DESKTOP: NATIVE CHILD WEBVIEW · REMOTE CONTENT HAS NO FILESYSTEM / DIALOG / IPC CAPABILITY · ':'WEB PREVIEW: EMBEDDING DEPENDS ON THE SITE · USE DESKTOP xBROWSER FOR SITES THAT BLOCK FRAMES · '}CAPTURE USES A BOUNDED PUBLIC-NETWORK FETCHER · NO AUTH/DRM BYPASS</small></div>
 
     <div className="m6-browser-layout">
-      <section className="m6-browser-frame"><iframe key={current} title="xFactor browser" src={current} sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-downloads"/></section>
+      <section className={`m6-browser-frame ${nativeBrowser?'native':''}`}>
+        {nativeBrowser
+          ? <NativeBrowserSurface url={current} host={host} onNavigation={syncNativeNavigation} onStatus={setStatus}/>
+          : <><iframe key={`${current}:${webReloadKey}`} title="xFactor browser web preview" src={current} sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-downloads"/><div className="m7-web-frame-note">WEB PREVIEW · SOME SITES BLOCK EMBEDDING · DESKTOP xBROWSER USES A NATIVE WEBVIEW</div></>}
+      </section>
       <aside className="m6-browser-tools">
         <div className="m6-browser-tabs"><button className={panel==='tools'?'active':''} onClick={()=>setPanel('tools')}>TOOLS</button><button className={panel==='bookmarks'?'active':''} onClick={()=>setPanel('bookmarks')}>BOOKMARKS</button><button className={panel==='source'?'active':''} onClick={()=>setPanel('source')}>SOURCE</button></div>
         {panel==='tools'&&<div className="m6-browser-tool-list">
