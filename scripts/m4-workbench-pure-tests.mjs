@@ -27,6 +27,7 @@ assert('Git is promoted into dock', source.includes("dockView === 'git'") && sou
 assert('project search is promoted into dock', source.includes("dockView === 'search'") && source.includes('SEARCH ACROSS THIS PROJECT'));
 assert('keyboard save/search/terminal shortcuts exist', source.includes("event.key.toLowerCase() === 's'") && source.includes('event.shiftKey') && source.includes("event.key === '`'"));
 assert('cockpit CSS has desktop and compact layouts', css.includes('.dev-cockpit .dev-workbench-grid') && css.includes('@media(max-width:760px)'));
+assert('direct pane resize handles persist explorer and preview widths', source.includes("beginPaneResize('explorer'") && source.includes("beginPaneResize('preview'") && source.includes('aria-label="Resize project explorer"') && source.includes('aria-label="Resize project preview"') && css.includes('.dev-pane-splitter'));
 assert('old vertical M2 beacon is suppressed', css.includes('.dev-cockpit .dev-m2-beacon'));
 assert('M6 Workbench exposes three adaptive view presets', source.includes("'cockpit'") && source.includes("'code-focus'") && source.includes("'preview-focus'") && source.includes('dev-view-presets'));
 assert('M6 Workbench persists user sizing', source.includes('xfactor-workbench-explorer-width') && source.includes('xfactor-workbench-preview-width'));
