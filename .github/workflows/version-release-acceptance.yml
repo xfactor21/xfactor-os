@@ -69,8 +69,10 @@ jobs:
           import fs from 'node:fs';
           const version = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
           const html = fs.readFileSync('dist/index.html', 'utf8');
+          const assets = fs.readdirSync('dist/assets').filter(name => name.endsWith('.js')).map(name => fs.readFileSync('dist/assets/' + name, 'utf8')).join('\n');
           if (html.includes('__XFACTOR_VERSION__')) throw new Error('unresolved version token in production HTML');
-          if (!html.includes(`xFactor.OS // v${version}`)) throw new Error('visible build badge missing release version');
           if (!html.includes(`xFactor.OS v${version}`)) throw new Error('document title missing release version');
-          console.log(`Production UI visibly identifies xFactor.OS v${version}.`);
+          if (!assets.includes(version) || !assets.includes('CONTROLLED CHAOS SYSTEM')) throw new Error('header build identity missing release version');
+          if (html.includes('xfactor-build-badge')) throw new Error('obsolete lower-right version badge returned');
+          console.log(`Production UI visibly identifies xFactor.OS v${version} in the document title and application header.`);
           NODE
