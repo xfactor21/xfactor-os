@@ -23,6 +23,16 @@ assert('main no longer grants SQL select permission', !permissions.has('sql:allo
 assert('main no longer grants unused fs exists permission', !permissions.has('fs:allow-exists'));
 assert('main no longer grants broad dialog default permission', !permissions.has('dialog:default'));
 
+const browserBackend = fs.readFileSync('src-tauri/src/browser.rs', 'utf8');
+const tauriLib = fs.readFileSync('src-tauri/src/lib.rs', 'utf8');
+assert('desktop browser backend only accepts http(s)', browserBackend.includes('matches!(url.scheme(), "http" | "https")'));
+assert('desktop browser backend blocks credential-bearing URLs', browserBackend.includes('Credential-bearing URLs are not accepted.'));
+assert('desktop browser backend blocks loopback/private/link-local networks', browserBackend.includes('ip.is_private()') && browserBackend.includes('ip.is_loopback()') && browserBackend.includes('ip.is_link_local()') && browserBackend.includes('100') && browserBackend.includes('64..=127'));
+assert('desktop browser backend revalidates redirect destinations', browserBackend.includes('Policy::none()') && browserBackend.includes('validate_public_destination(&current)'));
+assert('desktop browser backend caps HTML and asset bytes', browserBackend.includes('MAX_HTML_BYTES') && browserBackend.includes('MAX_ASSET_BYTES') && browserBackend.includes('read_bounded'));
+assert('browser capture commands are explicitly registered', tauriLib.includes('browser::browser_fetch_html') && tauriLib.includes('browser::browser_fetch_asset'));
+assert('no broad Tauri HTTP plugin permission is granted', ![...permissions].some(permission => String(permission).startsWith('http:')));
+
 const widget = fs.readFileSync('src/components/CaptureWidget.tsx', 'utf8');
 assert('capture widget uses canonical xFactor workspace store', widget.includes("from '../xfactor/store'"));
 assert('capture widget does not import tauri APIs', !widget.includes('@tauri-apps/'));
