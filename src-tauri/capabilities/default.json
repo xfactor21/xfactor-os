@@ -2,9 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-workspace",
   "description": "Least-privilege permissions for the primary xFactor.OS workspace window",
-  "windows": [
-    "main"
-  ],
   "permissions": [
     "core:default",
     "dialog:allow-open",
@@ -17,5 +14,8 @@
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
     "core:webview:allow-create-webview-window"
+  ],
+  "webviews": [
+    "main"
   ]
 }

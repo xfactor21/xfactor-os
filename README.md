@@ -1,4 +1,4 @@
-> **Current engineering milestone:** xFactor.OS **0.6.0 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
+> **Current engineering milestone:** xFactor.OS **0.7.0 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
 
 # xFactor.OS
 
@@ -6,9 +6,9 @@
 
 xFactor.OS is a local-first controlled-chaos operating workspace for builders, creators, developers, and people whose real work refuses to fit inside a tidy dashboard.
 
-## What 0.5.0 actually contains
+## What 0.7.0 M6 actually contains
 
-The product entry path now includes a persistent spatial Floor, editable Incidents, overlapping Piles, Signal/Hotwire capture and routing, a full Blackbox Incident workbench, bidirectional Incident relations, Tape history, a Black Vault with real IndexedDB-backed local file ingestion/previews plus URL references, JSON workspace backup/restore, the Command Deck, optional Supabase account/sync UI, the inherited 25-tool Design Lab with Vault metadata integration, and the inherited Node/Python/Ruby/PHP/Go Terminal.
+The product entry path includes a persistent spatial Floor, editable Incidents, overlapping Piles, Signal/Hotwire capture and routing, Blackbox context, Tape history, Black Vault, backup/restore, Command Deck, optional Supabase metadata sync, the 25-tool Design Lab, multi-runtime Terminal, the M6 Spatial Organizer (Normal/Plasma/Matter + durable bundles), Project Cockpit/Workbench, scoped desktop Files explorer, bounded research Browser, and device-local Settings.
 
 See **`BUILD-MATRIX.md`** for the precise BUILT vs VERIFICATION GATE status of every major capability. That file is the source of truth; do not infer completeness merely because a route exists.
 
@@ -39,7 +39,7 @@ VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
 
-Apply `supabase/migrations/20260815_xfactor_workspace.sql` before live testing. Binary Vault file blobs remain local to the device in 0.5.0; links, file metadata, Studio documents, Incidents, Signal, Piles, layouts, and Tape metadata are in the workspace envelope.
+Apply `supabase/migrations/20260815_xfactor_workspace.sql` before live testing. Binary Vault file blobs remain local to the device in 0.7.0; links, file metadata, Studio documents, Incidents, Signal, Piles, layouts, and Tape metadata are in the workspace envelope.
 
 ## Desktop
 

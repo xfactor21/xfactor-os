@@ -218,16 +218,25 @@ await check('Signal Matter mode uses canonical Signal data', async () => {
   const input = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
   await input.fill('open signal');
   await input.press('Enter');
-  await page.getByRole('button', { name: /MATTER/i }).click();
-  await page.locator('.xf-root.xf-matter-mode').waitFor();
-  await waitSpatialSettled();
-  await page.getByText('THOUGHTS HAVE WEIGHT NOW.').waitFor();
-  const editor = page.locator('.xf-matter-note textarea').first();
-  await editor.waitFor();
-  const value = await editor.inputValue();
-  if (!value.includes('PLASMA SAFE')) throw new Error('Matter did not receive the canonical Signal edit');
-  await page.getByRole('button', { name: 'NORMAL' }).click();
-  await waitSpatialSettled();
+  try {
+    await page.getByRole('button', { name: /MATTER/i }).click();
+    await page.locator('.xf-root.xf-matter-mode').waitFor();
+    await waitSpatialSettled();
+    await page.getByText('THOUGHTS HAVE WEIGHT NOW.').waitFor();
+    const editor = page.locator('.xf-matter-note textarea').first();
+    await editor.waitFor();
+    const value = await editor.inputValue();
+    if (!value.includes('PLASMA SAFE')) throw new Error('Matter did not receive the canonical Signal edit');
+  } finally {
+    if (await page.locator('.xf-root.xf-matter-mode').count()) {
+      // Floor acceptance already exercises a real pointer click. Here the goal is
+      // deterministic teardown under GPU load, so avoid Playwright actionability
+      // waiting on continuously animated material geometry.
+      await page.getByRole('button', { name: 'NORMAL' }).dispatchEvent('click');
+      await waitSpatialSettled();
+      await page.locator('.xf-root.xf-matter-mode').waitFor({ state: 'detached', timeout: 10000 });
+    }
+  }
 });
 
 await check('M6 Files Browser Settings shell routes', async () => {

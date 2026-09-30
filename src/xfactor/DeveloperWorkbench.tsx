@@ -327,6 +327,27 @@ export default function DeveloperWorkbench({
   function changePreviewWidth(next:number){
     const value=Math.max(260,Math.min(640,next));setPreviewWidth(value);localStorage.setItem('xfactor-workbench-preview-width',String(value));
   }
+  function beginPaneResize(kind:'explorer'|'preview', startX:number){
+    const explorerStart=explorerWidth;
+    const previewStart=previewWidth;
+    const move=(event:PointerEvent)=>{
+      const delta=event.clientX-startX;
+      if(kind==='explorer') changeExplorerWidth(explorerStart+delta);
+      else changePreviewWidth(previewStart-delta);
+    };
+    const stop=()=>{
+      window.removeEventListener('pointermove',move);
+      window.removeEventListener('pointerup',stop);
+      document.documentElement.classList.remove('dev-resizing');
+    };
+    document.documentElement.classList.add('dev-resizing');
+    window.addEventListener('pointermove',move);
+    window.addEventListener('pointerup',stop,{once:true});
+  }
+  function nudgePane(kind:'explorer'|'preview',delta:number){
+    if(kind==='explorer') changeExplorerWidth(explorerWidth+delta);
+    else changePreviewWidth(previewWidth+delta);
+  }
 
   useEffect(() => {
     if (!active) return;
@@ -828,6 +849,20 @@ export default function DeveloperWorkbench({
           </div>
         </SpatialSurface>
 
+        <div
+          className="dev-pane-splitter explorer-splitter"
+          data-plasma-nodrag
+          role="separator"
+          aria-label="Resize project explorer"
+          aria-orientation="vertical"
+          aria-valuemin={160}
+          aria-valuemax={360}
+          aria-valuenow={explorerWidth}
+          tabIndex={0}
+          onPointerDown={event=>{event.preventDefault();beginPaneResize('explorer',event.clientX)}}
+          onKeyDown={event=>{if(event.key==='ArrowLeft'){event.preventDefault();nudgePane('explorer',-10)}if(event.key==='ArrowRight'){event.preventDefault();nudgePane('explorer',10)}}}
+        ><span/></div>
+
         <SpatialSurface as="section" className="dev-code-pane dev-spatial-pane" group="workbench-panes" fuse={false} spatialId={`workbench:${projectId ?? 'scratch'}:editor`} spatialDraggable>
           <div className="dev-tabs">
             {tabs.map((tab) => {
@@ -850,6 +885,20 @@ export default function DeveloperWorkbench({
             </div>
           </> : <div className="dev-no-file">{mode === 'local' ? 'OPEN A TEXT FILE FROM THE PROJECT TREE' : 'CREATE OR OPEN A FILE'}</div>}
         </SpatialSurface>
+
+        <div
+          className="dev-pane-splitter preview-splitter"
+          data-plasma-nodrag
+          role="separator"
+          aria-label="Resize project preview"
+          aria-orientation="vertical"
+          aria-valuemin={260}
+          aria-valuemax={640}
+          aria-valuenow={previewWidth}
+          tabIndex={0}
+          onPointerDown={event=>{event.preventDefault();beginPaneResize('preview',event.clientX)}}
+          onKeyDown={event=>{if(event.key==='ArrowLeft'){event.preventDefault();nudgePane('preview',10)}if(event.key==='ArrowRight'){event.preventDefault();nudgePane('preview',-10)}}}
+        ><span/></div>
 
         <SpatialSurface as="section" className="dev-preview-pane dev-spatial-pane" group="workbench-panes" fuse={false} spatialId={`workbench:${projectId ?? 'scratch'}:preview`} spatialDraggable>
           <div className="dev-pane-title"><Play size={13}/> {previewUrl ? 'LIVE DEV SERVER' : mode === 'local' ? 'PROJECT PREVIEW' : 'STATIC PREVIEW'}<span>{previewUrl ? 'LIVE' : 'IDLE'}</span></div>

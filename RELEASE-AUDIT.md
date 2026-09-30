@@ -1,12 +1,12 @@
-> **Current engineering milestone:** xFactor.OS **0.6.0 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
+> **Current engineering milestone:** xFactor.OS **0.7.0 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
 
-# xFactor.OS Release Audit — 0.5.0
+# xFactor.OS Release Audit — 0.7.0 M6
 
 ## Current verdict
 
 **ENGINEERING RELEASE CANDIDATE VERIFIED / PUBLIC DISTRIBUTION STILL GATED.**
 
-The current 0.5.0 line passes clean dependency installation, release/security checks, TypeScript/Vite production build, real Chromium product/runtime acceptance, consolidated Design Lab regression, cloud-sync freshness/account-isolation contracts, Tauri least-privilege checks, and Windows Tauri packaging.
+The current 0.7.0 M6 line passes clean dependency installation, release/security checks, TypeScript/Vite production build, real Chromium product/runtime acceptance, consolidated Design Lab regression, cloud-sync freshness/account-isolation contracts, Tauri least-privilege checks, and Windows Tauri packaging.
 
 Production Vercel is currently deployed from the latest verified `main` line. This does **not** mean signed public Windows distribution is complete.
 
@@ -70,8 +70,8 @@ Production preview also verifies the required cross-origin isolation behavior.
 1. **Live Supabase user acceptance:** create one dedicated Auth test user and run the merged two-client A→B / B→A sync harness.
 2. **Windows install acceptance:** install the generated EXE/MSI on a real Windows environment and verify launch, restart/persistence, native file dialog, tray/Hotwire behavior, upgrade, and uninstall.
 3. **Code signing / SmartScreen:** sign the Windows release before broad public distribution.
-4. **macOS/public multi-platform distribution:** current release work is Windows-focused; signed/notarized macOS distribution is not claimed for 0.5.0.
+4. **macOS/public multi-platform distribution:** current release work is Windows-focused; signed/notarized macOS distribution is not claimed for 0.7.0.
 
 ## Release-manager conclusion
 
-**0.5.0 is a verified engineering release candidate.** The remaining blockers are explicit deployment/owner-backed gates rather than hidden missing core implementation. Public Windows distribution should remain gated until real installer acceptance and signing are complete; cloud sync should remain described as unverified until the credential-backed two-session test passes.
+**0.7.0 M6 is a verified engineering release candidate.** The remaining blockers are explicit deployment/owner-backed gates rather than hidden missing core implementation. Public Windows distribution should remain gated until real installer acceptance and signing are complete; cloud sync should remain described as unverified until the credential-backed two-session test passes.

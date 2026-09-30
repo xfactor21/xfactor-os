@@ -30,9 +30,11 @@ import { useAuthStore } from '../stores/authStore';
 import { supabaseConfigured } from '../lib/supabase';
 import './xfactor.css';
 
+declare const __XFACTOR_VERSION__: string;
 type View = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'files' | 'browser' | 'terminal' | 'settings';
-const BUILD_VERSION = '0.6.0';
+const BUILD_VERSION = __XFACTOR_VERSION__;
 type DragState = { id: string; ox: number; oy: number; rect: DOMRect };
+type VaultCategory = 'all'|'browser'|'code'|'images'|'media'|'links'|'studio'|'files';
 
 const assetIcon = (kind: string) => kind === 'image' ? Image : kind === 'audio' ? Music : kind === 'video' ? Video : kind === 'code' ? Code2 : kind === 'studio' ? Hammer : FileText;
 const statusOrder: IncidentStatus[]=['FERAL','LIVE','BREACH','DORMANT'];
@@ -59,6 +61,7 @@ export default function ChaosDeck() {
   const [signalQuery, setSignalQuery] = useState('');
   const [vaultQuery, setVaultQuery] = useState('');
   const [vaultArchived, setVaultArchived] = useState(false);
+  const [vaultCategory,setVaultCategory] = useState<VaultCategory>('all');
   const [capture, setCapture] = useState('');
   const [signalStrength, setSignalStrength] = useState(86);
   const [selectedIds, setSelectedIds] = useState<string[]>(() => ws.selectedIncidentId ? [ws.selectedIncidentId] : []);
@@ -175,6 +178,20 @@ export default function ChaosDeck() {
   const selected = selectedIds[0];
   const chosen = useMemo(() => ws.incidents.find(s => s.id === selected) ?? ws.incidents.find(i=>!i.archived), [ws.incidents, selected]);
   const visibleIncidents=useMemo(()=>ws.incidents.filter(i=>!i.archived),[ws.incidents]);
+  const vaultAssets=useMemo(()=>ws.assets
+    .filter(asset=>asset.archived===vaultArchived)
+    .filter(asset=>!vaultQuery||`${asset.name} ${asset.kind} ${asset.tags.join(' ')}`.toLowerCase().includes(vaultQuery.toLowerCase()))
+    .filter(asset=>{
+      if(vaultCategory==='all')return true;
+      if(vaultCategory==='browser')return asset.tags.some(tag=>tag.startsWith('browser-'))||asset.tags.includes('offline-site');
+      if(vaultCategory==='code')return asset.kind==='code'||asset.tags.includes('component')||asset.tags.includes('browser-project');
+      if(vaultCategory==='images')return asset.kind==='image';
+      if(vaultCategory==='media')return asset.kind==='audio'||asset.kind==='video';
+      if(vaultCategory==='links')return asset.kind==='link';
+      if(vaultCategory==='studio')return asset.source==='studio'||asset.kind==='studio';
+      if(vaultCategory==='files')return asset.source==='file';
+      return true;
+    }),[ws.assets,vaultArchived,vaultQuery,vaultCategory]);
   // Spatial display mode is an OS-level presentation state. Incident layouts remain scoped separately.
   const plasma = usePlasmaMode('global');
 
@@ -301,6 +318,9 @@ export default function ChaosDeck() {
     if(label==='Create pile') createPileFromSelection();
     if(label==='Backup workspace') exportBackup();
     if(label==='Restore workspace') importRef.current?.click();
+    if(label==='Save current layout') saveLayout();
+    if(label==='Account & sync') setAccount(true);
+    if(label==='Open command help') { setView('settings'); setNotice('COMMAND DECK // CTRL/CMD + K · TYPE AN ACTION OR ENTITY'); }
   }
   function runPaletteInput() {
     const parsed=parseCommand(paletteQuery);
@@ -314,12 +334,16 @@ export default function ChaosDeck() {
     const first=commands[0]; if(first)command(first.label);
   }
   const commands = [
-    {label:'New incident',hint:'CREATE',icon:Plus},{label:'Riot Mode',hint:'LAYOUT',icon:Shuffle},{label:'Stack It',hint:'LAYOUT',icon:Layers3},
-    {label:'Create pile',hint:'ORGANIZE',icon:FolderPlus},{label:'Signal',hint:'PLANNING',icon:Radio},{label:'Piles',hint:'PLANNING',icon:Boxes},{label:'Vault',hint:'PLANNING',icon:Archive},{label:'Tape',hint:'PLANNING',icon:History},
-    {label:'Files',hint:'DEV TOOLS',icon:FolderTree},{label:'Browser',hint:'DEV TOOLS',icon:Globe2},{label:'Design Lab',hint:'DEV TOOLS',icon:Hammer},{label:'Workbench',hint:'DEV TOOLS',icon:TerminalSquare},{label:'Settings',hint:'SYSTEM',icon:Settings},
+    {label:'Floor',hint:'PLAN',icon:Crosshair},{label:'Signal',hint:'PLAN',icon:Radio},{label:'Piles',hint:'PLAN',icon:Boxes},{label:'Vault',hint:'PLAN',icon:Archive},{label:'Tape',hint:'PLAN',icon:History},
+    {label:'New incident',hint:'ORGANIZE',icon:Plus},{label:'Create pile',hint:'ORGANIZE',icon:FolderPlus},{label:'Save current layout',hint:'ORGANIZE',icon:Save},{label:'Riot Mode',hint:'ORGANIZE',icon:Shuffle},{label:'Stack It',hint:'ORGANIZE',icon:Layers3},
+    {label:'Files',hint:'DEV TOOLS',icon:FolderTree},{label:'Browser',hint:'DEV TOOLS',icon:Globe2},{label:'Design Lab',hint:'DEV TOOLS',icon:Hammer},{label:'Workbench',hint:'DEV TOOLS',icon:TerminalSquare},
     {label:'Normal mode',hint:'SPATIAL',icon:Layers3},{label:'Plasma mode',hint:'SPATIAL',icon:Sparkles},{label:'Matter mode',hint:'SPATIAL',icon:Boxes},
-    {label:'Backup workspace',hint:'EXPORT',icon:Download},{label:'Restore workspace',hint:'IMPORT',icon:Upload},
-  ].filter(c=>c.label.toLowerCase().includes(paletteQuery.toLowerCase()));
+    {label:'Settings',hint:'SYSTEM',icon:Settings},{label:'Account & sync',hint:'SYSTEM',icon:Radio},{label:'Open command help',hint:'SYSTEM',icon:Command},
+    {label:'Backup workspace',hint:'DATA',icon:Download},{label:'Restore workspace',hint:'DATA',icon:Upload},
+  ].filter(c=>c.label.toLowerCase().includes(paletteQuery.toLowerCase())||c.hint.toLowerCase().includes(paletteQuery.toLowerCase()));
+  const commandGroups = ['PLAN','ORGANIZE','DEV TOOLS','SPATIAL','SYSTEM','DATA']
+    .map(group=>({group,items:commands.filter(command=>command.hint===group)}))
+    .filter(section=>section.items.length);
 
   if (studio) return <div className={`xf-studio-shell ${plasma.mode==='plasma'?'xf-plasma-mode':plasma.mode==='matter'?'xf-matter-mode':''} ${plasma.transitioning?'xf-spatial-transition':''}`}>{plasma.transitioning&&<div className="xf-spatial-transition-mask"><b>RECASTING MATERIAL</b><span>{plasma.mode.toUpperCase()} → {(plasma.targetMode??plasma.mode).toUpperCase()}</span><small>TEARING DOWN THE OLD FIELD BEFORE THE NEXT ONE FORMS</small></div>}<button className="xf-studio-exit" onClick={()=>setStudio(false)}><X size={15}/> EXIT LAB</button><Studio active plasma={plasma} onBundle={(firstId,secondId)=>linkBundle('studio',firstId,secondId)} bundleLabel={id=>bundleBadge(ws,'studio',id)}/></div>;
 
@@ -388,7 +412,9 @@ export default function ChaosDeck() {
       onBundle={(firstId,secondId)=>linkBundle('signal',firstId,secondId)}
     />}
 
-{view==='vault' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">BLACK VAULT //</span><h1>BURY IT WITH COORDINATES.</h1><p>Files, links, Design Lab documents, and references stay attached to the work that made them matter.</p></div><div className="xf-floor-actions"><button onClick={()=>fileRef.current?.click()}><Upload size={14}/> IMPORT FILES</button><button onClick={()=>setVaultArchived(v=>!v)}>{vaultArchived?<Eye size={14}/>:<EyeOff size={14}/>} {vaultArchived?'ACTIVE':'ARCHIVED'}</button></div></div><div className="vault-search"><Search size={14}/><input value={vaultQuery} onChange={e=>setVaultQuery(e.target.value)} placeholder="SEARCH THE VAULT..."/></div><div className="vault-add"><Archive size={15}/><input value={assetDraft} onChange={e=>setAssetDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addAssetDraft()}} placeholder="PASTE A URL OR NAME A REFERENCE..."/><button onClick={addAssetDraft}>VAULT IT</button></div><div className="vault-grid">{ws.assets.filter(a=>a.archived===vaultArchived).filter(a=>!vaultQuery||`${a.name} ${a.kind} ${a.tags.join(' ')}`.toLowerCase().includes(vaultQuery.toLowerCase())).length===0?<Empty label={vaultArchived?'NO ARCHIVED ASSETS':'VAULT IS EMPTY'} detail="Import files, paste a URL, or create something in Design Lab."/>:ws.assets.filter(a=>a.archived===vaultArchived).filter(a=>!vaultQuery||`${a.name} ${a.kind} ${a.tags.join(' ')}`.toLowerCase().includes(vaultQuery.toLowerCase())).map(a=><AssetCard key={a.id} spatial={plasma.active} onBundle={other=>linkBundle('asset',a.id,other)} asset={a} incidentName={ws.incidents.find(i=>i.id===a.incidentId)?.name} onPatch={changes=>patch(p=>({...p,assets:p.assets.map(x=>x.id===a.id?{...x,...changes,updatedAt:Date.now()}:x)}))} onDelete={()=>void deleteAsset(a)} onStudio={()=>setStudio(true)}/>)}</div></section>}
+{view==='vault' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">BLACK VAULT //</span><h1>BURY IT WITH COORDINATES.</h1><p>Files, links, Design Lab documents, and references stay attached to the work that made them matter.</p></div><div className="xf-floor-actions"><button onClick={()=>fileRef.current?.click()}><Upload size={14}/> IMPORT FILES</button><button onClick={()=>setVaultArchived(v=>!v)}>{vaultArchived?<Eye size={14}/>:<EyeOff size={14}/>} {vaultArchived?'ACTIVE':'ARCHIVED'}</button></div></div><div className="vault-search"><Search size={14}/><input value={vaultQuery} onChange={e=>setVaultQuery(e.target.value)} placeholder="SEARCH THE VAULT..."/></div><div className="vault-categories" aria-label="Vault categories">{([
+          ['all','ALL'],['browser','BROWSER'],['code','CODE + COMPONENTS'],['images','IMAGES'],['media','AUDIO + VIDEO'],['links','LINKS'],['studio','LAB'],['files','LOCAL FILES']
+        ] as Array<[VaultCategory,string]>).map(([value,label])=><button title={value==='browser'?'Bookmarks, offline pages, captured sites and browser assets':value==='code'?'Code, captured components and site-project captures':`Show ${label.toLowerCase()} in the Vault`} className={vaultCategory===value?'active':''} key={value} onClick={()=>setVaultCategory(value)}>{label}</button>)}</div><div className="vault-add"><Archive size={15}/><input value={assetDraft} onChange={e=>setAssetDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addAssetDraft()}} placeholder="PASTE A URL OR NAME A REFERENCE..."/><button onClick={addAssetDraft}>VAULT IT</button></div><div className="vault-grid">{vaultAssets.length===0?<Empty label={vaultArchived?'NO ARCHIVED ASSETS':'VAULT IS EMPTY'} detail="Import files, paste a URL, capture browser material, or create something in Design Lab."/>:vaultAssets.map(a=><AssetCard key={a.id} spatial={plasma.active} onBundle={other=>linkBundle('asset',a.id,other)} asset={a} incidentName={ws.incidents.find(i=>i.id===a.incidentId)?.name} onPatch={changes=>patch(p=>({...p,assets:p.assets.map(x=>x.id===a.id?{...x,...changes,updatedAt:Date.now()}:x)}))} onDelete={()=>void deleteAsset(a)} onStudio={()=>setStudio(true)}/>)}</div></section>}
 
       {view==='tape' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">TAPE //</span><h1>THE MESS HAS A MEMORY.</h1><p>Append-only operational history. Nothing here controls the data; it tells you what happened to it.</p></div><div className="xf-floor-actions"><button onClick={exportBackup}><Download size={14}/> BACKUP WORKSPACE</button><button onClick={()=>importRef.current?.click()}><Upload size={14}/> RESTORE BACKUP</button></div></div><div className="tape-ledger">{ws.activity.length===0?<Empty label="NO TAPE YET" detail="Your actions will start leaving a trail here."/>:ws.activity.map(a=><SpatialSurface as="article" group="tape-ledger" spatialId={a.id} spatialDraggable={plasma.active} key={a.id}><span>{relative(a.createdAt)} AGO</span><b>{a.type.toUpperCase()}</b><p>{a.label}</p><small>{a.incidentId?ws.incidents.find(i=>i.id===a.incidentId)?.name??'FORMER INCIDENT':'SYSTEM'}</small></SpatialSurface>)}</div></section>}
 
@@ -416,7 +442,7 @@ export default function ChaosDeck() {
     <div className="xf-hotwire"><Zap size={17}/><b>HOTWIRE</b><input value={capture} onChange={e=>setCapture(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCapture('spark')}} placeholder={chosen?`THROW A THOUGHT INTO ${chosen.name}...`:'THROW A THOUGHT INTO THE SYSTEM...'}/><button onClick={()=>addCapture('task')}>TASK</button><button onClick={()=>addCapture('note')}>NOTE</button><button onClick={()=>addCapture('link')}><Link2 size={11}/></button><button onClick={()=>addCapture('spark')}>BURN IT IN</button></div>
 
     {account&&<AccountPanel onClose={()=>setAccount(false)}/>}
-    {palette&&<div className="xf-palette-backdrop" onMouseDown={()=>setPalette(false)}><div className="xf-palette" onMouseDown={e=>e.stopPropagation()}><div className="palette-input"><Search size={18}/><input autoFocus value={paletteQuery} onChange={e=>setPaletteQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')runPaletteInput()}} placeholder="TYPE WHAT YOU WANT TO DO..."/><kbd>ESC</kbd></div>{commands.map(c=><button className="palette-row" key={c.label} onClick={()=>command(c.label)}><c.icon/>{c.label}<span>{c.hint}</span></button>)}{entityResults.length>0&&<div className="palette-divider">FOUND IN THE MESS</div>}{entityResults.map(r=><button className="palette-row entity" key={`${r.kind}-${r.id}`} onClick={()=>openEntity(r)}><Crosshair/>{r.label}<span>{r.kind}</span></button>)}<div className="palette-foot">TRY: “OPEN FILES”, “OPEN BROWSER”, “PLASMA MODE”, “NEW PROJECT MONSTER X”, “TASK SHIP THE BUILD”, “FIND AUDIO”</div></div></div>}
+    {palette&&<div className="xf-palette-backdrop" onMouseDown={()=>setPalette(false)}><div className="xf-palette" onMouseDown={e=>e.stopPropagation()}><div className="palette-input"><Search size={18}/><input autoFocus value={paletteQuery} onChange={e=>setPaletteQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')runPaletteInput()}} placeholder="TYPE WHAT YOU WANT TO DO..."/><kbd>ESC</kbd></div>{commandGroups.map(section=><div className="palette-group" key={section.group}><div className="palette-divider">{section.group}</div>{section.items.map(c=><button className="palette-row" key={c.label} onClick={()=>command(c.label)}><c.icon/>{c.label}<span>{c.hint}</span></button>)}</div>)}{entityResults.length>0&&<div className="palette-divider">FOUND IN THE MESS</div>}{entityResults.map(r=><button className="palette-row entity" key={`${r.kind}-${r.id}`} onClick={()=>openEntity(r)}><Crosshair/>{r.label}<span>{r.kind}</span></button>)}<div className="palette-foot">TRY: “OPEN FILES”, “OPEN BROWSER”, “PLASMA MODE”, “NEW PROJECT MONSTER X”, “TASK SHIP THE BUILD”, “FIND AUDIO”</div></div></div>}
   </div>;
 }
 
