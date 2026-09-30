@@ -23,6 +23,7 @@ const signal = fs.readFileSync(new URL('../src/xfactor/PlasmaSignalWorkspace.tsx
 const globalCss = fs.readFileSync(new URL('../src/xfactor/spatialGlobal.css', import.meta.url), 'utf8');
 const signalCss = fs.readFileSync(new URL('../src/xfactor/plasmaMode.css', import.meta.url), 'utf8');
 const physics = fs.readFileSync(new URL('../src/xfactor/spatialPhysics.ts', import.meta.url), 'utf8');
+const workbench = fs.readFileSync(new URL('../src/xfactor/DeveloperWorkbench.tsx', import.meta.url), 'utf8');
 
 assert('room provider uses actual PlasmaProvider', trueSpatial.includes('<PlasmaProvider') && trueSpatial.includes('ground="clear"'));
 assert('room canvas is lifted above legacy room backgrounds', trueSpatial.includes('zIndex={8}'));
@@ -33,7 +34,7 @@ assert('Floor incidents register as true spatial surfaces', chaos.includes('grou
 assert('Piles register as true spatial surfaces', chaos.includes('group="pile-cards"'));
 assert('Vault assets register as true spatial surfaces', chaos.includes('group="vault-assets"'));
 assert('Tape entries register as true spatial surfaces', chaos.includes('group="tape-ledger"'));
-assert('Blackbox and Workbench register with the room renderer', chaos.includes('group="deck-lower"') && chaos.includes('group="workbench-shell"'));
+assert('Blackbox and Workbench register with the room renderer', chaos.includes('group="deck-lower"') && workbench.includes('group="workbench-panes"') && workbench.includes('fuse={false}'));
 assert('legacy card fills are removed in spatial modes', globalCss.includes('M6 FINAL SPATIAL LAYERING') && globalCss.includes('background:none!important'));
 assert('Signal canvas is visible above the board', signal.includes('ground="clear"') && signal.includes('zIndex={8}'));
 assert('Signal Plasma has strong liquid body tuning', (signal.includes('opacity={0.68}') || signal.includes('opacity={0.84}')) && (signal.includes('stretch={3.15}') || signal.includes('stretch={4.8}')) && (signal.includes('flow={0.78}') || signal.includes('flow={1.28}')) && (signal.includes('tension={0.24}') || signal.includes('tension={0.38}')));
