@@ -27,3 +27,22 @@
 .dev-cockpit .dev-workbench-grid.view-preview-focus .dev-explorer{opacity:.78}
 @media(max-width:1180px){.dev-layout-rack label{display:none}.dev-cockpit .dev-workbench-grid,.dev-cockpit .dev-workbench-grid.view-code-focus,.dev-cockpit .dev-workbench-grid.view-preview-focus{grid-template-columns:190px 1fr}}
 @media(max-width:760px){.dev-layout-rack{align-items:flex-start;flex-direction:column}.dev-cockpit .dev-workbench-grid,.dev-cockpit .dev-workbench-grid.view-code-focus,.dev-cockpit .dev-workbench-grid.view-preview-focus{display:flex}}
+
+/* M6.1 pane-level spatial Workbench: each major region is material, independently movable, never fusible. */
+.dev-spatial-pane{position:relative;container-type:inline-size;container-name:workbench-pane}
+.dev-spatial-pane>.xf-spatial-content{display:contents}
+.dev-code-editor-wrap{min-width:0;min-height:0;height:100%;overflow:hidden}
+.xf-root.xf-plasma-mode .dev-spatial-pane,
+.xf-root.xf-matter-mode .dev-spatial-pane{
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+}
+.xf-root.xf-plasma-mode .dev-spatial-pane:focus-within,
+.xf-root.xf-matter-mode .dev-spatial-pane:focus-within{outline:1px solid rgba(32,217,255,.22);outline-offset:2px}
+@container workbench-pane (max-width:340px){
+  .dev-pane-title{font-size:8px}
+  .dev-editor-filebar small{display:none}
+  .dev-local-preview-empty{padding:16px}
+  .dev-local-preview-empty p{font-size:9px}
+}
