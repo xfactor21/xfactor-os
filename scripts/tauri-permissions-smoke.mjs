@@ -13,6 +13,7 @@ assert('capability applies only to main workspace window', windows.length === 1 
 assert('capture-widget receives no shared privileged capability', !windows.includes('capture-widget'));
 assert('main retains native open dialog', permissions.has('dialog:allow-open'));
 assert('main retains native save dialog', permissions.has('dialog:allow-save'));
+assert('main allows isolated browser webview creation', permissions.has('core:webview:allow-create-webview-window'));
 assert('main retains selected-file read access', permissions.has('fs:allow-read-text-file'));
 assert('main retains selected-file write access', permissions.has('fs:allow-write-text-file'));
 assert('main no longer grants SQL default permission', !permissions.has('sql:default'));

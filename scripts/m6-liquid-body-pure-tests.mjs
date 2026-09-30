@@ -22,6 +22,8 @@ const signal = fs.readFileSync(new URL('../src/xfactor/PlasmaSignalWorkspace.tsx
 const signalCss = fs.readFileSync(new URL('../src/xfactor/plasmaMode.css', import.meta.url), 'utf8');
 const globalCss = fs.readFileSync(new URL('../src/xfactor/spatialGlobal.css', import.meta.url), 'utf8');
 const physics = fs.readFileSync(new URL('../src/xfactor/spatialPhysics.ts', import.meta.url), 'utf8');
+const mode = fs.readFileSync(new URL('../src/xfactor/plasmaMode.ts', import.meta.url), 'utf8');
+const toggle = fs.readFileSync(new URL('../src/xfactor/GlobalSpatialToggle.tsx', import.meta.url), 'utf8');
 
 assert('room Plasma has an explicit refracted body source', room.includes("background={matter ? '#05070a' : '#07020a'}"));
 assert('room Plasma body dominates its rim', room.includes('opacity={matter ? 0.84 : 0.86}') && room.includes('rimWidth={matter ? 0.9 : 0.82}') && room.includes('edgeLine={matter ? 0.62 : 0.34}'));
@@ -37,5 +39,8 @@ assert('M6 throw has lower threshold and longer travel', physics.includes('speed
 
 assert('room cards do not start as one giant fused blob', room.includes("piles: 11") && room.includes("tape: 9") && signal.includes("blend={compact ? 14 : 22}"));
 assert('spatial transition formation animation is disabled', room.includes('formIn={false}') && room.includes('formOut={false}') && signal.includes('formIn={false}') && signal.includes('formOut={false}'));
+assert('transition lifecycle is staged outside the click handler', mode.includes('requestAnimationFrame') && mode.includes('transitioning') && mode.includes('targetMode'));
+assert('spatial controls lock while renderer recasts', toggle.includes('disabled={plasma.transitioning}') && globalCss.includes('M6 STABLE MATERIAL RECAST'));
+assert('Signal text is explicitly above the WebGL material', signalCss.includes('M6 SIGNAL CONTENT LAYER') && signalCss.includes('z-index:24!important'));
 
 console.log('\nM6 unmistakable liquid-body checks passed.');

@@ -81,3 +81,18 @@
   border-color:rgba(255,255,255,.035)!important;
   box-shadow:none!important;
 }
+
+
+/* M6 SIGNAL CONTENT LAYER — material behind, readable information above. */
+.xf-root.xf-plasma-mode .xf-plasma-note,
+.xf-root.xf-matter-mode .xf-plasma-note{z-index:22!important}
+.xf-root.xf-plasma-mode .xf-plasma-note-inner,
+.xf-root.xf-matter-mode .xf-plasma-note-inner{
+  position:relative!important;
+  z-index:24!important;
+  color:#f5eff5!important;
+}
+.xf-root.xf-plasma-mode .xf-plasma-note-head,
+.xf-root.xf-plasma-mode .xf-plasma-note textarea,
+.xf-root.xf-matter-mode .xf-plasma-note-head,
+.xf-root.xf-matter-mode .xf-plasma-note textarea{color:#fff!important}

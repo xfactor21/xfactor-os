@@ -105,7 +105,7 @@ export function SpatialRoomProvider({
       grid={24}
       magnet={matter ? 24 : 30}
       quality={1}
-      maxSurfaces={20}
+      maxSurfaces={16}
       pointerDrop={false}
       pointerPull
       ambientDrops={false}

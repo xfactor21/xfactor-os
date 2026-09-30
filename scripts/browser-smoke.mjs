@@ -5,6 +5,11 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const failures = [];
 
+const waitSpatialSettled = async () => {
+  const mask = page.locator('.xf-spatial-transition-mask');
+  if (await mask.count()) await mask.waitFor({ state: 'detached', timeout: 20000 });
+};
+
 const studioModes = [
   'draw', 'wireframe', 'animation', 'vector', 'diagram', 'moodboard', 'presentation', 'iconDesign',
   'imageConverter', 'backgroundRemover', 'paletteGenerator', 'quickPhotoEditor', 'logoMaker', 'pixelArt',
@@ -49,6 +54,7 @@ await check('global Normal Plasma Matter control renders true spatial surfaces f
   try {
     await page.getByRole('button', { name: 'PLASMA', exact: true }).click();
     await page.locator('.xf-root.xf-plasma-mode').waitFor();
+    await waitSpatialSettled();
     const floorSurface = page.locator('.xf-root.xf-plasma-mode .xf-shard.xf-true-spatial.plasma-panel').first();
     await floorSurface.waitFor();
     const plasmaCanvas = page.locator('.xf-root.xf-plasma-mode canvas').first();
@@ -70,11 +76,13 @@ await check('global Normal Plasma Matter control renders true spatial surfaces f
 
     await page.getByRole('button', { name: /MATTER/i }).click();
     await page.locator('.xf-root.xf-matter-mode').waitFor();
+    await waitSpatialSettled();
     await page.locator('.xf-root.xf-matter-mode .xf-shard.xf-true-spatial.plasma-panel').first().waitFor();
   } finally {
     const spatial = page.locator('.xf-root.xf-plasma-mode, .xf-root.xf-matter-mode');
     if (await spatial.count()) {
       await page.getByRole('button', { name: 'NORMAL', exact: true }).click();
+      await waitSpatialSettled();
       await spatial.waitFor({ state: 'detached', timeout: 10000 });
     }
   }
@@ -151,6 +159,7 @@ await check('Signal Plasma mode is reversible, physical, and creates durable org
   try {
     await page.getByRole('button', { name: /PLASMA/i }).click();
     await page.locator('.xf-root.xf-plasma-mode').waitFor();
+    await waitSpatialSettled();
     const notes = page.locator('.xf-plasma-note');
     await notes.first().waitFor();
     if (await notes.count() < 2) throw new Error('need two Signal surfaces for fusion acceptance');
@@ -194,6 +203,7 @@ await check('Signal Plasma mode is reversible, physical, and creates durable org
   } finally {
     if (await page.locator('.xf-root.xf-plasma-mode').count()) {
       await page.getByRole('button', { name: 'NORMAL', exact: true }).click();
+      await waitSpatialSettled();
       await page.locator('.xf-root.xf-plasma-mode').waitFor({ state: 'detached', timeout: 10000 });
     }
   }
@@ -210,12 +220,14 @@ await check('Signal Matter mode uses canonical Signal data', async () => {
   await input.press('Enter');
   await page.getByRole('button', { name: /MATTER/i }).click();
   await page.locator('.xf-root.xf-matter-mode').waitFor();
+  await waitSpatialSettled();
   await page.getByText('THOUGHTS HAVE WEIGHT NOW.').waitFor();
   const editor = page.locator('.xf-matter-note textarea').first();
   await editor.waitFor();
   const value = await editor.inputValue();
   if (!value.includes('PLASMA SAFE')) throw new Error('Matter did not receive the canonical Signal edit');
   await page.getByRole('button', { name: 'NORMAL' }).click();
+  await waitSpatialSettled();
 });
 
 await check('M6 Files Browser Settings shell routes', async () => {

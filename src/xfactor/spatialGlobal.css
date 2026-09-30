@@ -154,3 +154,36 @@
   letter-spacing:.08em;
   box-shadow:0 0 14px color-mix(in srgb,var(--bundle-color,#ff2aa3) 28%,transparent);
 }
+
+
+/* M6 STABLE MATERIAL RECAST — old/new WebGL fields never visibly overlap. */
+.xf-spatial-transition canvas{visibility:hidden!important}
+.xf-root.xf-spatial-transition .xf-main,
+.xf-studio-shell.xf-spatial-transition #r-studio{
+  filter:blur(1.5px) brightness(.42) saturate(.7);
+  pointer-events:none;
+}
+.xf-spatial-transition-mask{
+  position:fixed;
+  inset:58px 0 42px 62px;
+  z-index:9990;
+  display:grid;
+  place-content:center;
+  justify-items:center;
+  gap:7px;
+  pointer-events:none;
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.014) 1px,transparent 1px),
+    linear-gradient(rgba(255,255,255,.014) 1px,transparent 1px),
+    radial-gradient(circle at 44% 45%,rgba(255,42,163,.16),transparent 28%),
+    radial-gradient(circle at 58% 48%,rgba(32,217,255,.10),transparent 32%),
+    rgba(3,3,6,.90);
+  background-size:28px 28px,28px 28px,auto,auto,auto;
+  backdrop-filter:blur(10px);
+}
+.xf-spatial-transition-mask b{font:900 17px 'Archivo Black',sans-serif;letter-spacing:.05em;color:#fff}
+.xf-spatial-transition-mask span{font:900 10px 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#ff65bd}
+.xf-spatial-transition-mask small{font:800 7px 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#6f6873}
+.xf-global-spatial.recasting .xf-global-spatial-modes button{opacity:.5;cursor:wait}
+.xf-spatial-recast{color:#ff89ca;font:900 7px 'IBM Plex Mono',monospace;letter-spacing:.09em;white-space:nowrap}
+@media(max-width:760px){.xf-spatial-transition-mask{left:0;inset-block:58px 42px}}

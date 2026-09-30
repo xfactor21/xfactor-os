@@ -321,10 +321,10 @@ export default function ChaosDeck() {
     {label:'Backup workspace',hint:'EXPORT',icon:Download},{label:'Restore workspace',hint:'IMPORT',icon:Upload},
   ].filter(c=>c.label.toLowerCase().includes(paletteQuery.toLowerCase()));
 
-  if (studio) return <div className={`xf-studio-shell ${plasma.mode==='plasma'?'xf-plasma-mode':plasma.mode==='matter'?'xf-matter-mode':''}`}><button className="xf-studio-exit" onClick={()=>setStudio(false)}><X size={15}/> EXIT LAB</button><Studio active plasma={plasma} onBundle={(firstId,secondId)=>linkBundle('studio',firstId,secondId)} bundleLabel={id=>bundleBadge(ws,'studio',id)}/></div>;
+  if (studio) return <div className={`xf-studio-shell ${plasma.mode==='plasma'?'xf-plasma-mode':plasma.mode==='matter'?'xf-matter-mode':''} ${plasma.transitioning?'xf-spatial-transition':''}`}>{plasma.transitioning&&<div className="xf-spatial-transition-mask"><b>RECASTING MATERIAL</b><span>{plasma.mode.toUpperCase()} → {(plasma.targetMode??plasma.mode).toUpperCase()}</span><small>TEARING DOWN THE OLD FIELD BEFORE THE NEXT ONE FORMS</small></div>}<button className="xf-studio-exit" onClick={()=>setStudio(false)}><X size={15}/> EXIT LAB</button><Studio active plasma={plasma} onBundle={(firstId,secondId)=>linkBundle('studio',firstId,secondId)} bundleLabel={id=>bundleBadge(ws,'studio',id)}/></div>;
 
-  return <div className={`xf-root ${plasma.mode === 'plasma' ? `xf-plasma-mode plasma-${plasma.look}` : plasma.mode === 'matter' ? `xf-matter-mode matter-${plasma.look}` : ''}`}>
-    <div className="xf-noise"/><div className="xf-scan"/>
+  return <div className={`xf-root ${plasma.mode === 'plasma' ? `xf-plasma-mode plasma-${plasma.look}` : plasma.mode === 'matter' ? `xf-matter-mode matter-${plasma.look}` : ''} ${plasma.transitioning ? 'xf-spatial-transition' : ''}`}>
+    <div className="xf-noise"/><div className="xf-scan"/>{plasma.transitioning&&<div className="xf-spatial-transition-mask"><b>RECASTING MATERIAL</b><span>{plasma.mode.toUpperCase()} → {(plasma.targetMode??plasma.mode).toUpperCase()}</span><small>ONE FIELD OUT · ONE FIELD IN · NO OVERLAPPING CANVASES</small></div>}
     {persistenceError&&<div className="xf-system-alert fatal">LOCAL STORAGE IS UNAVAILABLE — WORKSPACE METADATA MAY NOT SURVIVE A RELOAD.</div>}
     {cloudError&&<div className="xf-system-alert">CLOUD SYNC IS OFFLINE — LOCAL WORK CONTINUES SAFELY.</div>}
     {notice&&<div className="xf-toast">{notice}</div>}
