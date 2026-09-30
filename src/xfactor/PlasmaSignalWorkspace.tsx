@@ -4,6 +4,7 @@ import { Plasma, PlasmaProvider, type Offset } from '@cruxgarden/plasma-ui';
 import type { Incident, Signal, SignalType } from './domain';
 import type { MatterMaterial, MatterSlot, PlasmaController, PlasmaLook, PlasmaPolicy } from './plasmaMode';
 import { beginMomentum, joinedAny, momentumTarget, sampleMomentum, type PointerMomentum } from './spatialPhysics';
+import { loadM6Settings } from './m6Settings';
 import './plasmaMode.css';
 
 interface PlasmaSignalWorkspaceProps {
@@ -177,6 +178,10 @@ function LiquidBoard({
 }) {
   const momentum = useRef(new Map<string, PointerMomentum>());
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
+  const settings = loadM6Settings();
+  const quality = compact ? 0.62 : settings.spatialFx === 'full' ? 1.08 : settings.spatialFx === 'reduced' ? 0.58 : 0.82;
+  const maxSurfaces = compact ? 6 : settings.spatialFx === 'full' ? 14 : settings.spatialFx === 'reduced' ? 7 : 10;
+  const pointerPull = settings.spatialFx !== 'reduced' && !settings.reduceMotion;
   const rememberPointer = (id: string, event: ReactPointerEvent) => {
     const previous = momentum.current.get(id);
     momentum.current.set(id, previous ? sampleMomentum(previous, event.clientX, event.clientY) : beginMomentum(event.clientX, event.clientY));
@@ -213,10 +218,10 @@ function LiquidBoard({
     grain={0.06}
     grid={24}
     magnet={compact ? 22 : 30}
-    quality={compact ? 0.74 : 1.08}
-    maxSurfaces={compact ? 7 : 16}
+    quality={quality}
+    maxSurfaces={maxSurfaces}
     pointerDrop={false}
-    pointerPull
+    pointerPull={pointerPull}
     ambientDrops={false}
     ground="clear"
     zIndex={8}
@@ -289,6 +294,10 @@ function MatterBoard({
 }) {
   const momentum = useRef(new Map<string, PointerMomentum>());
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
+  const settings = loadM6Settings();
+  const matterQuality = compact ? 0.5 : settings.spatialFx === 'full' ? 0.9 : settings.spatialFx === 'reduced' ? 0.5 : 0.72;
+  const matterBudget = compact ? 5 : settings.spatialFx === 'full' ? 10 : settings.spatialFx === 'reduced' ? 6 : 8;
+  const matterPointerPull = settings.spatialFx !== 'reduced' && !settings.reduceMotion;
   const rememberPointer = (id: string, event: ReactPointerEvent) => {
     const previous = momentum.current.get(id);
     momentum.current.set(id, previous ? sampleMomentum(previous, event.clientX, event.clientY) : beginMomentum(event.clientX, event.clientY));
@@ -352,10 +361,10 @@ function MatterBoard({
         grain={material === 'stone' || material === 'wood' ? 0.62 : 0.16}
         grid={24}
         magnet={48}
-        quality={compact ? 0.56 : 0.9}
-        maxSurfaces={Math.max(1, Math.min(materialSignals.length, compact ? 5 : 10))}
+        quality={matterQuality}
+        maxSurfaces={Math.max(1, Math.min(materialSignals.length, matterBudget))}
         pointerDrop={false}
-        pointerPull
+        pointerPull={matterPointerPull}
         ambientDrops={false}
         ground="clear"
         zIndex={18}
@@ -413,7 +422,10 @@ export default function PlasmaSignalWorkspace({
     return true;
   }), [signals, query, plasma.active, scope, selectedIncidentId]);
 
-  const visibleSignals = useMemo(() => filtered.slice(0, compact ? 5 : plasma.mode === 'matter' ? 10 : 14), [filtered, compact, plasma.mode]);
+  const settings = loadM6Settings();
+  const plasmaCap = compact ? 5 : settings.spatialFx === 'full' ? 14 : settings.spatialFx === 'reduced' ? 7 : 10;
+  const matterCap = compact ? 5 : settings.spatialFx === 'full' ? 10 : settings.spatialFx === 'reduced' ? 6 : 8;
+  const visibleSignals = useMemo(() => filtered.slice(0, plasma.mode === 'matter' ? matterCap : plasmaCap), [filtered, matterCap, plasmaCap, plasma.mode]);
   // Global mode; spatial arrangements still belong to the Incident being viewed.
   const layoutScope = scope === 'all' ? 'all-signals' : selectedIncidentId ?? 'unrouted';
   const spatialMode = plasma.mode === 'matter' ? 'matter' : 'plasma';
