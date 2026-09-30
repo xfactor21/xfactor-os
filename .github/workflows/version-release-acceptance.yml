@@ -45,7 +45,7 @@ jobs:
           const cargoLock = fs.readFileSync('src-tauri/Cargo.lock', 'utf8');
           const activeDocs = ['README.md', 'README-XFACTOR.md', 'RELEASE-AUDIT.md', 'BUILD-MATRIX.md'].map(path => [path, fs.readFileSync(path, 'utf8')]);
           const version = pkg.version;
-          if (version !== '0.6.1') throw new Error(`expected release 0.6.1, got ${version}`);
+          if (version !== '0.7.0') throw new Error(`expected release 0.7.0, got ${version}`);
           if (lock.version !== version || lock.packages?.['']?.version !== version) throw new Error('package-lock version drift');
           if (tauri.version !== version) throw new Error('Tauri version drift');
           if (!new RegExp(`^version = "${version.replaceAll('.', '\\.') }"$`, 'm').test(cargo)) throw new Error('Cargo.toml version drift');
