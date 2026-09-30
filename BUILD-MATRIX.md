@@ -1,8 +1,8 @@
-> **Current engineering milestone:** xFactor.OS **0.6.0 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
+> **Current engineering milestone:** xFactor.OS **0.6.1 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
 
 # xFactor.OS — Truthful Build Matrix
 
-Version: **0.6.0 (M6)**
+Version: **0.6.1 (M6)**
 
 This matrix exists so “routed,” “implemented,” “runtime-verified,” and “distribution-ready” are not conflated. `BUILT` means real source implementation exists in the production entry path. `VERIFIED` means the relevant behavior has passed dependency-backed CI and/or real browser/desktop execution. `DEPLOYMENT GATE` means owner credentials, signing, or physical/real-machine acceptance remains outside the engineering build.
 
@@ -26,7 +26,7 @@ This matrix exists so “routed,” “implemented,” “runtime-verified,” a
 | Cloud metadata sync | **BUILT + HARDENED / LIVE TWO-SESSION GATE** | Owner-scoped workspace mirror, whole-workspace freshness clock, stale-auth-generation isolation, nonfatal offline behavior, and a merged two-client live acceptance harness. Credential-backed A↔B run remains pending. |
 | Analytics ingestion | **BUILT + VERIFIED** | Production `/api/analytics` ingestion was verified with synthetic audit evidence; shared summaries exclude explicitly synthetic/audit rows. |
 | Desktop/Tauri security | **BUILT + VERIFIED** | Explicit CSP, COOP/COEP preservation, xFactor.OS desktop identity, least-privilege active capability split, permanent security/permission acceptance. |
-| Windows packaging | **BUILT + PACKAGE VERIFIED** | Current version-aware CI builds **0.6.0** NSIS EXE and MSI artifacts successfully on Windows. |
+| Windows packaging | **BUILT + PACKAGE VERIFIED** | Current version-aware CI builds **0.6.1** NSIS EXE and MSI artifacts successfully on Windows. |
 | Windows real install | **DEPLOYMENT GATE** | Physical/real Windows install, launch/restart, tray/native-file behavior, upgrade and uninstall still require explicit acceptance. |
 | Version identity | **VERIFIED** | Package metadata, npm lock, Tauri, Cargo, Windows artifact naming, document title, and the small header version are guarded by Version Release Acceptance. The obsolete lower-right version badge was removed in M6. |
 | First-run/tutorial | **BUILT + VERIFIED** | Empty workspace onboarding plus persistent tutorial/relaunch path covered by release/browser acceptance. |
@@ -37,7 +37,7 @@ This matrix exists so “routed,” “implemented,” “runtime-verified,” a
 ## Deliberately not claimed
 
 - xFactor.OS does **not** claim collaborative simultaneous editing.
-- Vault binary file blobs are **not** cloud-synced in 0.6.0; metadata is.
+- Vault binary file blobs are **not** cloud-synced in 0.6.1; metadata is.
 - The 3D tool is a GLB/glTF viewer, not a full modeling/rigging suite.
 - Command Deck parsing is deterministic/local; AI semantic routing is not advertised.
 - Live Supabase A↔B behavior is not called verified until the credential-backed two-client workflow passes.
@@ -46,4 +46,4 @@ This matrix exists so “routed,” “implemented,” “runtime-verified,” a
 
 ## Current release posture
 
-**0.6.0 (M6) is READY as a verified engineering release candidate, not yet as a signed public Windows distribution.** The remaining explicit gates are live-user cloud acceptance (only if cloud sync is enabled), real-machine Windows installer acceptance, and signing/SmartScreen readiness.
+**0.6.1 (M6) is READY as a verified engineering release candidate, not yet as a signed public Windows distribution.** The remaining explicit gates are live-user cloud acceptance (only if cloud sync is enabled), real-machine Windows installer acceptance, and signing/SmartScreen readiness.
