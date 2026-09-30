@@ -1,4 +1,4 @@
-> **Current engineering milestone:** xFactor.OS **0.6.1 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
+> **Current engineering milestone:** xFactor.OS **0.7.0 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
 
 # xFactor.OS — Controlled Chaos System
 
@@ -6,7 +6,7 @@
 
 xFactor.OS is the deliberately physical, damaged, loud counterpart to xOS. It reuses proven engines where that saves real work, but it does not inherit xOS's galaxy/brain visual language.
 
-## 0.6.1 M6 product surfaces
+## 0.7.0 M6 product surfaces
 
 - **The Floor** — spatial draggable Incident workspace with Riot/Stack and Saved Damage layouts.
 - **Incidents + Blackbox** — editable project workbench with status, priority, heat, description, next move, tags, tasks, relations and Tape.
@@ -25,4 +25,4 @@ xFactor.OS is the deliberately physical, damaged, loud counterpart to xOS. It re
 
 ## Truthful completeness
 
-Read `BUILD-MATRIX.md`. It explicitly distinguishes **BUILT** from **BUILT / VERIFICATION GATE** and lists what is deliberately not claimed. The 0.6.1 M6 source scope is implemented and dependency-backed browser/runtime plus Windows packaging gates are green. Public distribution still requires live credential-backed cloud acceptance if cloud sync is enabled, Windows signing, and real-machine installer acceptance.
+Read `BUILD-MATRIX.md`. It explicitly distinguishes **BUILT** from **BUILT / VERIFICATION GATE** and lists what is deliberately not claimed. The 0.7.0 M6 source scope is implemented and dependency-backed browser/runtime plus Windows packaging gates are green. Public distribution still requires live credential-backed cloud acceptance if cloud sync is enabled, Windows signing, and real-machine installer acceptance.
