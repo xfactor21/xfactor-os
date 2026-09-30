@@ -1,4 +1,4 @@
-import type { ActivityEvent, Asset, AssetSource, Incident, IncidentPriority, IncidentStatus, Pile, Position, SavedLayout, Signal, SignalType, WorkspaceState } from './domain';
+import type { ActivityEvent, Asset, AssetSource, Bundle, BundleMaterial, Incident, IncidentPriority, IncidentStatus, Pile, Position, SavedLayout, Signal, SignalType, WorkspaceState } from './domain';
 
 export const WORKSPACE_STORAGE_KEY = 'xfactor-os-workspace-v2';
 const KEY = WORKSPACE_STORAGE_KEY;
@@ -29,6 +29,7 @@ export function freshWorkspace(): WorkspaceState {
     activity:[],
     positions:{},
     savedLayouts:[],
+    bundles:[],
     selectedIncidentId:undefined,
   };
 }
@@ -132,6 +133,20 @@ function normalizeLayout(value: unknown): SavedLayout | null {
   return { id:value.id, name:text(value.name,'SAVED LAYOUT').slice(0,240), positions, createdAt:finite(value.createdAt,now()) };
 }
 
+const bundleMaterials: BundleMaterial[] = ['plasma','crystal','metal','wood','stone','cloud'];
+function normalizeBundle(value: unknown): Bundle | null {
+  if (!isRecord(value) || typeof value.id !== 'string' || !value.id) return null;
+  const material = bundleMaterials.includes(value.material as BundleMaterial) ? value.material as BundleMaterial : 'plasma';
+  return {
+    id:value.id,
+    name:text(value.name,'PLASMA BUNDLE').slice(0,240),
+    color:text(value.color,'#ff2aa3').slice(0,32),
+    material,
+    memberKeys:stringArray(value.memberKeys).slice(0,500),
+    createdAt:finite(value.createdAt,now()),
+  };
+}
+
 /** Return the newest meaningful timestamp represented by the workspace.
  * The explicit workspace clock covers mutations such as pile collapse or floor movement
  * that do not naturally update an entity timestamp. Legacy schema-v2 payloads still
@@ -145,6 +160,7 @@ export function workspaceClock(state: WorkspaceState): number {
     ...state.assets.flatMap(item => [item.createdAt, item.updatedAt]),
     ...state.activity.map(item => item.createdAt),
     ...state.savedLayouts.map(item => item.createdAt),
+    ...(state.bundles ?? []).map(item => item.createdAt),
   );
 }
 
@@ -163,6 +179,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
   if (isRecord(value.positions)) for (const [id,pos] of Object.entries(value.positions)) if (incidentIds.has(id)) { const clean=normalizePosition(pos); if(clean) positions[id]=clean; }
   const separatedPositions = separateIdenticalPositions(cleanIncidents,positions);
   const savedLayouts = (Array.isArray(value.savedLayouts) ? value.savedLayouts : []).map(normalizeLayout).filter((v): v is SavedLayout => Boolean(v));
+  const bundles = (Array.isArray(value.bundles) ? value.bundles : []).map(normalizeBundle).filter((v): v is Bundle => Boolean(v));
   const updatedAt = Math.max(
     0, finite(value.updatedAt, 0),
     ...cleanIncidents.flatMap(item => [item.createdAt, item.updatedAt]),
@@ -171,6 +188,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
     ...assets.flatMap(item => [item.createdAt, item.updatedAt]),
     ...activity.map(item => item.createdAt),
     ...savedLayouts.map(item => item.createdAt),
+    ...bundles.map(item => item.createdAt),
   );
   return {
     schemaVersion:2,
@@ -182,6 +200,7 @@ export function normalizeWorkspace(value: unknown): WorkspaceState | null {
     activity:activity.slice(0,5000),
     positions:separatedPositions,
     savedLayouts:savedLayouts.slice(0,50),
+    bundles:bundles.slice(0,200),
     selectedIncidentId:typeof value.selectedIncidentId === 'string' && incidentIds.has(value.selectedIncidentId) ? value.selectedIncidentId : undefined,
   };
 }
@@ -247,3 +266,9 @@ export function newPile(name='NEW PILE'): Pile { return {id:uid(),name,stamp:'CO
 export function newSignal(textValue:string,type:SignalType='spark',incidentId?:string): Signal { const ts=now(); return {id:uid(),text:textValue,type,incidentId,pinned:false,done:false,createdAt:ts,updatedAt:ts}; }
 export function newAsset(name:string, kind:Asset['kind']='other', uri?:string, incidentId?:string, source:AssetSource='reference'): Asset { const ts=now(); return {id:uid(),name,kind,source,uri,incidentId,tags:[],favorite:false,archived:false,createdAt:ts,updatedAt:ts}; }
 export function newLayout(name:string, positions:Record<string,Position>): SavedLayout { return {id:uid(),name,positions:typeof structuredClone === 'function' ? structuredClone(positions) : JSON.parse(JSON.stringify(positions)) as Record<string,Position>,createdAt:now()}; }
+
+export function newBundle(name:string,memberKeys:string[],index=0): Bundle {
+  const colors=['#ff2aa3','#20d9ff','#9b5cff','#ff8b4d','#76f7b2','#ffd84d'];
+  const materials: BundleMaterial[]=['plasma','crystal','metal','wood','stone','cloud'];
+  return {id:uid(),name,color:colors[index%colors.length],material:materials[index%materials.length],memberKeys:[...new Set(memberKeys)],createdAt:now()};
+}
