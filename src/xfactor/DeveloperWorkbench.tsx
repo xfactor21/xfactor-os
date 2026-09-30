@@ -875,17 +875,17 @@ export default function DeveloperWorkbench({
           <span>CTRL/⌘+S SAVE · CTRL/⌘+SHIFT+F SEARCH · CTRL/⌘+` TERMINAL</span>
         </div>
 
-        {dockView === 'terminal' && <div className="dev-dock-content terminal"><TerminalRoom active={active} compact /></div>}
+        {dockView === 'terminal' && <div data-plasma-nodrag className="dev-dock-content terminal"><TerminalRoom active={active} compact /></div>}
 
-        {dockView === 'problems' && <div className="dev-dock-content">
+        {dockView === 'problems' && <div data-plasma-nodrag className="dev-dock-content">
           {problems.length > 0 ? <div className="dev-problems-list">{problems.slice(0, 80).map((problem) => <button key={problem.id} onClick={() => { if (problem.file) openFile(problem.file); }} disabled={!problem.file}><i className={problem.severity}/><b>{problem.code ?? problem.source.toUpperCase()}</b><span>{problem.file ? `${problem.file}${problem.line ? `:${problem.line}${problem.column ? `:${problem.column}` : ''}` : ''}` : 'PROCESS'}</span><p>{problem.message}</p></button>)}</div> : <div className="dev-dock-empty">NO PARSED PROBLEMS. BUILD/RUNTIME OUTPUT WILL APPEAR HERE WHEN SOMETHING BREAKS.</div>}
         </div>}
 
-        {dockView === 'git' && <div className="dev-dock-content">
+        {dockView === 'git' && <div data-plasma-nodrag className="dev-dock-content">
           {mode === 'local' && binding ? <GitPanel rootPath={binding.rootPath}/> : <div className="dev-dock-empty"><b>SOURCE CONTROL NEEDS A REAL PROJECT.</b><span>Bind a desktop folder to inspect diffs, stage, unstage and commit without leaving this Incident.</span>{isTauri() && projectId && <button onClick={() => void bindFolder()}><FolderOpen size={12}/> OPEN REAL PROJECT</button>}</div>}
         </div>}
 
-        {dockView === 'search' && <div className="dev-dock-content search">
+        {dockView === 'search' && <div data-plasma-nodrag className="dev-dock-content search">
           {mode === 'local' && binding ? <>
             <div className="dev-project-search"><Search size={13}/><input ref={searchInputRef} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void runProjectSearch(); }} placeholder="SEARCH ACROSS THIS PROJECT..."/><button disabled={searchBusy || !searchQuery.trim()} onClick={() => void runProjectSearch()}>{searchBusy ? 'SEARCHING' : 'SEARCH'}</button></div>
             {searchMeta && <small className="dev-search-meta">{searchMeta}</small>}
