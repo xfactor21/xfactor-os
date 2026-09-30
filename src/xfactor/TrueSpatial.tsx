@@ -1,6 +1,7 @@
-import { createContext, createElement, useContext, useState, type ElementType, type HTMLAttributes, type ReactNode } from 'react';
+import { createContext, createElement, useContext, useEffect, useState, type ElementType, type HTMLAttributes, type ReactNode } from 'react';
 import { Plasma, PlasmaProvider, type Offset } from '@cruxgarden/plasma-ui';
 import type { PlasmaController, SpatialMode } from './plasmaMode';
+import { loadM6Settings } from './m6Settings';
 
 export type SpatialRoom = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'terminal' | 'studio' | 'files' | 'browser' | 'settings';
 
@@ -17,11 +18,11 @@ const ROOM_MATERIAL: Record<'deck'|'piles'|'vault'|'tape'|'terminal'|'studio', M
 
 const ROOM_BLEND: Record<'deck'|'piles'|'vault'|'tape'|'terminal'|'studio', number> = {
   deck: 20,
-  piles: 11,
-  vault: 14,
-  tape: 9,
+  piles: 5,
+  vault: 12,
+  tape: 6,
   terminal: 7,
-  studio: 12,
+  studio: 9,
 };
 
 const PlasmaSurface = Plasma as any;
@@ -75,7 +76,11 @@ export function SpatialRoomProvider({
   const spatialRoom = room as 'deck'|'piles'|'vault'|'tape'|'terminal'|'studio';
   const material: MaterialName = plasma.mode === 'matter' ? ROOM_MATERIAL[spatialRoom] : 'plasma';
   const matter = plasma.mode === 'matter';
-  const blend = matter ? Math.max(5, ROOM_BLEND[spatialRoom]-3) : ROOM_BLEND[spatialRoom];
+  const blend = matter ? Math.max(3, ROOM_BLEND[spatialRoom]-2) : ROOM_BLEND[spatialRoom];
+  const settings = loadM6Settings();
+  const quality = settings.spatialFx === 'full' ? 1.04 : settings.spatialFx === 'reduced' ? 0.62 : 0.82;
+  const maxSurfaces = settings.spatialFx === 'full' ? 16 : settings.spatialFx === 'reduced' ? 7 : 10;
+  const pointerPull = settings.spatialFx !== 'reduced' && !settings.reduceMotion;
 
   return <SpatialContext.Provider value={value}>
     <PlasmaProvider
@@ -104,10 +109,10 @@ export function SpatialRoomProvider({
       grain={0.1}
       grid={24}
       magnet={matter ? 24 : 30}
-      quality={1}
-      maxSurfaces={16}
+      quality={quality}
+      maxSurfaces={maxSurfaces}
       pointerDrop={false}
-      pointerPull
+      pointerPull={pointerPull}
       ambientDrops={false}
       ground="clear"
       zIndex={8}
@@ -146,6 +151,9 @@ export function SpatialSurface({
 }) {
   const { mode, room } = useContext(SpatialContext);
   const [offset,setOffset]=useState<Offset>(()=>readOffset(room,mode,spatialId));
+  useEffect(() => {
+    setOffset(readOffset(room, mode, spatialId));
+  }, [room, mode, spatialId]);
   const classes = ['xf-true-spatial', className].filter(Boolean).join(' ');
 
   if (mode === 'normal') {
