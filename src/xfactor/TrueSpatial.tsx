@@ -69,11 +69,16 @@ export function SpatialRoomProvider({
 }) {
   const value = { mode: plasma.mode, room };
 
-  if (plasma.mode === 'normal' || room === 'signal' || room === 'files' || room === 'browser' || room === 'settings') {
+  // Signal owns its specialized renderer. Files/Browser/Settings intentionally
+  // stay conventional. Every other room keeps ONE provider mounted even while
+  // NORMAL is active so switching to Plasma does not tear down/recreate the
+  // WebGL renderer and shader graph.
+  if (room === 'signal' || room === 'files' || room === 'browser' || room === 'settings') {
     return <SpatialContext.Provider value={value}>{children}</SpatialContext.Provider>;
   }
 
   const spatialRoom = room as 'deck'|'piles'|'vault'|'tape'|'terminal'|'studio';
+  const prewarm = plasma.mode === 'normal';
   const material: MaterialName = plasma.mode === 'matter' ? ROOM_MATERIAL[spatialRoom] : 'plasma';
   const matter = plasma.mode === 'matter';
   const blend = matter ? Math.max(3, ROOM_BLEND[spatialRoom]-2) : ROOM_BLEND[spatialRoom];
@@ -89,7 +94,7 @@ export function SpatialRoomProvider({
       material={material}
       tint={tintFor(plasma)}
       background={matter ? '#05070a' : '#07020a'}
-      opacity={matter ? 0.84 : 0.86}
+      opacity={prewarm ? 0 : matter ? 0.84 : 0.86}
       frost={matter ? (material === 'crystal' ? 0.2 : 0.03) : 0.035}
       blend={blend}
       viscosity={matter ? 0.42 : 0.1}
@@ -112,7 +117,7 @@ export function SpatialRoomProvider({
       quality={quality}
       maxSurfaces={maxSurfaces}
       pointerDrop={false}
-      pointerPull={pointerPull}
+      pointerPull={!prewarm && pointerPull}
       ambientDrops={false}
       ground="clear"
       zIndex={8}
