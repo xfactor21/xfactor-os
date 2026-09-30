@@ -87,6 +87,8 @@ assert('main product exposes Tape view', deck.includes("view==='tape'"));
 assert('main product exposes account/cloud panel', deck.includes('AccountPanel'));
 assert('Black Vault exposes real file ingestion', deck.includes('putAssetBlob'));
 assert('Blackbox exposes related incidents', deck.includes('RELATED DAMAGE'));
+assert('Command Deck groups operational commands', deck.includes("const commandGroups = ['PLAN','ORGANIZE','DEV TOOLS','SPATIAL','SYSTEM','DATA']") && deck.includes('Save current layout'));
+assert('Vault exposes first-class content categories', deck.includes('vault-categories') && deck.includes('CODE + COMPONENTS') && deck.includes('BROWSER') && deck.includes('LOCAL FILES'));
 const boards = fs.readFileSync('src/modules/studio/boards.ts','utf8');
 assert('Design Lab metadata uses xFactor storage key', boards.includes('xfactor-studio-boards-v1'));
 assert('Design Lab emits xFactor board events', boards.includes('xfactor:studio-board'));
