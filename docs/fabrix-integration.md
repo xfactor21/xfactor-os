@@ -1,4 +1,4 @@
-# xFactor.OS 0.8.0 — fabriX native integration
+# xFactor.OS 0.8.1 — fabriX native integration
 
 ## Product boundary
 

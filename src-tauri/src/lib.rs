@@ -55,6 +55,7 @@ pub fn run() {
       native_browser::browser_surface_close,
       fabrix::fabrix_describe,
       fabrix::fabrix_health,
+      fabrix::fabrix_register_self,
       fabrix::fabrix_products,
       fabrix::fabrix_open_product,
       fabrix::fabrix_launch_hub,
