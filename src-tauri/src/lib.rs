@@ -1,6 +1,7 @@
 mod git;
 mod browser;
 mod native_browser;
+mod fabrix;
 
 use tauri::Manager;
 
@@ -52,6 +53,15 @@ pub fn run() {
       native_browser::browser_surface_back,
       native_browser::browser_surface_forward,
       native_browser::browser_surface_close,
+      fabrix::fabrix_describe,
+      fabrix::fabrix_health,
+      fabrix::fabrix_products,
+      fabrix::fabrix_open_product,
+      fabrix::fabrix_launch_hub,
+      fabrix::fabrix_publish_project,
+      fabrix::fabrix_publish_artifact,
+      fabrix::fabrix_entitlement_status,
+      fabrix::fabrix_pending_context,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

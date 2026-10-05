@@ -3,24 +3,26 @@ import { Plasma, PlasmaProvider, type Offset } from '@cruxgarden/plasma-ui';
 import type { PlasmaController, SpatialMode } from './plasmaMode';
 import { loadM6Settings } from './m6Settings';
 
-export type SpatialRoom = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'terminal' | 'studio' | 'files' | 'browser' | 'settings';
+export type SpatialRoom = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'fabrix' | 'terminal' | 'studio' | 'files' | 'browser' | 'settings';
 
 type MaterialName = 'plasma' | 'crystal' | 'metal' | 'wood' | 'stone' | 'cloud';
 
-const ROOM_MATERIAL: Record<'deck'|'piles'|'vault'|'tape'|'terminal'|'studio', MaterialName> = {
+const ROOM_MATERIAL: Record<'deck'|'piles'|'vault'|'tape'|'fabrix'|'terminal'|'studio', MaterialName> = {
   deck: 'metal',
   piles: 'stone',
   vault: 'crystal',
   tape: 'wood',
+  fabrix: 'crystal',
   terminal: 'metal',
   studio: 'crystal',
 };
 
-const ROOM_BLEND: Record<'deck'|'piles'|'vault'|'tape'|'terminal'|'studio', number> = {
+const ROOM_BLEND: Record<'deck'|'piles'|'vault'|'tape'|'fabrix'|'terminal'|'studio', number> = {
   deck: 20,
   piles: 5,
   vault: 12,
   tape: 6,
+  fabrix: 10,
   terminal: 7,
   studio: 9,
 };
@@ -79,7 +81,7 @@ export function SpatialRoomProvider({
     return <SpatialContext.Provider value={value}>{children}</SpatialContext.Provider>;
   }
 
-  const spatialRoom = room as 'deck'|'piles'|'vault'|'tape'|'terminal'|'studio';
+  const spatialRoom = room as 'deck'|'piles'|'vault'|'tape'|'fabrix'|'terminal'|'studio';
   const prewarm = plasma.mode === 'normal';
   const material: MaterialName = plasma.mode === 'matter' ? ROOM_MATERIAL[spatialRoom] : 'plasma';
   const matter = plasma.mode === 'matter';

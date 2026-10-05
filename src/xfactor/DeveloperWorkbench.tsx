@@ -44,6 +44,7 @@ import {
   unbindLocalProject,
   type LocalProjectBinding,
 } from './localProjectBindings';
+import { fabrixLaunchHub, fabrixPublishProject } from './fabrixClient';
 import './workbench.css';
 
 type WorkbenchFile = { path: string; content: string };
@@ -242,6 +243,7 @@ export default function DeveloperWorkbench({
   const [searchBusy, setSearchBusy] = useState(false);
   const [searchMeta, setSearchMeta] = useState('');
   const [dockView, setDockView] = useState<DockView>('terminal');
+  const [fabrixState,setFabrixState]=useState('');
   const [workbenchView,setWorkbenchView] = useState<WorkbenchViewMode>(()=>loadM6Settings().workbenchView);
   const [explorerWidth,setExplorerWidth] = useState(()=>Number(localStorage.getItem('xfactor-workbench-explorer-width')||220));
   const [previewWidth,setPreviewWidth] = useState(()=>Number(localStorage.getItem('xfactor-workbench-preview-width')||360));
@@ -735,6 +737,7 @@ export default function DeveloperWorkbench({
   const projectFileCount = mode === 'local' ? projectScan?.fileCount ?? 0 : sandboxFiles.length;
   const cockpitState = diskConnected ? 'REAL PROJECT CONNECTED' : 'INCIDENT SANDBOX';
   const runtimeState = previewUrl ? 'LIVE PREVIEW' : devStatus === 'idle' ? 'READY' : devStatus.toUpperCase();
+  async function publishProjectToFabrix(){setFabrixState('PUBLISHING...');try{const result=await fabrixPublishProject({schema_version:'1.0',project_id:`xfactor:${projectId??'scratch'}`,source_product_id:'planetx.xfactor-os',name:projectName??binding?.name??'Scratch Project',status:projectStatus??'active',priority:projectPriority,next_move:nextMove,source_mode:mode,project_root_name:binding?.name,evidence:{files:projectFileCount,open_tabs:tabs.length,problems:problems.length,unsaved:dirtyCount,runtime:runtimeState},capabilities:['repo.project-state','build.result','project.evidence'],updated_at:new Date().toISOString(),policy:{publish:'explicit-user-action'}});setFabrixState(result.ok?(result.mode==='rpc'?'PUBLISHED':'STAGED IN FABRIX HOME'):(result.message??'UNAVAILABLE'))}catch(err){setFabrixState(err instanceof Error?err.message:String(err))}}
 
   return (
     <section className={`dev-workbench dev-cockpit ${active ? 'active' : ''} mode-${mode}`}>
@@ -777,6 +780,9 @@ export default function DeveloperWorkbench({
           {!isTauri() && mode === 'sandbox' && <div className="dev-desktop-hint">DESKTOP APP // OPEN REAL PROJECT ENABLED THERE</div>}
           {mode === 'local' && <button onClick={() => void refreshLocalTree()}><FolderSync size={13}/> RESCAN</button>}
           {mode === 'local' && <button onClick={detachFolder}><X size={13}/> DETACH</button>}
+          <button onClick={()=>void publishProjectToFabrix()}>PUBLISH TO FABRIX</button>
+          <button onClick={()=>void fabrixLaunchHub('fabrix://workflow?source=planetx.xfactor-os')}><ExternalLink size={13}/> SUITE</button>
+          {fabrixState&&<span className="dev-fabrix-state">{fabrixState}</span>}
         </div>
       </section>
 
@@ -1006,6 +1012,7 @@ function FileRow({
   rename?: () => void;
   remove: () => void;
 }) {
+
   return <div className={`dev-file ${active ? 'active' : ''}`} title={path}>
     <button style={{ paddingLeft: `${6 + indent * 11}px` }} onClick={open}><FileCode2 size={12}/><span>{label}{dirty ? ' ●' : ''}</span></button>
     {rename && <button className="rename" title="Rename file" onClick={rename}>R</button>}

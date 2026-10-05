@@ -11,6 +11,7 @@ import DeveloperWorkbench from './DeveloperWorkbench';
 import FileExplorerRoom from './FileExplorerRoom';
 import BrowserRoom from './BrowserRoom';
 import SettingsRoom from './SettingsRoom';
+import FabrixSuiteRoom from './FabrixSuiteRoom';
 import { applyM6Settings, loadM6Settings, type M6Settings } from './m6Settings';
 import PlasmaSignalWorkspace from './PlasmaSignalWorkspace';
 import GlobalSpatialToggle from './GlobalSpatialToggle';
@@ -31,7 +32,7 @@ import { supabaseConfigured } from '../lib/supabase';
 import './xfactor.css';
 
 declare const __XFACTOR_VERSION__: string;
-type View = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'files' | 'browser' | 'terminal' | 'settings';
+type View = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'fabrix' | 'files' | 'browser' | 'terminal' | 'settings';
 const BUILD_VERSION = __XFACTOR_VERSION__;
 type DragState = { id: string; ox: number; oy: number; rect: DOMRect };
 type VaultCategory = 'all'|'browser'|'code'|'images'|'media'|'links'|'studio'|'files';
@@ -311,6 +312,7 @@ export default function ChaosDeck() {
     if(label==='Terminal'||label==='Workbench') setView('terminal');
     if(label==='Files') setView('files');
     if(label==='Browser') setView('browser');
+    if(label==='fabriX Suite') setView('fabrix');
     if(label==='Settings') setView('settings');
     if(label==='Normal mode') plasma.setMode('normal');
     if(label==='Plasma mode') plasma.setMode('plasma');
@@ -338,7 +340,7 @@ export default function ChaosDeck() {
     {label:'New incident',hint:'ORGANIZE',icon:Plus},{label:'Create pile',hint:'ORGANIZE',icon:FolderPlus},{label:'Save current layout',hint:'ORGANIZE',icon:Save},{label:'Riot Mode',hint:'ORGANIZE',icon:Shuffle},{label:'Stack It',hint:'ORGANIZE',icon:Layers3},
     {label:'Files',hint:'DEV TOOLS',icon:FolderTree},{label:'Browser',hint:'DEV TOOLS',icon:Globe2},{label:'Design Lab',hint:'DEV TOOLS',icon:Hammer},{label:'Workbench',hint:'DEV TOOLS',icon:TerminalSquare},
     {label:'Normal mode',hint:'SPATIAL',icon:Layers3},{label:'Plasma mode',hint:'SPATIAL',icon:Sparkles},{label:'Matter mode',hint:'SPATIAL',icon:Boxes},
-    {label:'Settings',hint:'SYSTEM',icon:Settings},{label:'Account & sync',hint:'SYSTEM',icon:Radio},{label:'Open command help',hint:'SYSTEM',icon:Command},
+    {label:'fabriX Suite',hint:'SYSTEM',icon:Link2},{label:'Settings',hint:'SYSTEM',icon:Settings},{label:'Account & sync',hint:'SYSTEM',icon:Radio},{label:'Open command help',hint:'SYSTEM',icon:Command},
     {label:'Backup workspace',hint:'DATA',icon:Download},{label:'Restore workspace',hint:'DATA',icon:Upload},
   ].filter(c=>c.label.toLowerCase().includes(paletteQuery.toLowerCase())||c.hint.toLowerCase().includes(paletteQuery.toLowerCase()));
   const commandGroups = ['PLAN','ORGANIZE','DEV TOOLS','SPATIAL','SYSTEM','DATA']
@@ -369,6 +371,8 @@ export default function ChaosDeck() {
       <button className={`rail-x ${view==='vault'?'active':''}`} title="Vault: files, references, code, captures, and offline browser material." onClick={()=>setView('vault')}><Archive/><small>VAULT</small></button>
       <button className={`rail-x ${view==='tape'?'active':''}`} title="Tape: append-only operational history." onClick={()=>setView('tape')}><History/><small>TAPE</small></button>
       <div className="rail-grow"/>
+      <div className="rail-dev-label">SUITE</div>
+      <button className={`rail-x ${view==='fabrix'?'active':''}`} title="fabriX Hub, products, projects, artifacts and workflows." onClick={()=>setView('fabrix')}><Link2/><small>fabriX</small></button>
       <div className="rail-dev-label">DEV</div>
       <button className={`rail-x ${view==='files'?'active':''}`} title="Experimental local file explorer." onClick={()=>setView('files')}><FolderTree/><small>FILES</small></button>
       <button className={`rail-x ${view==='browser'?'active':''}`} title="Research browser, bookmarks, capture, and Vault tools." onClick={()=>setView('browser')}><Globe2/><small>BROWSER</small></button>
@@ -417,6 +421,8 @@ export default function ChaosDeck() {
         ] as Array<[VaultCategory,string]>).map(([value,label])=><button title={value==='browser'?'Bookmarks, offline pages, captured sites and browser assets':value==='code'?'Code, captured components and site-project captures':`Show ${label.toLowerCase()} in the Vault`} className={vaultCategory===value?'active':''} key={value} onClick={()=>setVaultCategory(value)}>{label}</button>)}</div><div className="vault-add"><Archive size={15}/><input value={assetDraft} onChange={e=>setAssetDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addAssetDraft()}} placeholder="PASTE A URL OR NAME A REFERENCE..."/><button onClick={addAssetDraft}>VAULT IT</button></div><div className="vault-grid">{vaultAssets.length===0?<Empty label={vaultArchived?'NO ARCHIVED ASSETS':'VAULT IS EMPTY'} detail="Import files, paste a URL, capture browser material, or create something in Design Lab."/>:vaultAssets.map(a=><AssetCard key={a.id} spatial={plasma.active} onBundle={other=>linkBundle('asset',a.id,other)} asset={a} incidentName={ws.incidents.find(i=>i.id===a.incidentId)?.name} onPatch={changes=>patch(p=>({...p,assets:p.assets.map(x=>x.id===a.id?{...x,...changes,updatedAt:Date.now()}:x)}))} onDelete={()=>void deleteAsset(a)} onStudio={()=>setStudio(true)}/>)}</div></section>}
 
       {view==='tape' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">TAPE //</span><h1>THE MESS HAS A MEMORY.</h1><p>Append-only operational history. Nothing here controls the data; it tells you what happened to it.</p></div><div className="xf-floor-actions"><button onClick={exportBackup}><Download size={14}/> BACKUP WORKSPACE</button><button onClick={()=>importRef.current?.click()}><Upload size={14}/> RESTORE BACKUP</button></div></div><div className="tape-ledger">{ws.activity.length===0?<Empty label="NO TAPE YET" detail="Your actions will start leaving a trail here."/>:ws.activity.map(a=><SpatialSurface as="article" group="tape-ledger" spatialId={a.id} spatialDraggable={plasma.active} key={a.id}><span>{relative(a.createdAt)} AGO</span><b>{a.type.toUpperCase()}</b><p>{a.label}</p><small>{a.incidentId?ws.incidents.find(i=>i.id===a.incidentId)?.name??'FORMER INCIDENT':'SYSTEM'}</small></SpatialSurface>)}</div></section>}
+
+      {view==='fabrix' && <FabrixSuiteRoom workspace={ws} currentIncident={chosen} onNotice={setNotice}/>}
 
       {view==='files' && <FileExplorerRoom/>}
 
