@@ -1,0 +1,109 @@
+{
+  "schema_version": "0.3",
+  "product_id": "planetx.xfactor-os",
+  "name": "xFactor.OS",
+  "version": "0.8.0",
+  "family": "planet.X",
+  "kind": "software",
+  "entry": "xFactor.OS.exe",
+  "provides": [
+    "repo.project-state",
+    "filesystem.project",
+    "filesystem.asset",
+    "project.snapshot",
+    "project.evidence",
+    "build.request",
+    "build.result",
+    "build.log",
+    "release.artifact",
+    "code.project",
+    "code.component",
+    "website.project",
+    "website.capture",
+    "website.assets",
+    "ui.component",
+    "visual.screenshot",
+    "visual.mockup-source",
+    "cli.command",
+    "automation.task"
+  ],
+  "accepts": [
+    "repo.project-state",
+    "project.evidence",
+    "filesystem.asset",
+    "code.project",
+    "code.component",
+    "website.project",
+    "website.capture",
+    "website.assets",
+    "ui.component",
+    "visual.screenshot",
+    "visual.mockup-source",
+    "release.artifact",
+    "build.result"
+  ],
+  "exports": [
+    "repo.project-state",
+    "project.snapshot",
+    "project.evidence",
+    "build.result",
+    "build.log",
+    "release.artifact",
+    "code.project",
+    "code.component",
+    "website.project",
+    "website.capture",
+    "website.assets",
+    "ui.component",
+    "visual.screenshot",
+    "fabrix.project-state"
+  ],
+  "project_types": [
+    "software-project",
+    "web-project",
+    "repo-os",
+    "creative-project",
+    "browser-capture"
+  ],
+  "storage_keys": [
+    "xfactor-os-workspace-v2"
+  ],
+  "adapter": "native:fabrix-adapter-v1",
+  "adapter_version": "1.0.0",
+  "entitlement": {
+    "mode": "software-license",
+    "authority": "xfactor-os",
+    "software_license": true,
+    "registration_grants_entitlement": false
+  },
+  "launch": {
+    "native_executable": "xFactor.OS.exe",
+    "pwa_entrypoint": "https://xfactor-os-xfactor21s-projects.vercel.app/",
+    "context_argument": "--fabrix-context",
+    "deep_links": [
+      "fabrix://open",
+      "fabrix://project",
+      "fabrix://artifact",
+      "fabrix://workflow"
+    ]
+  },
+  "health": {
+    "transport": "authenticated-loopback-or-rc3-compatible",
+    "adapter_version": "1.0.0"
+  },
+  "permissions": [
+    "hub.status.read",
+    "hub.products.read",
+    "hub.product.open",
+    "project.publish.scoped",
+    "artifact.publish.scoped"
+  ],
+  "portable": false,
+  "installation": {
+    "mode": "licensed-native-or-pwa",
+    "managed_library_supported": false,
+    "external_registration_supported": true,
+    "whole_computer_scan": false
+  },
+  "notes": "xFactor.OS is a distinct licensed planet.X product and a high-capability fabriX client. fabriX registration/discovery never grants xFactor.OS entitlement. Privileged filesystem, terminal, browser-capture and local-execution capabilities stay behind the xFactor.OS native permission boundary."
+}

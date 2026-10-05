@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FileCode2, FileText, Folder, FolderOpen, Image, Music, RefreshCw, Search, Video } from 'lucide-react';
 import { isTauri } from '../lib/platform';
+import { fabrixCapabilityForPath, fabrixLaunchHub, fabrixPublishArtifact } from './fabrixClient';
 import { chooseProjectFolder, flattenProjectFiles, isLikelyTextProjectFile, readProjectTextFile, scanProjectFolder, type ProjectEntry, type ProjectScanResult } from '../lib/projectFolder';
 
 type Preview = { path: string; content: string };
@@ -39,6 +40,7 @@ export default function FileExplorerRoom() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [recents, setRecents] = useState(recentRoots);
+  const [fabrixStatus,setFabrixStatus]=useState('');
 
   const files = useMemo(() => scan ? flattenProjectFiles(scan.entries).filter(entry => entry.kind === 'file') : [], [scan]);
   const filtered = useMemo(() => files.filter(file => !query || file.relativePath.toLowerCase().includes(query.toLowerCase())), [files, query]);
@@ -70,6 +72,8 @@ export default function FileExplorerRoom() {
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
   }
 
+  async function sendPreviewToFabrix(){if(!preview||!root)return;setFabrixStatus('SENDING...');try{const capability=fabrixCapabilityForPath(preview.path);const result=await fabrixPublishArtifact({schema_version:'1.0',artifact_id:`xfactor-file:${preview.path}`,source_product_id:'planetx.xfactor-os',capability,name:preview.path.split('/').pop(),project:{root_name:root.split(/[\\/]/).pop()},file:{relative_path:preview.path,kind:kind(preview.path)},created_at:new Date().toISOString()});setFabrixStatus(result.ok?(result.mode==='rpc'?'PUBLISHED TO FABRIX':'STAGED IN FABRIX HOME'):(result.message??'DESKTOP BRIDGE REQUIRED'))}catch(err){setFabrixStatus(err instanceof Error?err.message:String(err))}}
+
   return <section className="xf-page m6-files-room">
     <div className="xf-section-head"><div><span className="kicker">FILES //</span><h1>SHATTER EXPLORER.</h1><p>A local-only project map: pick one approved root, then move through fragments instead of pretending the whole disk belongs to the app.</p></div>
       <div className="xf-floor-actions"><button onClick={choose}><FolderOpen size={16}/> OPEN ROOT</button>{root&&<button onClick={() => void load(root)}><RefreshCw size={16}/> RESCAN</button>}</div>
@@ -93,7 +97,7 @@ export default function FileExplorerRoom() {
 
       <aside className="m6-file-inspector">
         <div className="m6-pane-label"><FileCode2 size={14}/> FRAGMENT INSPECTOR</div>
-        {preview ? <><b>{preview.path.split('/').pop()}</b><small>{preview.path}</small><pre>{preview.content}</pre></> : <div className="m6-file-empty">SELECT A FILE TO PEEK INSIDE WITHOUT LEAVING THE MAP.</div>}
+        {preview ? <><b>{preview.path.split('/').pop()}</b><small>{preview.path}</small><div className="m8-fabrix-inline-actions"><button onClick={()=>void sendPreviewToFabrix()}>SEND TO FABRIX</button><button onClick={()=>void fabrixLaunchHub('fabrix://artifact?source=planetx.xfactor-os')}>USE IN…</button>{fabrixStatus&&<span>{fabrixStatus}</span>}</div><pre>{preview.content}</pre></> : <div className="m6-file-empty">SELECT A FILE TO PEEK INSIDE WITHOUT LEAVING THE MAP.</div>}
       </aside>
     </div>
   </section>;

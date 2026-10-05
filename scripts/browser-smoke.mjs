@@ -238,13 +238,19 @@ await check('Signal Matter mode uses canonical Signal data', async () => {
 });
 
 await check('M6 Files Browser Settings shell routes', async () => {
-  for (const [command, heading] of [['open files','SHATTER EXPLORER.'],['open browser','STEAL THE USEFUL PARTS.'],['open settings','TUNE THE CHAOS.']]) {
+  for (const [command, heading] of [['open files','SHATTER EXPLORER.'],['open browser','STEAL THE USEFUL PARTS.'],['fabrix suite','CONNECTED DAMAGE.'],['open settings','TUNE THE CHAOS.']]) {
     await page.keyboard.press('Control+K');
     const input = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
     await input.fill(command);
     await input.press('Enter');
     await page.getByText(heading).waitFor();
   }
+  await page.keyboard.press('Control+K');
+  const suiteInput = page.getByPlaceholder('TYPE WHAT YOU WANT TO DO...');
+  await suiteInput.fill('fabrix suite');
+  await suiteInput.press('Enter');
+  await page.getByText('CONNECTED DAMAGE.').waitFor();
+  await page.getByText('DESKTOP BRIDGE REQUIRED').waitFor();
   await page.locator('.xf-command-fab').waitFor();
 });
 

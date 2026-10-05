@@ -12,6 +12,7 @@ on:
       - 'src-tauri/tauri.conf.json'
       - 'src-tauri/Cargo.toml'
       - 'src-tauri/Cargo.lock'
+      - 'fabrix.manifest.json'
       - '.github/workflows/windows-release.yml'
       - 'README.md'
       - 'README-XFACTOR.md'
@@ -43,9 +44,11 @@ jobs:
           const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
           const cargo = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
           const cargoLock = fs.readFileSync('src-tauri/Cargo.lock', 'utf8');
+          const fabrix = JSON.parse(fs.readFileSync('fabrix.manifest.json', 'utf8'));
           const activeDocs = ['README.md', 'README-XFACTOR.md', 'RELEASE-AUDIT.md', 'BUILD-MATRIX.md'].map(path => [path, fs.readFileSync(path, 'utf8')]);
           const version = pkg.version;
-          if (version !== '0.7.0') throw new Error(`expected release 0.7.0, got ${version}`);
+          if (!/^0\.\d+\.\d+$/.test(version)) throw new Error(`invalid release version ${version}`);
+          if (fabrix.version !== version) throw new Error(`fabriX manifest version drift: ${fabrix.version}`);
           if (lock.version !== version || lock.packages?.['']?.version !== version) throw new Error('package-lock version drift');
           if (tauri.version !== version) throw new Error('Tauri version drift');
           if (!new RegExp(`^version = "${version.replaceAll('.', '\\.') }"$`, 'm').test(cargo)) throw new Error('Cargo.toml version drift');

@@ -1,4 +1,4 @@
-> **Current engineering milestone:** xFactor.OS **0.7.0 (M6)** — Spatial Organizer + Project Cockpit + Files/Browser/Settings shell.
+> **Current engineering milestone:** xFactor.OS **0.8.0** — Controlled Chaos core + native fabriX Suite integration.
 
 # xFactor.OS — Controlled Chaos System
 
@@ -6,7 +6,7 @@
 
 xFactor.OS is the deliberately physical, damaged, loud counterpart to xOS. It reuses proven engines where that saves real work, but it does not inherit xOS's galaxy/brain visual language.
 
-## 0.7.0 M6 product surfaces
+## 0.8.0 product surfaces
 
 - **The Floor** — spatial draggable Incident workspace with Riot/Stack and Saved Damage layouts.
 - **Incidents + Blackbox** — editable project workbench with status, priority, heat, description, next move, tags, tasks, relations and Tape.
@@ -22,7 +22,8 @@ xFactor.OS is the deliberately physical, damaged, loud counterpart to xOS. It re
 - **Files / Browser / Settings** — scoped desktop file explorer, bounded research/capture browser, and device-local readability/spatial/workbench settings.
 - **Account / cloud mirror** — optional Supabase metadata sync while preserving local-first operation.
 - **Backup / restore** — normalized workspace metadata export/import.
+- **fabriX Suite** — first-class Hub connection/health surface, live product registry + capability-ranked launcher, project/artifact handoff, Shatter Explorer send actions, Workbench publishing, and deep links to Hub workflows/assets. xFactor.OS remains a distinct licensed product.
 
 ## Truthful completeness
 
-Read `BUILD-MATRIX.md`. It explicitly distinguishes **BUILT** from **BUILT / VERIFICATION GATE** and lists what is deliberately not claimed. The 0.7.0 M6 source scope is implemented and dependency-backed browser/runtime plus Windows packaging gates are green. Public distribution still requires live credential-backed cloud acceptance if cloud sync is enabled, Windows signing, and real-machine installer acceptance.
+Read `BUILD-MATRIX.md`. It explicitly distinguishes **BUILT** from **BUILT / VERIFICATION GATE** and lists what is deliberately not claimed. The 0.8.0 source scope preserves the verified 0.7 core and adds the fabriX adapter/surfaces. Browser/runtime and Windows packaging gates must be green on the exact 0.8.0 head; real installed Hub↔xFactor interaction remains a separate integration acceptance gate. Public distribution still requires live credential-backed cloud acceptance if cloud sync is enabled, Windows signing, and real-machine installer acceptance.
