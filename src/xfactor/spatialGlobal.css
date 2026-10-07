@@ -157,10 +157,10 @@
 
 
 /* M6 STABLE MATERIAL RECAST — old/new WebGL fields never visibly overlap. */
-.xf-spatial-transition canvas{visibility:hidden!important}
+.xf-spatial-transition canvas{opacity:.88!important;transition:opacity .12s ease!important}
 .xf-root.xf-spatial-transition .xf-main,
 .xf-studio-shell.xf-spatial-transition #r-studio{
-  filter:blur(1.5px) brightness(.42) saturate(.7);
+  filter:brightness(.82) saturate(.9);
   pointer-events:none;
 }
 .xf-spatial-transition-mask{
@@ -177,9 +177,9 @@
     linear-gradient(rgba(255,255,255,.014) 1px,transparent 1px),
     radial-gradient(circle at 44% 45%,rgba(255,42,163,.16),transparent 28%),
     radial-gradient(circle at 58% 48%,rgba(32,217,255,.10),transparent 32%),
-    rgba(3,3,6,.90);
+    rgba(3,3,6,.38);
   background-size:28px 28px,28px 28px,auto,auto,auto;
-  backdrop-filter:blur(10px);
+  backdrop-filter:none;
 }
 .xf-spatial-transition-mask b{font:900 17px 'Archivo Black',sans-serif;letter-spacing:.05em;color:#fff}
 .xf-spatial-transition-mask span{font:900 10px 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#ff65bd}
@@ -204,3 +204,8 @@
 }
 .xf-root.xf-plasma-mode .xf-true-spatial>.xf-spatial-content>*,
 .xf-root.xf-matter-mode .xf-true-spatial>.xf-spatial-content>*{position:relative;z-index:1}
+
+
+/* 0.8.2 deferred-room placeholder — intentional wake state, never a black screen. */
+.xf-deferred-room{min-height:180px;display:grid;place-content:center;gap:8px;text-align:center;border:1px dashed rgba(255,42,163,.28);background:radial-gradient(circle at 50% 35%,rgba(255,42,163,.09),transparent 42%),rgba(7,6,10,.62);color:#fff}
+.xf-deferred-room span{font:900 12px 'IBM Plex Mono',monospace;letter-spacing:.13em;color:#ff73c2}.xf-deferred-room small{font:800 8px 'IBM Plex Mono',monospace;letter-spacing:.11em;color:#77707b}

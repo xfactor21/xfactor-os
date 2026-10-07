@@ -133,7 +133,10 @@ export function usePlasmaMode(incidentId?: string): PlasmaController {
   }, []);
 
   const scheduleTransition = useCallback((fn: () => void, delay: number) => {
-    const timer = window.setTimeout(fn, delay);
+    const timer = window.setTimeout(() => {
+      transitionTimers.current = transitionTimers.current.filter(active => active !== timer);
+      fn();
+    }, delay);
     transitionTimers.current.push(timer);
   }, []);
 
@@ -197,30 +200,20 @@ export function usePlasmaMode(incidentId?: string): PlasmaController {
       setTargetMode(undefined);
     };
 
-    // Paint a stable recast state before destroying or compiling WebGL fields.
-    // Plasma -> Matter intentionally passes through NORMAL for one short frame
-    // so old/new canvases never overlap or fight for the GPU in the click event.
+    // 0.8.2: recast Plasma <-> Matter directly. Passing through NORMAL forced
+    // a provider teardown/recompile cycle and was the source of multi-second
+    // visual instability on some Windows GPUs. NORMAL remains an explicit exit.
     scheduleTransition(() => {
       window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          if (mode === 'normal') {
-            deactivate();
-            scheduleTransition(finish, 180);
-            return;
-          }
-          if (activation.mode !== 'normal') {
-            deactivate();
-            scheduleTransition(() => {
-              activate(undefined, mode);
-              scheduleTransition(finish, 280);
-            }, 120);
-            return;
-          }
-          activate(undefined, mode);
-          scheduleTransition(finish, 280);
-        });
+        if (mode === 'normal') {
+          deactivate();
+          scheduleTransition(finish, 110);
+          return;
+        }
+        activate(undefined, mode);
+        scheduleTransition(finish, activation.mode === 'normal' ? 190 : 145);
       });
-    }, 16);
+    }, 8);
   }, [activation.mode, transitioning, activate, deactivate, scheduleTransition]);
 
   const setPolicy = useCallback((policy: PlasmaPolicy) => {
