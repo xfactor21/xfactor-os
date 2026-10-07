@@ -1,17 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, Archive, Boxes, Command, Crosshair, Download, ExternalLink, FileJson, FileText, Flame,
   FolderMinus, FolderPlus, Grip, Hammer, History, Image, Layers3, Link2, Music, Pin, Plus, Radio,
   RotateCcw, Save, Search, Shuffle, Sparkles, Star, TerminalSquare, Trash2, Upload, Video, X, Zap,
   Check, Code2, Eye, EyeOff, SlidersHorizontal, ArrowRightLeft, FolderTree, Globe2, Settings
 } from 'lucide-react';
-import Studio from '../modules/studio';
 import { loadBoards } from '../modules/studio/boards';
-import DeveloperWorkbench from './DeveloperWorkbench';
-import FileExplorerRoom from './FileExplorerRoom';
-import BrowserRoom from './BrowserRoom';
-import SettingsRoom from './SettingsRoom';
-import FabrixSuiteRoom from './FabrixSuiteRoom';
 import { applyM6Settings, loadM6Settings, type M6Settings } from './m6Settings';
 import PlasmaSignalWorkspace from './PlasmaSignalWorkspace';
 import GlobalSpatialToggle from './GlobalSpatialToggle';
@@ -30,6 +24,13 @@ import { SupabaseWorkspaceSyncAdapter } from './syncAdapter';
 import { useAuthStore } from '../stores/authStore';
 import { supabaseConfigured } from '../lib/supabase';
 import './xfactor.css';
+
+const Studio = lazy(() => import('../modules/studio'));
+const DeveloperWorkbench = lazy(() => import('./DeveloperWorkbench'));
+const FileExplorerRoom = lazy(() => import('./FileExplorerRoom'));
+const BrowserRoom = lazy(() => import('./BrowserRoom'));
+const SettingsRoom = lazy(() => import('./SettingsRoom'));
+const FabrixSuiteRoom = lazy(() => import('./FabrixSuiteRoom'));
 
 declare const __XFACTOR_VERSION__: string;
 type View = 'deck' | 'piles' | 'signal' | 'vault' | 'tape' | 'fabrix' | 'files' | 'browser' | 'terminal' | 'settings';
@@ -51,6 +52,9 @@ function relative(ts:number) {
 function clonePositions<T>(value:T):T { return typeof structuredClone==='function'?structuredClone(value):JSON.parse(JSON.stringify(value)) as T; }
 function downloadText(name:string,text:string,type='application/json') { const url=URL.createObjectURL(new Blob([text],{type})); const a=document.createElement('a'); a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500); }
 function safeUrl(value?:string){try{return value?new URL(value).toString():undefined}catch{return undefined}}
+function DeferredRoom({label}:{label:string}) {
+  return <div className="xf-deferred-room" role="status"><span>LOADING // {label}</span><small>HEAVY SYSTEMS WAKE ONLY WHEN YOU ASK FOR THEM.</small></div>;
+}
 
 export default function ChaosDeck() {
   const [ws, setWs] = useState<WorkspaceState>(() => loadWorkspace());
@@ -347,10 +351,10 @@ export default function ChaosDeck() {
     .map(group=>({group,items:commands.filter(command=>command.hint===group)}))
     .filter(section=>section.items.length);
 
-  if (studio) return <div className={`xf-studio-shell ${plasma.mode==='plasma'?'xf-plasma-mode':plasma.mode==='matter'?'xf-matter-mode':''} ${plasma.transitioning?'xf-spatial-transition':''}`}>{plasma.transitioning&&<div className="xf-spatial-transition-mask"><b>RECASTING MATERIAL</b><span>{plasma.mode.toUpperCase()} → {(plasma.targetMode??plasma.mode).toUpperCase()}</span><small>TEARING DOWN THE OLD FIELD BEFORE THE NEXT ONE FORMS</small></div>}<button className="xf-studio-exit" onClick={()=>setStudio(false)}><X size={15}/> EXIT LAB</button><Studio active plasma={plasma} onBundle={(firstId,secondId)=>linkBundle('studio',firstId,secondId)} bundleLabel={id=>bundleBadge(ws,'studio',id)}/></div>;
+  if (studio) return <div className={`xf-studio-shell ${plasma.mode==='plasma'?'xf-plasma-mode':plasma.mode==='matter'?'xf-matter-mode':''} ${plasma.transitioning?'xf-spatial-transition':''}`}>{plasma.transitioning&&<div className="xf-spatial-transition-mask"><b>RECASTING MATERIAL</b><span>{plasma.mode.toUpperCase()} → {(plasma.targetMode??plasma.mode).toUpperCase()}</span><small>DIRECT MATERIAL RECAST · CONTENT STAYS LIVE</small></div>}<button className="xf-studio-exit" onClick={()=>setStudio(false)}><X size={15}/> EXIT LAB</button><Suspense fallback={<DeferredRoom label="DESIGN LAB"/>}><Studio active plasma={plasma} onBundle={(firstId,secondId)=>linkBundle('studio',firstId,secondId)} bundleLabel={id=>bundleBadge(ws,'studio',id)}/></Suspense></div>;
 
   return <div className={`xf-root ${plasma.mode === 'plasma' ? `xf-plasma-mode plasma-${plasma.look}` : plasma.mode === 'matter' ? `xf-matter-mode matter-${plasma.look}` : ''} ${plasma.transitioning ? 'xf-spatial-transition' : ''}`}>
-    <div className="xf-noise"/><div className="xf-scan"/>{plasma.transitioning&&<div className="xf-spatial-transition-mask"><b>RECASTING MATERIAL</b><span>{plasma.mode.toUpperCase()} → {(plasma.targetMode??plasma.mode).toUpperCase()}</span><small>ONE FIELD OUT · ONE FIELD IN · NO OVERLAPPING CANVASES</small></div>}
+    <div className="xf-noise"/><div className="xf-scan"/>{plasma.transitioning&&<div className="xf-spatial-transition-mask"><b>RECASTING MATERIAL</b><span>{plasma.mode.toUpperCase()} → {(plasma.targetMode??plasma.mode).toUpperCase()}</span><small>DIRECT MATERIAL RECAST · CONTENT STAYS LIVE</small></div>}
     {persistenceError&&<div className="xf-system-alert fatal">LOCAL STORAGE IS UNAVAILABLE — WORKSPACE METADATA MAY NOT SURVIVE A RELOAD.</div>}
     {cloudError&&<div className="xf-system-alert">CLOUD SYNC IS OFFLINE — LOCAL WORK CONTINUES SAFELY.</div>}
     {notice&&<div className="xf-toast">{notice}</div>}
@@ -422,15 +426,15 @@ export default function ChaosDeck() {
 
       {view==='tape' && <section className="xf-page"><div className="xf-section-head"><div><span className="kicker">TAPE //</span><h1>THE MESS HAS A MEMORY.</h1><p>Append-only operational history. Nothing here controls the data; it tells you what happened to it.</p></div><div className="xf-floor-actions"><button onClick={exportBackup}><Download size={14}/> BACKUP WORKSPACE</button><button onClick={()=>importRef.current?.click()}><Upload size={14}/> RESTORE BACKUP</button></div></div><div className="tape-ledger">{ws.activity.length===0?<Empty label="NO TAPE YET" detail="Your actions will start leaving a trail here."/>:ws.activity.map(a=><SpatialSurface as="article" group="tape-ledger" spatialId={a.id} spatialDraggable={plasma.active} key={a.id}><span>{relative(a.createdAt)} AGO</span><b>{a.type.toUpperCase()}</b><p>{a.label}</p><small>{a.incidentId?ws.incidents.find(i=>i.id===a.incidentId)?.name??'FORMER INCIDENT':'SYSTEM'}</small></SpatialSurface>)}</div></section>}
 
-      {view==='fabrix' && <FabrixSuiteRoom workspace={ws} currentIncident={chosen} onNotice={setNotice}/>}
+      {view==='fabrix' && <Suspense fallback={<DeferredRoom label="FABRIX BRIDGE"/>}><FabrixSuiteRoom workspace={ws} currentIncident={chosen} onNotice={setNotice}/></Suspense>}
 
-      {view==='files' && <FileExplorerRoom/>}
+      {view==='files' && <Suspense fallback={<DeferredRoom label="FILES"/>}><FileExplorerRoom/></Suspense>}
 
-      {view==='browser' && <BrowserRoom onVaultReference={(name,url,kind='link',tags=[])=>{const asset=newAsset(name,kind,url,chosen?.id,'reference');asset.tags=tags;patch(p=>({...p,assets:[asset,...p.assets],activity:[event('asset','Browser reference vaulted',chosen?.id),...p.activity]}));setNotice('SAVED TO VAULT')}} onVaultBlob={async(name,blob,kind,tags=[])=>{const id=crypto.randomUUID(),blobKey='file-'+id;await putAssetBlob(blobKey,blob);const asset=newAsset(name,kind,undefined,chosen?.id,'file');asset.id=id;asset.blobKey=blobKey;asset.mime=blob.type;asset.size=blob.size;asset.tags=tags;patch(p=>({...p,assets:[asset,...p.assets],activity:[event('asset','Browser capture vaulted',chosen?.id),...p.activity]}));setNotice('CAPTURE SAVED TO VAULT')}} onOpenVault={()=>setView('vault')}/>}
+      {view==='browser' && <Suspense fallback={<DeferredRoom label="BROWSER"/>}><BrowserRoom onVaultReference={(name,url,kind='link',tags=[])=>{const asset=newAsset(name,kind,url,chosen?.id,'reference');asset.tags=tags;patch(p=>({...p,assets:[asset,...p.assets],activity:[event('asset','Browser reference vaulted',chosen?.id),...p.activity]}));setNotice('SAVED TO VAULT')}} onVaultBlob={async(name,blob,kind,tags=[])=>{const id=crypto.randomUUID(),blobKey='file-'+id;await putAssetBlob(blobKey,blob);const asset=newAsset(name,kind,undefined,chosen?.id,'file');asset.id=id;asset.blobKey=blobKey;asset.mime=blob.type;asset.size=blob.size;asset.tags=tags;patch(p=>({...p,assets:[asset,...p.assets],activity:[event('asset','Browser capture vaulted',chosen?.id),...p.activity]}));setNotice('CAPTURE SAVED TO VAULT')}} onOpenVault={()=>setView('vault')}/></Suspense>}
 
-      {view==='settings' && <SettingsRoom/>}
+      {view==='settings' && <Suspense fallback={<DeferredRoom label="SETTINGS"/>}><SettingsRoom/></Suspense>}
 
-      {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">WORKBENCH //</span><h1>BUILD THE INCIDENT.</h1><p>Code, run, preview and debug without dropping the project context. The active Incident owns this Workbench; the shared runtime keeps the project and terminal in the same environment.</p></div></div><div className="dev-spatial-shell"><DeveloperWorkbench
+      {view==='terminal' && <section className="xf-page xf-terminal-page"><div className="xf-section-head"><div><span className="kicker">WORKBENCH //</span><h1>BUILD THE INCIDENT.</h1><p>Code, run, preview and debug without dropping the project context. The active Incident owns this Workbench; the shared runtime keeps the project and terminal in the same environment.</p></div></div><div className="dev-spatial-shell"><Suspense fallback={<DeferredRoom label="WORKBENCH"/>}><DeveloperWorkbench
   active
   projectId={chosen?.id}
   projectName={chosen?.name}
@@ -440,7 +444,7 @@ export default function ChaosDeck() {
   openSignals={chosen ? ws.signals.filter(signal => signal.incidentId === chosen.id && !signal.done).length : 0}
   taskCount={chosen ? ws.signals.filter(signal => signal.incidentId === chosen.id && signal.type === 'task' && !signal.done).length : 0}
   assetCount={chosen ? ws.assets.filter(asset => asset.incidentId === chosen.id && !asset.archived).length : 0}
-/></div></section>}
+/></Suspense></div></section>}
     </main></SpatialRoomProvider>
 
     {m6Settings.commandFab&&<button className={`xf-command-fab ${palette?'active':''}`} title="Open the Command Deck (Ctrl/Cmd + K)" aria-label="Open Command Deck" onClick={()=>{setPalette(v=>!v);setPaletteQuery('')}}><Command size={22}/><span>{palette?'CLOSE':'COMMAND'}</span></button>}

@@ -70,6 +70,17 @@ export function SpatialRoomProvider({
   children: ReactNode;
 }) {
   const value = { mode: plasma.mode, room };
+  const [prewarmReady,setPrewarmReady]=useState(false);
+
+  useEffect(() => {
+    if (plasma.mode !== 'normal') { setPrewarmReady(true); return; }
+    let cancelled=false;
+    const idleWindow=window as Window & { requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number; cancelIdleCallback?: (id:number)=>void };
+    const wake=()=>{ if(!cancelled)setPrewarmReady(true); };
+    const idleId=typeof idleWindow.requestIdleCallback==='function' ? idleWindow.requestIdleCallback(wake,{timeout:1800}) : undefined;
+    const timer=idleId===undefined ? window.setTimeout(wake,700) : undefined;
+    return()=>{ cancelled=true; if(timer!==undefined)window.clearTimeout(timer); if(idleId!==undefined)idleWindow.cancelIdleCallback?.(idleId); };
+  }, [plasma.mode, room]);
 
   // Signal owns its specialized renderer. Files/Browser/Settings intentionally
   // stay conventional. Planning surfaces keep ONE provider warm in NORMAL so
@@ -77,7 +88,8 @@ export function SpatialRoomProvider({
   // Workbench is the exception: in NORMAL, keep its CodeMirror/WebContainer
   // runtime free from an invisible WebGL field; Plasma/Matter mounts it on demand.
   const conventionalNormalRoom = room === 'terminal' && plasma.mode === 'normal';
-  if (room === 'signal' || room === 'files' || room === 'browser' || room === 'settings' || conventionalNormalRoom) {
+  const idleNormalRoom = plasma.mode === 'normal' && !prewarmReady;
+  if (room === 'signal' || room === 'files' || room === 'browser' || room === 'settings' || conventionalNormalRoom || idleNormalRoom) {
     return <SpatialContext.Provider value={value}>{children}</SpatialContext.Provider>;
   }
 

@@ -10,8 +10,17 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="description" content="xFactor.OS — controlled chaos for builders, creators, and operators." />
     <title>xFactor.OS v__XFACTOR_VERSION__ — Controlled Chaos</title>
+    <style>
+      #xfactor-boot{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#050507;color:#fff;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;transition:opacity .18s ease,visibility .18s ease}
+      #xfactor-boot::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 42%,rgba(255,42,163,.16),transparent 28%),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px);background-size:auto,28px 28px,28px 28px;opacity:.75}
+      #xfactor-boot .boot-card{position:relative;display:grid;gap:8px;min-width:min(420px,78vw);padding:22px 24px;border:1px solid rgba(255,42,163,.34);background:rgba(8,7,12,.78);box-shadow:0 18px 70px rgba(0,0,0,.48),0 0 32px rgba(255,42,163,.12)}
+      #xfactor-boot b{font:900 18px/1.1 Arial,sans-serif;letter-spacing:.055em}#xfactor-boot b i{color:#ff2aa3;font-style:normal}#xfactor-boot span{font-size:10px;letter-spacing:.16em;color:#ff8dce}#xfactor-boot small{font-size:8px;letter-spacing:.13em;color:#756b78}
+      #xfactor-boot.boot-out{opacity:0;visibility:hidden}
+      @media (prefers-reduced-motion:reduce){#xfactor-boot{transition:none}}
+    </style>
   </head>
   <body class="nodock">
+    <div id="xfactor-boot" role="status" aria-live="polite" aria-label="Starting xFactor.OS"><div class="boot-card"><b>xFACTOR<i>.OS</i></b><span>CONTROLLED CHAOS // BOOTING</span><small>RESTORING THE FLOOR · SIGNAL · VAULT · WORKBENCH</small></div></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
